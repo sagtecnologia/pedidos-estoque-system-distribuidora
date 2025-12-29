@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações da Empresa - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Configurações da Empresa</h2>
+                <p class="text-gray-600 mt-1">Gerencie as informações e identidade visual da empresa</p>
+            </div>
+
+            <form id="form-empresa" class="space-y-6">
+                <!-- Logo da Empresa -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Logo da Empresa</h3>
+                    
+                    <div class="flex items-center space-x-6">
+                        <div class="flex-shrink-0">
+                            <div id="logo-preview" class="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden">
+                                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <div class="flex-1">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Upload de Logo</label>
+                            <input type="file" id="logo-input" accept="image/*" class="hidden">
+                            <div class="flex space-x-3">
+                                <button type="button" onclick="document.getElementById('logo-input').click()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                    📤 Escolher Imagem
+                                </button>
+                                <button type="button" id="btn-remove-logo" onclick="removerLogo()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 hidden">
+                                    🗑️ Remover
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-2">PNG, JPG ou GIF. Máximo 2MB.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informações Básicas -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Informações Básicas</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome Fantasia *</label>
+                            <input type="text" id="nome_empresa" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Razão Social</label>
+                            <input type="text" id="razao_social" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CNPJ</label>
+                            <input type="text" id="cnpj" placeholder="00.000.000/0000-00" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+                            <input type="tel" id="telefone" placeholder="(00) 0000-0000" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                            <input type="email" id="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Website</label>
+                            <input type="url" id="website" placeholder="https://" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Endereço -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">Endereço</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Endereço Completo</label>
+                            <input type="text" id="endereco" placeholder="Rua, número, complemento" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+                            <input type="text" id="cidade" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+                                <select id="estado" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="">Selecione</option>
+                                    <option value="AC">AC</option>
+                                    <option value="AL">AL</option>
+                                    <option value="AP">AP</option>
+                                    <option value="AM">AM</option>
+                                    <option value="BA">BA</option>
+                                    <option value="CE">CE</option>
+                                    <option value="DF">DF</option>
+                                    <option value="ES">ES</option>
+                                    <option value="GO">GO</option>
+                                    <option value="MA">MA</option>
+                                    <option value="MT">MT</option>
+                                    <option value="MS">MS</option>
+                                    <option value="MG">MG</option>
+                                    <option value="PA">PA</option>
+                                    <option value="PB">PB</option>
+                                    <option value="PR">PR</option>
+                                    <option value="PE">PE</option>
+                                    <option value="PI">PI</option>
+                                    <option value="RJ">RJ</option>
+                                    <option value="RN">RN</option>
+                                    <option value="RS">RS</option>
+                                    <option value="RO">RO</option>
+                                    <option value="RR">RR</option>
+                                    <option value="SC">SC</option>
+                                    <option value="SP">SP</option>
+                                    <option value="SE">SE</option>
+                                    <option value="TO">TO</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">CEP</label>
+                                <input type="text" id="cep" placeholder="00000-000" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Botões -->
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="window.location.href='/pages/dashboard.html'" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        💾 Salvar Configurações
+                    </button>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Salvando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/empresa.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        let logoAtual = null;
+        let logoFile = null;
+
+        (async () => {
+            await checkAuth();
+            
+            // Verificar se é ADMIN
+            const user = await getCurrentUser();
+            if (user.role !== 'ADMIN') {
+                showToast('Acesso negado. Apenas administradores podem acessar esta página.', 'error');
+                setTimeout(() => window.location.href = '/pages/dashboard.html', 2000);
+                return;
+            }
+
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            await loadEmpresaConfig();
+        })();
+
+        // Máscara para CNPJ
+        document.getElementById('cnpj').addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 14) {
+                value = value.replace(/^(\d{2})(\d)/, '$1.$2');
+                value = value.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+                value = value.replace(/\.(\d{3})(\d)/, '.$1/$2');
+                value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                e.target.value = value;
+            }
+        });
+
+        // Máscara para CEP
+        document.getElementById('cep').addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 8) {
+                value = value.replace(/^(\d{5})(\d)/, '$1-$2');
+                e.target.value = value;
+            }
+        });
+
+        // Máscara para Telefone
+        document.getElementById('telefone').addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length <= 11) {
+                if (value.length <= 10) {
+                    value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{4})(\d)/, '$1-$2');
+                } else {
+                    value = value.replace(/^(\d{2})(\d)/, '($1) $2');
+                    value = value.replace(/(\d{5})(\d)/, '$1-$2');
+                }
+                e.target.value = value;
+            }
+        });
+
+        // Preview da logo
+        document.getElementById('logo-input').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) {
+                    showToast('Apenas imagens são permitidas', 'error');
+                    return;
+                }
+                if (file.size > 2 * 1024 * 1024) {
+                    showToast('A imagem deve ter no máximo 2MB', 'error');
+                    return;
+                }
+
+                logoFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    document.getElementById('logo-preview').innerHTML = `
+                        <img src="${e.target.result}" alt="Logo" class="w-full h-full object-contain">
+                    `;
+                    document.getElementById('btn-remove-logo').classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function removerLogo() {
+            logoFile = null;
+            logoAtual = null;
+            document.getElementById('logo-input').value = '';
+            document.getElementById('logo-preview').innerHTML = `
+                <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+            `;
+            document.getElementById('btn-remove-logo').classList.add('hidden');
+        }
+
+        async function loadEmpresaConfig() {
+            try {
+                const config = await getEmpresaConfig();
+                if (config) {
+                    document.getElementById('nome_empresa').value = config.nome_empresa || '';
+                    document.getElementById('razao_social').value = config.razao_social || '';
+                    document.getElementById('cnpj').value = config.cnpj || '';
+                    document.getElementById('telefone').value = config.telefone || '';
+                    document.getElementById('email').value = config.email || '';
+                    document.getElementById('website').value = config.website || '';
+                    document.getElementById('endereco').value = config.endereco || '';
+                    document.getElementById('cidade').value = config.cidade || '';
+                    document.getElementById('estado').value = config.estado || '';
+                    document.getElementById('cep').value = config.cep || '';
+
+                    if (config.logo_url) {
+                        logoAtual = config.logo_url;
+                        document.getElementById('logo-preview').innerHTML = `
+                            <img src="${config.logo_url}" alt="Logo" class="w-full h-full object-contain">
+                        `;
+                        document.getElementById('btn-remove-logo').classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar configurações:', error);
+            }
+        }
+
+        document.getElementById('form-empresa').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading(true);
+
+            try {
+                let logoUrl = logoAtual;
+
+                // Se houver nova logo, fazer upload
+                if (logoFile) {
+                    console.log('Fazendo upload da nova logo...');
+                    // Deletar logo antiga se existir
+                    if (logoAtual) {
+                        console.log('Deletando logo antiga:', logoAtual);
+                        await deleteLogo(logoAtual);
+                    }
+                    logoUrl = await uploadLogo(logoFile);
+                    console.log('Logo enviada com sucesso:', logoUrl);
+                } else if (!logoAtual) {
+                    logoUrl = null;
+                }
+
+                const empresaData = {
+                    nome_empresa: document.getElementById('nome_empresa').value,
+                    razao_social: document.getElementById('razao_social').value || null,
+                    cnpj: document.getElementById('cnpj').value || null,
+                    telefone: document.getElementById('telefone').value || null,
+                    email: document.getElementById('email').value || null,
+                    website: document.getElementById('website').value || null,
+                    endereco: document.getElementById('endereco').value || null,
+                    cidade: document.getElementById('cidade').value || null,
+                    estado: document.getElementById('estado').value || null,
+                    cep: document.getElementById('cep').value || null,
+                    logo_url: logoUrl
+                };
+
+                console.log('Salvando configurações:', empresaData);
+                const result = await updateEmpresaConfig(empresaData);
+                console.log('Configurações salvas:', result);
+                
+                showToast('Configurações salvas com sucesso!', 'success');
+                
+                // Atualizar variáveis locais
+                logoAtual = logoUrl;
+                logoFile = null;
+                
+                // Recarregar para atualizar logo no navbar
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                console.error('Erro completo:', error);
+                handleError(error, 'Erro ao salvar configurações');
+            } finally {
+                showLoading(false);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhes do Pedido - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <a href="/pages/pedidos.html" class="text-blue-600 hover:text-blue-800 mb-4 inline-block">← Voltar</a>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 id="pedido-numero" class="text-3xl font-bold text-gray-900">Pedido</h2>
+                        <p id="pedido-status" class="text-gray-600 mt-1"></p>
+                    </div>
+                    <div id="acoes-pedido" class="space-x-2"></div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Informações do Pedido -->
+                <div class="lg:col-span-2 space-y-6">
+                    <!-- Itens -->
+                    <div class="bg-white rounded-lg shadow">
+                        <div class="px-6 py-4 border-b flex justify-between items-center">
+                            <h3 class="text-lg font-semibold">Itens do Pedido</h3>
+                            <button id="btn-add-item" onclick="openModal('modal-item')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                + Adicionar Item
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <table class="min-w-full">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preço Un.</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itens-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumo -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold mb-4">Resumo</h3>
+                        <dl class="space-y-3">
+                            <div class="flex justify-between">
+                                <dt class="text-gray-600">Total:</dt>
+                                <dd id="pedido-total" class="font-bold text-xl text-gray-900">R$ 0,00</dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold mb-4">Informações</h3>
+                        <dl class="space-y-2 text-sm">
+                            <div><dt class="text-gray-600">Solicitante:</dt><dd id="pedido-solicitante" class="font-medium"></dd></div>
+                            <div><dt class="text-gray-600">Fornecedor:</dt><dd id="pedido-fornecedor"></dd></div>
+                            <div><dt class="text-gray-600">Data:</dt><dd id="pedido-data"></dd></div>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Adicionar Item -->
+    <div id="modal-item" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Adicionar Item</h3>
+                <button onclick="closeModal('modal-item')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-item" class="px-6 py-4">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
+                        <select id="item-marca" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarProdutosPorMarca()">
+                            <option value="">Selecione a marca...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto*</label>
+                        <select id="item-produto" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarSaboresProduto()" disabled>
+                            <option value="">Selecione o produto...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Sabor*</label>
+                        <select id="item-sabor" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="atualizarPrecoItem()" disabled>
+                            <option value="">Selecione o sabor...</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Estoque: <span id="sabor-estoque">-</span></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade*</label>
+                        <input type="number" step="0.01" id="item-quantidade" required min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço Unitário*</label>
+                        <input type="number" step="0.01" id="item-preco" required min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeModal('modal-item')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Adicionar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/pedidos.js"></script>
+    <script src="../js/services/produtos.js"></script>
+    <script src="../js/services/impressao.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/modal.js"></script>
+    
+    <script>
+        let pedidoId = null;
+        let pedido = null;
+        let currentUser = null;
+
+        (async () => {
+            await checkAuth();
+            currentUser = await getCurrentUser();
+            
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            
+            pedidoId = getUrlParameter('id');
+            if (!pedidoId) {
+                showToast('Pedido não encontrado', 'error');
+                redirect('/pages/pedidos.html');
+                return;
+            }
+
+            await loadPedido();
+            await loadMarcasSelect();
+        })();
+
+        // Carregar marcas no select
+        async function loadMarcasSelect() {
+            const marcas = await getMarcas();
+            const select = document.getElementById('item-marca');
+            marcas.forEach(m => {
+                const option = document.createElement('option');
+                option.value = m;
+                option.textContent = m;
+                select.appendChild(option);
+            });
+        }
+
+        // Carregar produtos da marca selecionada
+        async function carregarProdutosPorMarca() {
+            const marca = document.getElementById('item-marca').value;
+            const selectProduto = document.getElementById('item-produto');
+            const selectSabor = document.getElementById('item-sabor');
+            
+            // Resetar selects
+            selectProduto.innerHTML = '<option value="">Selecione o produto...</option>';
+            selectSabor.innerHTML = '<option value="">Selecione o sabor...</option>';
+            selectProduto.disabled = true;
+            selectSabor.disabled = true;
+            document.getElementById('sabor-estoque').textContent = '-';
+            
+            if (!marca) return;
+            
+            const produtos = await getProdutosPorMarca(marca);
+            produtos.forEach(p => {
+                const precoCompra = p.preco_compra || p.preco || 0;
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = `${p.nome} (${formatCurrency(precoCompra)})`;
+                option.dataset.preco = precoCompra;
+                selectProduto.appendChild(option);
+            });
+            
+            selectProduto.disabled = false;
+        }
+
+        // Carregar sabores do produto selecionado
+        async function carregarSaboresProduto() {
+            const produtoId = document.getElementById('item-produto').value;
+            const selectSabor = document.getElementById('item-sabor');
+            
+            // Resetar select
+            selectSabor.innerHTML = '<option value="">Selecione o sabor...</option>';
+            selectSabor.disabled = true;
+            document.getElementById('sabor-estoque').textContent = '-';
+            
+            if (!produtoId) return;
+            
+            const sabores = await getSaboresProduto(produtoId);
+            if (sabores.length === 0) {
+                showToast('Este produto não possui sabores cadastrados', 'warning');
+                return;
+            }
+            
+            sabores.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s.id;
+                option.textContent = `${s.sabor} (Estoque: ${s.quantidade})`;
+                option.dataset.estoque = s.quantidade;
+                selectSabor.appendChild(option);
+            });
+            
+            selectSabor.disabled = false;
+        }
+
+        // Atualizar preço e exibir estoque do sabor
+        function atualizarPrecoItem() {
+            const selectProduto = document.getElementById('item-produto');
+            const selectSabor = document.getElementById('item-sabor');
+            
+            // Atualizar preço baseado no produto
+            const preco = selectProduto.options[selectProduto.selectedIndex]?.dataset.preco;
+            if (preco) {
+                document.getElementById('item-preco').value = preco;
+            }
+            
+            // Exibir estoque do sabor
+            const estoque = selectSabor.options[selectSabor.selectedIndex]?.dataset.estoque || '-';
+            document.getElementById('sabor-estoque').textContent = estoque;
+        }
+
+        async function loadProdutosSelect() {
+            // Função antiga removida - agora usa seleção em cascata
+        }
+
+        async function loadPedido() {
+            pedido = await getPedido(pedidoId);
+            if (!pedido) return;
+
+            document.getElementById('pedido-numero').textContent = `Pedido ${pedido.numero}`;
+            document.getElementById('pedido-status').innerHTML = getStatusBadge(pedido.status);
+            document.getElementById('pedido-total').textContent = formatCurrency(pedido.total);
+            document.getElementById('pedido-solicitante').textContent = pedido.solicitante?.full_name || 'N/A';
+            document.getElementById('pedido-fornecedor').textContent = pedido.fornecedor?.nome || '-';
+            document.getElementById('pedido-data').textContent = formatDate(pedido.created_at);
+
+            // Ações baseadas no status
+            const acoesEl = document.getElementById('acoes-pedido');
+            const btnAddItem = document.getElementById('btn-add-item');
+            
+            // Botão de impressão sempre visível
+            let botoesHTML = '<button onclick="imprimirPedidoCompra(\'' + pedidoId + '\')" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">🖨️ Imprimir</button>';
+            
+            if (pedido.status === 'RASCUNHO' && pedido.solicitante_id === currentUser.id) {
+                botoesHTML += ' <button onclick="enviarPedidoHandler()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Enviar para Aprovação</button>';
+                btnAddItem.classList.remove('hidden');
+            } else {
+                btnAddItem.classList.add('hidden');
+                if (pedido.status === 'APROVADO' && ['ADMIN'].includes(currentUser.role)) {
+                    botoesHTML += ' <button onclick="finalizarPedidoHandler()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">Finalizar Pedido</button>';
+                }
+            }
+            
+            acoesEl.innerHTML = botoesHTML;
+
+            await loadItens();
+        }
+
+        async function loadItens() {
+            const itens = await getItensPedido(pedidoId);
+            const tbody = document.getElementById('itens-tbody');
+            
+            if (itens.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Nenhum item adicionado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = itens.map(item => {
+                const produtoNome = item.produto?.nome || 'N/A';
+                const sabor = item.sabor?.sabor ? ` - ${item.sabor.sabor}` : '';
+                return `
+                    <tr class="border-t">
+                        <td class="px-4 py-3 text-sm">
+                            <div>${produtoNome}</div>
+                            ${sabor ? `<div class="text-xs text-gray-500">${sabor}</div>` : ''}
+                        </td>
+                        <td class="px-4 py-3 text-sm">${item.quantidade} ${item.produto?.unidade || ''}</td>
+                        <td class="px-4 py-3 text-sm">${formatCurrency(item.preco_unitario)}</td>
+                        <td class="px-4 py-3 text-sm font-semibold">${formatCurrency(item.subtotal)}</td>
+                        <td class="px-4 py-3 text-sm">
+                            ${pedido.status === 'RASCUNHO' ? 
+                                `<button onclick="removeItem('${item.id}')" class="text-red-600 hover:text-red-800">Remover</button>` : '-'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('form-item').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const item = {
+                produto_id: document.getElementById('item-produto').value,
+                sabor_id: document.getElementById('item-sabor').value,
+                quantidade: parseFloat(document.getElementById('item-quantidade').value),
+                preco_unitario: parseFloat(document.getElementById('item-preco').value)
+            };
+
+            await addItemPedido(pedidoId, item);
+            closeModal('modal-item');
+            document.getElementById('form-item').reset();
+            // Resetar selects em cascata
+            document.getElementById('item-marca').value = '';
+            document.getElementById('item-produto').innerHTML = '<option value="">Selecione o produto...</option>';
+            document.getElementById('item-sabor').innerHTML = '<option value="">Selecione o sabor...</option>';
+            document.getElementById('item-produto').disabled = true;
+            document.getElementById('item-sabor').disabled = true;
+            document.getElementById('sabor-estoque').textContent = '-';
+            await loadPedido();
+        });
+
+        async function removeItem(itemId) {
+            const success = await removeItemPedido(itemId);
+            if (success) await loadPedido();
+        }
+
+        async function enviarPedidoHandler() {
+            await enviarPedido(pedidoId);
+            await loadPedido();
+        }
+
+        async function finalizarPedidoHandler() {
+            const success = await finalizarPedido(pedidoId);
+            if (success) await loadPedido();
+        }
+    </script>
+</body>
+</html>

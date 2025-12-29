@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <!-- Navbar -->
+    <div id="navbar"></div>
+
+    <!-- Sidebar -->
+    <div id="sidebar-container"></div>
+
+    <!-- Main Content -->
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Dashboard</h2>
+                <p class="text-gray-600 mt-1">Visão geral do sistema</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Pedidos de Compra -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">Pedidos de Compra</p>
+                            <p id="stat-compras" class="text-3xl font-bold text-blue-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Aguardando: <span id="stat-compras-pendentes" class="font-semibold">0</span></p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pedidos de Venda -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">Pedidos de Venda</p>
+                            <p id="stat-vendas" class="text-3xl font-bold text-green-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Aguardando: <span id="stat-vendas-pendentes" class="font-semibold">0</span></p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pedidos Aprovados (Geral) -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Aprovados Hoje</p>
+                            <p id="stat-aprovado" class="text-3xl font-bold text-purple-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Total: <span id="stat-valor-aprovado" class="font-semibold">R$ 0</span></p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Produtos Estoque Baixo -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Estoque Baixo</p>
+                            <p id="stat-estoque-baixo" class="text-3xl font-bold text-red-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Requer atenção</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Produtos com Estoque Baixo -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">⚠️ Alertas de Estoque</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="produtos-estoque-baixo" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pedidos Pendentes de Aprovação -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">🔔 Pendentes de Aprovação</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="pedidos-pendentes" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Últimos Pedidos Separados -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Últimos Pedidos de Compra -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-blue-50">
+                        <h3 class="text-lg font-semibold text-blue-900">🛒 Últimos Pedidos de Compra</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="ultimos-pedidos-compra" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Últimas Vendas -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-green-50">
+                        <h3 class="text-lg font-semibold text-green-900">💰 Últimas Vendas</h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="ultimos-pedidos-venda" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg">
+            <div class="spinner mx-auto"></div>
+            <p class="mt-4 text-gray-700">Carregando...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/produtos.js"></script>
+    <script src="../js/services/pedidos.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        // Inicializar
+        (async () => {
+            await checkAuth();
+            
+            // Renderizar navbar e sidebar
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            
+            // Carregar dados
+            await loadDashboard();
+        })();
+
+        async function loadDashboard() {
+            try {
+                // Buscar todos os pedidos
+                const todosPedidos = await listPedidos({});
+                
+                // Separar por tipo
+                const compras = todosPedidos.filter(p => p.tipo_pedido === 'COMPRA' || !p.tipo_pedido);
+                const vendas = todosPedidos.filter(p => p.tipo_pedido === 'VENDA');
+                
+                // Estatísticas de COMPRAS
+                const comprasPendentes = compras.filter(p => p.status === 'ENVIADO').length;
+                document.getElementById('stat-compras').textContent = compras.length;
+                document.getElementById('stat-compras-pendentes').textContent = comprasPendentes;
+                
+                // Estatísticas de VENDAS
+                const vendasPendentes = vendas.filter(p => p.status === 'ENVIADO').length;
+                document.getElementById('stat-vendas').textContent = vendas.length;
+                document.getElementById('stat-vendas-pendentes').textContent = vendasPendentes;
+                
+                // Aprovados HOJE (compras + vendas)
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                const aprovadosHoje = todosPedidos.filter(p => {
+                    if (p.status !== 'APROVADO' || !p.data_aprovacao) return false;
+                    const dataAprov = new Date(p.data_aprovacao);
+                    dataAprov.setHours(0, 0, 0, 0);
+                    return dataAprov.getTime() === hoje.getTime();
+                });
+                
+                const valorAprovado = aprovadosHoje.reduce((sum, p) => sum + parseFloat(p.total || 0), 0);
+                document.getElementById('stat-aprovado').textContent = aprovadosHoje.length;
+                document.getElementById('stat-valor-aprovado').textContent = formatCurrency(valorAprovado);
+
+                // Produtos com estoque baixo
+                const produtosBaixo = await getProdutosEstoqueBaixo();
+                const containerEstoque = document.getElementById('produtos-estoque-baixo');
+                
+                if (produtosBaixo.length === 0) {
+                    containerEstoque.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum produto com estoque baixo</p>';
+                } else {
+                    document.getElementById('stat-estoque-baixo').textContent = produtosBaixo.length;
+                    containerEstoque.innerHTML = produtosBaixo.slice(0, 5).map(p => `
+                        <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg stock-alert border-l-4 border-red-400">
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-900">${p.nome}</p>
+                                <p class="text-sm text-gray-600">Código: ${p.codigo}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold text-red-600">
+                                    ${p.estoque_atual} ${p.unidade}
+                                </p>
+                                <p class="text-xs text-gray-500">Mín: ${p.estoque_minimo}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+
+                // Pedidos pendentes de aprovação
+                const pendentes = todosPedidos.filter(p => p.status === 'ENVIADO');
+                const containerPendentes = document.getElementById('pedidos-pendentes');
+                
+                if (pendentes.length === 0) {
+                    containerPendentes.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum pedido pendente</p>';
+                } else {
+                    containerPendentes.innerHTML = pendentes.slice(0, 5).map(p => {
+                        const tipo = p.tipo_pedido === 'VENDA' ? 'VENDA' : 'COMPRA';
+                        const badgeColor = tipo === 'VENDA' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
+                        return `
+                            <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition border-l-4 border-yellow-400">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-medium text-gray-900">${p.numero}</p>
+                                        <span class="text-xs px-2 py-1 rounded ${badgeColor}">${tipo}</span>
+                                    </div>
+                                    <p class="text-sm text-gray-600">${p.solicitante?.full_name || 'N/A'}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-semibold text-gray-900">${formatCurrency(p.total)}</p>
+                                    <p class="text-xs text-gray-500">${formatDate(p.created_at)}</p>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Últimos pedidos de COMPRA
+                const containerCompras = document.getElementById('ultimos-pedidos-compra');
+                if (compras.length === 0) {
+                    containerCompras.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhum pedido de compra</p>';
+                } else {
+                    containerCompras.innerHTML = compras.slice(0, 5).map(p => `
+                        <a href="/pages/pedido-detalhe.html?id=${p.id}" class="block">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-blue-50 transition border-l-4 border-blue-400">
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">${p.numero}</p>
+                                    <p class="text-sm text-gray-600">${p.fornecedor?.nome || 'Sem fornecedor'}</p>
+                                </div>
+                                <div class="text-right">
+                                    ${getStatusBadge(p.status)}
+                                    <p class="text-sm font-semibold text-gray-900 mt-1">${formatCurrency(p.total)}</p>
+                                </div>
+                            </div>
+                        </a>
+                    `).join('');
+                }
+
+                // Últimas VENDAS
+                const containerVendas = document.getElementById('ultimos-pedidos-venda');
+                if (vendas.length === 0) {
+                    containerVendas.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma venda registrada</p>';
+                } else {
+                    containerVendas.innerHTML = vendas.slice(0, 5).map(p => `
+                        <a href="/pages/venda-detalhe.html?id=${p.id}" class="block">
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-green-50 transition border-l-4 border-green-400">
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">${p.numero}</p>
+                                    <p class="text-sm text-gray-600">${p.cliente?.nome || 'Sem cliente'}</p>
+                                </div>
+                                <div class="text-right">
+                                    ${getStatusBadge(p.status)}
+                                    <p class="text-sm font-semibold text-gray-900 mt-1">${formatCurrency(p.total)}</p>
+                                </div>
+                            </div>
+                        </a>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar dashboard:', error);
+                showToast('Erro ao carregar dashboard', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

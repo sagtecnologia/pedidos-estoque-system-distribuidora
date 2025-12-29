@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">Produtos</h2>
+                    <p class="text-gray-600 mt-1">Gerenciamento de produtos</p>
+                </div>
+                <button onclick="openModal('modal-produto')" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                    + Novo Produto
+                </button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input 
+                        type="text" 
+                        id="search" 
+                        placeholder="Buscar por nome ou código..."
+                        class="px-4 py-2 border border-gray-300 rounded-lg"
+                    >
+                    <select id="filter-categoria" class="px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="">Todas as categorias</option>
+                    </select>
+                    <button onclick="loadProdutos()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
+                        Filtrar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="produtos-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Produto -->
+    <div id="modal-produto" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b sticky top-0 bg-white z-10">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Novo Produto</h3>
+                <button onclick="closeModal('modal-produto')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-produto" class="px-6 py-4">
+                <input type="hidden" id="produto-id">
+                
+                <!-- Informações Básicas -->
+                <h4 class="text-md font-semibold text-gray-700 mb-3">Informações Básicas</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Produto*</label>
+                        <input type="text" id="produto-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: V250">
+                        <p class="text-xs text-gray-500 mt-1">O código será gerado automaticamente</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
+                        <input type="text" id="produto-marca" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: IGNITE">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                        <input type="text" id="produto-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Bebidas">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Unidade*</label>
+                        <select id="produto-unidade" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="UN">UN - Unidade</option>
+                            <option value="KG">KG - Quilograma</option>
+                            <option value="L">L - Litro</option>
+                            <option value="M">M - Metro</option>
+                            <option value="CX">CX - Caixa</option>
+                            <option value="PC">PC - Peça</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Mínimo</label>
+                        <input type="number" step="0.01" id="produto-estoque-minimo" value="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Compra (R$)*</label>
+                        <input type="number" step="0.01" id="produto-preco-compra" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Venda (R$)*</label>
+                        <input type="number" step="0.01" id="produto-preco-venda" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
+                    </div>
+                    <div class="md:col-span-2" id="margem-lucro-container" style="display: none;">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-medium text-gray-700">Margem de Lucro:</span>
+                                <span id="margem-lucro" class="text-lg font-bold text-blue-600">0%</span>
+                            </div>
+                            <div class="flex justify-between items-center mt-2">
+                                <span class="text-sm font-medium text-gray-700">Lucro Unitário:</span>
+                                <span id="lucro-unitario" class="text-lg font-bold text-green-600">R$ 0,00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sabores -->
+                <div class="border-t pt-4">
+                    <div class="flex justify-between items-center mb-3">
+                        <h4 class="text-md font-semibold text-gray-700">Sabores</h4>
+                        <button type="button" onclick="adicionarSabor()" class="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+                            + Adicionar Sabor
+                        </button>
+                    </div>
+                    <div id="sabores-container" class="space-y-2">
+                        <!-- Sabores serão adicionados aqui dinamicamente -->
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">* Adicione os sabores disponíveis para este produto. O estoque será controlado individualmente por sabor.</p>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                    <button type="button" onclick="closeModal('modal-produto')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar Produto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/produtos.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/modal.js"></script>
+    
+    <script>
+        let editingId = null;
+        let saboresCount = 0;
+
+        (async () => {
+            await checkAuth();
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            await loadProdutos();
+            await loadCategorias();
+        })();
+
+        // Gerenciamento de Sabores
+        function adicionarSabor(sabor = '', quantidade = 0, saborId = null) {
+            saboresCount++;
+            const container = document.getElementById('sabores-container');
+            const div = document.createElement('div');
+            div.className = 'flex gap-2 items-center bg-gray-50 p-3 rounded-lg';
+            div.id = `sabor-${saboresCount}`;
+            div.innerHTML = `
+                <input type="hidden" name="sabor-id-${saboresCount}" value="${saborId || ''}">
+                <div class="flex-1">
+                    <input 
+                        type="text" 
+                        name="sabor-nome-${saboresCount}" 
+                        value="${sabor}" 
+                        placeholder="Nome do sabor (ex: Melancia)" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        required
+                    >
+                </div>
+                <div class="w-32">
+                    <input 
+                        type="number" 
+                        name="sabor-qtd-${saboresCount}" 
+                        value="${quantidade}" 
+                        placeholder="Qtd" 
+                        step="0.01"
+                        min="0"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                </div>
+                <button 
+                    type="button" 
+                    onclick="removerSabor(${saboresCount})" 
+                    class="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
+                >
+                    ✕
+                </button>
+            `;
+            container.appendChild(div);
+        }
+
+        function removerSabor(id) {
+            const elemento = document.getElementById(`sabor-${id}`);
+            if (elemento) {
+                elemento.remove();
+            }
+        }
+
+        function limparSabores() {
+            document.getElementById('sabores-container').innerHTML = '';
+            saboresCount = 0;
+        }
+
+        function coletarSabores() {
+            const sabores = [];
+            const container = document.getElementById('sabores-container');
+            const inputs = container.querySelectorAll('[name^="sabor-nome-"]');
+            
+            inputs.forEach(input => {
+                const num = input.name.split('-')[2];
+                const saborId = document.querySelector(`[name="sabor-id-${num}"]`).value || null;
+                const nome = input.value.trim();
+                const qtd = parseFloat(document.querySelector(`[name="sabor-qtd-${num}"]`).value) || 0;
+                
+                if (nome) {
+                    sabores.push({
+                        id: saborId,
+                        sabor: nome,
+                        quantidade: qtd
+                    });
+                }
+            });
+            
+            return sabores;
+        }
+
+        async function loadCategorias() {
+            const categorias = await getCategorias();
+            const select = document.getElementById('filter-categoria');
+            categorias.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat;
+                option.textContent = cat;
+                select.appendChild(option);
+            });
+        }
+
+        async function loadProdutos() {
+            const search = document.getElementById('search').value;
+            const categoria = document.getElementById('filter-categoria').value;
+            const produtos = await listProdutos({ search, categoria });
+            
+            const tbody = document.getElementById('produtos-tbody');
+            if (produtos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Nenhum produto encontrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = produtos.map(p => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-900">${p.codigo}</td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm font-medium text-gray-900">${p.nome}</div>
+                        ${p.marca ? `<div class="text-xs text-gray-500">Marca: ${p.marca}</div>` : ''}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${p.categoria || '-'}</td>
+                    <td class="px-6 py-4 text-sm ${p.estoque_atual <= p.estoque_minimo ? 'text-red-600 font-semibold' : 'text-gray-900'}">
+                        ${p.estoque_atual} ${p.unidade}
+                        ${p.estoque_atual <= p.estoque_minimo ? '<span class="text-xs">(Baixo)</span>' : ''}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-sm text-gray-600">Compra: ${formatCurrency(p.preco_compra || p.preco || 0)}</div>
+                        <div class="text-sm font-medium text-gray-900">Venda: ${formatCurrency(p.preco_venda || p.preco || 0)}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm space-x-2">
+                        <button onclick="editProduto('${p.id}')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                        <button onclick="deleteProdutoHandler('${p.id}')" class="text-red-600 hover:text-red-800">Excluir</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('form-produto').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const precoCompra = parseFloat(document.getElementById('produto-preco-compra').value) || 0;
+            const precoVenda = parseFloat(document.getElementById('produto-preco-venda').value) || 0;
+            
+            const produto = {
+                // Código será gerado automaticamente
+                nome: document.getElementById('produto-nome').value,
+                marca: document.getElementById('produto-marca').value,
+                categoria: document.getElementById('produto-categoria').value || null,
+                unidade: document.getElementById('produto-unidade').value,
+                estoque_minimo: parseFloat(document.getElementById('produto-estoque-minimo').value),
+                preco_compra: precoCompra,
+                preco_venda: precoVenda,
+                preco: precoVenda // Manter compatibilidade
+            };
+
+            // Coletar sabores
+            const sabores = coletarSabores();
+
+            if (editingId) {
+                await updateProdutoComSabores(editingId, produto, sabores);
+            } else {
+                await createProdutoComSabores(produto, sabores);
+            }
+
+            closeModal('modal-produto');
+            document.getElementById('form-produto').reset();
+            limparSabores();
+            editingId = null;
+            await loadProdutos();
+        });
+
+        async function editProduto(id) {
+            const produto = await getProduto(id);
+            if (!produto) return;
+
+            editingId = id;
+            document.getElementById('modal-title').textContent = 'Editar Produto';
+            // Código não é editável - gerado automaticamente
+            document.getElementById('produto-nome').value = produto.nome;
+            document.getElementById('produto-marca').value = produto.marca || '';
+            document.getElementById('produto-categoria').value = produto.categoria || '';
+            document.getElementById('produto-unidade').value = produto.unidade;
+            document.getElementById('produto-estoque-minimo').value = produto.estoque_minimo;
+            document.getElementById('produto-preco-compra').value = produto.preco_compra || produto.preco || 0;
+            document.getElementById('produto-preco-venda').value = produto.preco_venda || produto.preco || 0;
+            
+            // Carregar sabores
+            limparSabores();
+            const sabores = await getSaboresProduto(id);
+            if (sabores && sabores.length > 0) {
+                sabores.forEach(s => adicionarSabor(s.sabor, s.quantidade, s.id));
+            }
+            
+            calcularMargem();
+            openModal('modal-produto');
+        }
+
+        async function deleteProdutoHandler(id) {
+            const success = await deleteProduto(id);
+            if (success) await loadProdutos();
+        }
+
+        // Calcular margem de lucro
+        function calcularMargem() {
+            const precoCompra = parseFloat(document.getElementById('produto-preco-compra').value) || 0;
+            const precoVenda = parseFloat(document.getElementById('produto-preco-venda').value) || 0;
+            
+            const margemContainer = document.getElementById('margem-lucro-container');
+            
+            if (precoCompra > 0 && precoVenda > 0) {
+                const lucro = precoVenda - precoCompra;
+                const margemPercent = ((lucro / precoCompra) * 100).toFixed(2);
+                
+                document.getElementById('margem-lucro').textContent = margemPercent + '%';
+                document.getElementById('lucro-unitario').textContent = formatCurrency(lucro);
+                
+                // Colorir margem baseada no valor
+                const margemEl = document.getElementById('margem-lucro');
+                if (margemPercent < 10) {
+                    margemEl.className = 'text-lg font-bold text-red-600';
+                } else if (margemPercent < 30) {
+                    margemEl.className = 'text-lg font-bold text-yellow-600';
+                } else {
+                    margemEl.className = 'text-lg font-bold text-green-600';
+                }
+                
+                margemContainer.style.display = 'block';
+            } else {
+                margemContainer.style.display = 'none';
+            }
+        }
+
+        // Adicionar listener no preço de compra também
+        document.getElementById('produto-preco-compra').addEventListener('input', calcularMargem);
+
+        document.getElementById('search').addEventListener('input', debounce(loadProdutos, 500));
+    </script>
+</body>
+</html>

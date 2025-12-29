@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confirmando Email...</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex items-center justify-center px-4">
+        <div class="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+            <div id="loading-state">
+                <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">Confirmando seu email...</h2>
+                <p class="text-gray-600">Aguarde um momento</p>
+            </div>
+
+            <div id="success-state" class="hidden">
+                <div class="w-16 h-16 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-green-600 mb-4">✅ Email Confirmado!</h2>
+                <p class="text-gray-700 mb-6">
+                    Seu email foi confirmado com sucesso. Agora sua conta está aguardando aprovação do administrador.
+                </p>
+                <p class="text-sm text-blue-600 mb-6">
+                    Você receberá um email quando sua conta for aprovada.
+                </p>
+                <button onclick="window.location.href='/index.html'" 
+                        class="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition">
+                    Ir para Login
+                </button>
+            </div>
+
+            <div id="error-state" class="hidden">
+                <div class="w-16 h-16 bg-red-100 rounded-full mx-auto mb-4 flex items-center justify-center">
+                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-red-600 mb-4">❌ Erro na Confirmação</h2>
+                <p id="error-message" class="text-gray-700 mb-6"></p>
+                <button onclick="window.location.href='/pages/register.html'" 
+                        class="w-full bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition mb-2">
+                    Fazer Novo Cadastro
+                </button>
+                <button onclick="window.location.href='/index.html'" 
+                        class="w-full bg-gray-200 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-300 transition">
+                    Voltar para Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script>
+        (async () => {
+            // Extrair parâmetros da URL
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const error = hashParams.get('error');
+            const errorCode = hashParams.get('error_code');
+            const errorDescription = hashParams.get('error_description');
+
+            // Verificar se há erro
+            if (error) {
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('error-state').classList.remove('hidden');
+                
+                let errorMsg = 'Ocorreu um erro ao confirmar seu email.';
+                
+                if (errorCode === 'otp_expired') {
+                    errorMsg = '⏰ O link de confirmação expirou. O link é válido por apenas 24 horas. Por favor, faça um novo cadastro.';
+                } else if (errorDescription) {
+                    errorMsg = decodeURIComponent(errorDescription.replace(/\+/g, ' '));
+                }
+                
+                document.getElementById('error-message').textContent = errorMsg;
+                return;
+            }
+
+            // Se não houver erro, verificar sessão
+            try {
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                
+                if (sessionError) throw sessionError;
+
+                if (session) {
+                    // Email confirmado com sucesso
+                    document.getElementById('loading-state').classList.add('hidden');
+                    document.getElementById('success-state').classList.remove('hidden');
+                    
+                    // Deslogar o usuário (ele precisa aguardar aprovação)
+                    setTimeout(async () => {
+                        await supabase.auth.signOut();
+                    }, 1000);
+                } else {
+                    // Sem sessão, mas sem erro - redirecionar para login
+                    setTimeout(() => {
+                        window.location.href = '/index.html';
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error('Erro ao verificar sessão:', err);
+                document.getElementById('loading-state').classList.add('hidden');
+                document.getElementById('error-state').classList.remove('hidden');
+                document.getElementById('error-message').textContent = err.message || 'Erro ao processar confirmação.';
+            }
+        })();
+    </script>
+</body>
+</html>

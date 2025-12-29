@@ -1,0 +1,1513 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Lucros - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Análise de Lucros</h2>
+                <p class="text-gray-600 mt-2">Análise detalhada de margem e lucro por marca, produto e sabor</p>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Filtros</h3>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                        <select id="filter-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarProdutosFiltro()">
+                            <option value="">Todas as marcas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto</label>
+                        <select id="filter-produto" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarSaboresFiltro()" disabled>
+                            <option value="">Todos os produtos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Sabor</label>
+                        <select id="filter-sabor" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()" disabled>
+                            <option value="">Todos os sabores</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input type="date" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+                        <input type="date" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                    </div>
+                </div>
+                <div class="mt-4 flex space-x-2">
+                    <button onclick="aplicarFiltros()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        🔍 Filtrar
+                    </button>
+                    <button onclick="limparFiltros()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">
+                        🔄 Limpar
+                    </button>
+                    <button onclick="exportarExcel()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                        📊 Exportar Excel
+                    </button>
+                    <button onclick="exportarPDF()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">
+                        📄 Exportar PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cards Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Receita Total</p>
+                            <p id="card-receita" class="text-2xl font-bold text-gray-900">R$ 0,00</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Custo Total</p>
+                            <p id="card-custo" class="text-2xl font-bold text-gray-900">R$ 0,00</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Lucro Total</p>
+                            <p id="card-lucro" class="text-2xl font-bold text-green-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Margem Média</p>
+                            <p id="card-margem" class="text-2xl font-bold text-purple-600">0%</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px">
+                        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-button active py-4 px-6 font-medium text-sm border-b-2 border-blue-600 text-blue-600">
+                            📈 Dashboard
+                        </button>
+                        <button onclick="switchTab('por-marca')" id="tab-por-marca" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            🏷️ Por Marca
+                        </button>
+                        <button onclick="switchTab('por-produto')" id="tab-por-produto" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            📦 Por Produto
+                        </button>
+                        <button onclick="switchTab('por-sabor')" id="tab-por-sabor" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            🍓 Por Sabor
+                        </button>
+                        <button onclick="switchTab('detalhado')" id="tab-detalhado" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            📊 Detalhado
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab: Dashboard -->
+                <div id="content-dashboard" class="tab-content p-6">
+                    <h3 class="text-lg font-semibold mb-6">Dashboard Visual de Vendas</h3>
+                    
+                    <!-- Gráficos Row 1 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">📊 Evolução de Vendas (Período)</h4>
+                            <canvas id="chart-evolucao"></canvas>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">🏷️ Vendas por Marca</h4>
+                            <canvas id="chart-marcas"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos Row 2 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">👥 Top 10 Clientes</h4>
+                            <canvas id="chart-clientes"></canvas>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">🍓 Top 10 Sabores</h4>
+                            <canvas id="chart-sabores"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos Row 3 -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">📦 Top 10 Produtos</h4>
+                            <canvas id="chart-produtos"></canvas>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">💰 Lucro vs Receita (Marcas)</h4>
+                            <canvas id="chart-lucro-receita"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Gráfico Full Width -->
+                    <div class="grid grid-cols-1 gap-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">📈 Receita, Custo e Lucro Diário</h4>
+                            <canvas id="chart-diario"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Por Marca -->
+                <div id="content-por-marca" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Lucro Consolidado por Marca</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Vendida</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-por-marca" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Por Produto -->
+                <div id="content-por-produto" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Lucro por Produto</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Vendida</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-por-produto" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Por Sabor -->
+                <div id="content-por-sabor" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Lucro Detalhado por Sabor</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sabor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Vendida</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-por-sabor" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Detalhado -->
+                <div id="content-detalhado" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Análise Detalhada de Vendas</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pedido</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sabor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço Un.</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo Un.</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro Un.</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-detalhado" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="10" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/produtos.js"></script>
+    <script src="../js/services/pedidos.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        let vendasFinalizadas = [];
+        let todosProdutos = [];
+        let filtroAtual = {
+            marca: '',
+            produto: '',
+            sabor: '',
+            dataInicio: '',
+            dataFim: ''
+        };
+
+        (async () => {
+            await checkAuth();
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            
+            // Definir data padrão (último mês)
+            const hoje = new Date();
+            const umMesAtras = new Date();
+            umMesAtras.setMonth(hoje.getMonth() - 1);
+            
+            document.getElementById('filter-data-inicio').value = umMesAtras.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            
+            await carregarMarcasFiltro();
+            await carregarDados();
+        })();
+
+        async function carregarMarcasFiltro() {
+            const marcas = await getMarcas();
+            const select = document.getElementById('filter-marca');
+            select.innerHTML = '<option value="">Todas as marcas</option>';
+            marcas.forEach(marca => {
+                const option = document.createElement('option');
+                option.value = marca;
+                option.textContent = marca;
+                select.appendChild(option);
+            });
+        }
+
+        async function carregarProdutosFiltro() {
+            const marca = document.getElementById('filter-marca').value;
+            const selectProduto = document.getElementById('filter-produto');
+            const selectSabor = document.getElementById('filter-sabor');
+            
+            selectProduto.innerHTML = '<option value="">Todos os produtos</option>';
+            selectSabor.innerHTML = '<option value="">Todos os sabores</option>';
+            selectSabor.disabled = true;
+            
+            if (!marca) {
+                selectProduto.disabled = true;
+                aplicarFiltros();
+                return;
+            }
+            
+            const produtos = todosProdutos.filter(p => p.marca === marca);
+            produtos.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nome;
+                selectProduto.appendChild(option);
+            });
+            
+            selectProduto.disabled = false;
+            aplicarFiltros();
+        }
+
+        async function carregarSaboresFiltro() {
+            const produtoId = document.getElementById('filter-produto').value;
+            const selectSabor = document.getElementById('filter-sabor');
+            
+            selectSabor.innerHTML = '<option value="">Todos os sabores</option>';
+            
+            if (!produtoId) {
+                selectSabor.disabled = true;
+                aplicarFiltros();
+                return;
+            }
+            
+            const sabores = await getSaboresProduto(produtoId);
+            sabores.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s.id;
+                option.textContent = s.sabor;
+                selectSabor.appendChild(option);
+            });
+            
+            selectSabor.disabled = false;
+            aplicarFiltros();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filter-marca').value = '';
+            document.getElementById('filter-produto').value = '';
+            document.getElementById('filter-produto').disabled = true;
+            document.getElementById('filter-sabor').value = '';
+            document.getElementById('filter-sabor').disabled = true;
+            
+            const hoje = new Date();
+            const umMesAtras = new Date();
+            umMesAtras.setMonth(hoje.getMonth() - 1);
+            document.getElementById('filter-data-inicio').value = umMesAtras.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            
+            filtroAtual = { marca: '', produto: '', sabor: '', dataInicio: '', dataFim: '' };
+            aplicarFiltros();
+        }
+
+        function aplicarFiltros() {
+            filtroAtual.marca = document.getElementById('filter-marca').value;
+            filtroAtual.produto = document.getElementById('filter-produto').value;
+            filtroAtual.sabor = document.getElementById('filter-sabor').value;
+            filtroAtual.dataInicio = document.getElementById('filter-data-inicio').value;
+            filtroAtual.dataFim = document.getElementById('filter-data-fim').value;
+            
+            calcularResumo();
+            renderizarTabAtiva();
+        }
+
+        async function carregarDados() {
+            showLoading(true);
+            try {
+                // Carregar produtos
+                todosProdutos = await listProdutos();
+                
+                // Carregar vendas finalizadas com itens
+                const { data: pedidos, error } = await supabase
+                    .from('pedidos')
+                    .select(`
+                        *,
+                        cliente:clientes(nome),
+                        solicitante:users!pedidos_solicitante_id_fkey(full_name)
+                    `)
+                    .eq('tipo_pedido', 'VENDA')
+                    .eq('status', 'FINALIZADO')
+                    .order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                // Buscar itens de cada pedido
+                vendasFinalizadas = await Promise.all(pedidos.map(async p => {
+                    const itens = await getItensPedido(p.id);
+                    return { ...p, itens };
+                }));
+                
+                calcularResumo();
+                renderizarTabAtiva();
+            } catch (error) {
+                handleError(error, 'Erro ao carregar dados');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function calcularResumo() {
+            const vendas = filtrarVendas();
+            
+            let receitaTotal = 0;
+            let custoTotal = 0;
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (produto) {
+                        receitaTotal += item.preco_unitario * item.quantidade;
+                        custoTotal += (produto.preco_compra || 0) * item.quantidade;
+                    }
+                });
+            });
+            
+            const lucroTotal = receitaTotal - custoTotal;
+            const margemMedia = receitaTotal > 0 ? (lucroTotal / receitaTotal * 100) : 0;
+            
+            document.getElementById('card-receita').textContent = formatCurrency(receitaTotal);
+            document.getElementById('card-custo').textContent = formatCurrency(custoTotal);
+            document.getElementById('card-lucro').textContent = formatCurrency(lucroTotal);
+            document.getElementById('card-margem').textContent = margemMedia.toFixed(1) + '%';
+        }
+
+        function filtrarVendas() {
+            let vendas = [...vendasFinalizadas];
+            
+            // Filtro de data
+            if (filtroAtual.dataInicio) {
+                vendas = vendas.filter(v => new Date(v.created_at) >= new Date(filtroAtual.dataInicio));
+            }
+            if (filtroAtual.dataFim) {
+                const dataFim = new Date(filtroAtual.dataFim);
+                dataFim.setHours(23, 59, 59);
+                vendas = vendas.filter(v => new Date(v.created_at) <= dataFim);
+            }
+            
+            return vendas;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active', 'border-blue-600', 'text-blue-600');
+            document.getElementById(`tab-${tabName}`).classList.remove('border-transparent', 'text-gray-500');
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
+            renderizarTabAtiva();
+        }
+
+        function renderizarTabAtiva() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            
+            switch(activeTab) {
+                case 'dashboard':
+                    renderDashboard();
+                    break;
+                case 'por-marca':
+                    renderPorMarca();
+                    break;
+                case 'por-produto':
+                    renderPorProduto();
+                    break;
+                case 'por-sabor':
+                    renderPorSabor();
+                    break;
+                case 'detalhado':
+                    renderDetalhado();
+                    break;
+            }
+        }
+
+        function renderPorMarca() {
+            const vendas = filtrarVendas();
+            const lucrosPorMarca = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    if (!lucrosPorMarca[marca]) {
+                        lucrosPorMarca[marca] = { quantidade: 0, receita: 0, custo: 0 };
+                    }
+                    
+                    lucrosPorMarca[marca].quantidade += item.quantidade;
+                    lucrosPorMarca[marca].receita += item.preco_unitario * item.quantidade;
+                    lucrosPorMarca[marca].custo += (produto.preco_compra || 0) * item.quantidade;
+                });
+            });
+            
+            const tbody = document.getElementById('tbody-por-marca');
+            const dados = Object.entries(lucrosPorMarca).map(([marca, dados]) => ({
+                marca,
+                ...dados,
+                lucro: dados.receita - dados.custo,
+                margem: dados.receita > 0 ? (dados.receita - dados.custo) / dados.receita * 100 : 0
+            })).sort((a, b) => b.lucro - a.lucro);
+            
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                return;
+            }
+            
+            const lucroTotal = dados.reduce((sum, d) => sum + d.lucro, 0);
+            
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${d.marca}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.quantidade.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(d.receita)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(d.custo)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(d.lucro)}</td>
+                    <td class="px-6 py-4 text-sm text-purple-600">${d.margem.toFixed(1)}%</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${(d.lucro / lucroTotal * 100).toFixed(1)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPorProduto() {
+            const vendas = filtrarVendas();
+            const lucrosPorProduto = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    // Aplicar filtros
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    
+                    const key = produto.id;
+                    if (!lucrosPorProduto[key]) {
+                        lucrosPorProduto[key] = { 
+                            marca: produto.marca,
+                            produto: produto.nome,
+                            quantidade: 0, 
+                            receita: 0, 
+                            custo: 0 
+                        };
+                    }
+                    
+                    lucrosPorProduto[key].quantidade += item.quantidade;
+                    lucrosPorProduto[key].receita += item.preco_unitario * item.quantidade;
+                    lucrosPorProduto[key].custo += (produto.preco_compra || 0) * item.quantidade;
+                });
+            });
+            
+            const tbody = document.getElementById('tbody-por-produto');
+            const dados = Object.values(lucrosPorProduto).map(d => ({
+                ...d,
+                lucro: d.receita - d.custo,
+                margem: d.receita > 0 ? (d.receita - d.custo) / d.receita * 100 : 0
+            })).sort((a, b) => b.lucro - a.lucro);
+            
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-700">${d.marca || '-'}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${d.produto}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.quantidade.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(d.receita)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(d.custo)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(d.lucro)}</td>
+                    <td class="px-6 py-4 text-sm text-purple-600">${d.margem.toFixed(1)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        async function renderPorSabor() {
+            const vendas = filtrarVendas();
+            const lucrosPorSabor = {};
+            
+            for (const venda of vendas) {
+                for (const item of venda.itens) {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto || !item.sabor_id) continue;
+                    
+                    // Aplicar filtros
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) continue;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) continue;
+                    if (filtroAtual.sabor && item.sabor_id !== filtroAtual.sabor) continue;
+                    
+                    const key = `${produto.id}-${item.sabor_id}`;
+                    if (!lucrosPorSabor[key]) {
+                        lucrosPorSabor[key] = {
+                            marca: produto.marca,
+                            produto: produto.nome,
+                            sabor: item.sabor?.sabor || 'Carregando...',
+                            quantidade: 0,
+                            receita: 0,
+                            custo: 0
+                        };
+                    }
+                    
+                    lucrosPorSabor[key].quantidade += item.quantidade;
+                    lucrosPorSabor[key].receita += item.preco_unitario * item.quantidade;
+                    lucrosPorSabor[key].custo += (produto.preco_compra || 0) * item.quantidade;
+                }
+            }
+            
+            const tbody = document.getElementById('tbody-por-sabor');
+            const dados = Object.values(lucrosPorSabor).map(d => ({
+                ...d,
+                lucro: d.receita - d.custo,
+                margem: d.receita > 0 ? (d.receita - d.custo) / d.receita * 100 : 0
+            })).sort((a, b) => b.lucro - a.lucro);
+            
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-700">${d.marca || '-'}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${d.produto}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-blue-600">${d.sabor}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.quantidade.toFixed(2)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(d.receita)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(d.custo)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(d.lucro)}</td>
+                    <td class="px-6 py-4 text-sm text-purple-600">${d.margem.toFixed(1)}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderDetalhado() {
+            const vendas = filtrarVendas();
+            const tbody = document.getElementById('tbody-detalhado');
+            const linhas = [];
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    // Aplicar filtros
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    if (filtroAtual.sabor && item.sabor_id !== filtroAtual.sabor) return;
+                    
+                    const custoUnitario = produto.preco_compra || 0;
+                    const lucroUnitario = item.preco_unitario - custoUnitario;
+                    const lucroTotal = lucroUnitario * item.quantidade;
+                    
+                    linhas.push({
+                        data: venda.created_at,
+                        numero: venda.numero,
+                        cliente: venda.cliente?.nome || '-',
+                        produto: produto.nome,
+                        sabor: item.sabor?.sabor || '-',
+                        quantidade: item.quantidade,
+                        preco: item.preco_unitario,
+                        custo: custoUnitario,
+                        lucroUn: lucroUnitario,
+                        lucroTotal: lucroTotal
+                    });
+                });
+            });
+            
+            if (linhas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = linhas.map(l => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-600">${formatDate(l.data)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${l.numero}</td>
+                    <td class="px-6 py-4 text-sm text-gray-700">${l.cliente}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${l.produto}</td>
+                    <td class="px-6 py-4 text-sm text-blue-600">${l.sabor}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${l.quantidade}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(l.preco)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(l.custo)}</td>
+                    <td class="px-6 py-4 text-sm text-green-600">${formatCurrency(l.lucroUn)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(l.lucroTotal)}</td>
+                </tr>
+            `).join('');
+        }
+
+        // ========================================
+        // FUNÇÕES DE EXPORTAÇÃO
+        // ========================================
+
+        function exportarExcel() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            const timestamp = new Date().toLocaleString('pt-BR').replace(/[/:]/g, '-');
+            let dados = [];
+            let nomeArquivo = '';
+
+            switch(activeTab) {
+                case 'dashboard':
+                    showToast('Para exportar o dashboard, use a aba específica que deseja exportar', 'info');
+                    return;
+                case 'por-marca':
+                    dados = obterDadosPorMarca();
+                    nomeArquivo = `Lucros_Por_Marca_${timestamp}.xlsx`;
+                    break;
+                case 'por-produto':
+                    dados = obterDadosPorProduto();
+                    nomeArquivo = `Lucros_Por_Produto_${timestamp}.xlsx`;
+                    break;
+                case 'por-sabor':
+                    dados = obterDadosPorSabor();
+                    nomeArquivo = `Lucros_Por_Sabor_${timestamp}.xlsx`;
+                    break;
+                case 'detalhado':
+                    dados = obterDadosDetalhado();
+                    nomeArquivo = `Vendas_Detalhadas_${timestamp}.xlsx`;
+                    break;
+            }
+
+            if (dados.length === 0) {
+                showToast('Nenhum dado para exportar', 'warning');
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(dados);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+            XLSX.writeFile(wb, nomeArquivo);
+            showToast('Arquivo Excel exportado com sucesso!', 'success');
+        }
+
+        function exportarPDF() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            const timestamp = new Date().toLocaleString('pt-BR');
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Cabeçalho
+            doc.setFontSize(18);
+            doc.text('Análise de Lucros', 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${timestamp}`, 14, 22);
+
+            // Filtros aplicados
+            let filtros = [];
+            if (filtroAtual.marca) filtros.push(`Marca: ${document.getElementById('filter-marca').selectedOptions[0].text}`);
+            if (filtroAtual.produto) filtros.push(`Produto: ${document.getElementById('filter-produto').selectedOptions[0].text}`);
+            if (filtroAtual.sabor) filtros.push(`Sabor: ${document.getElementById('filter-sabor').selectedOptions[0].text}`);
+            if (filtroAtual.dataInicio) filtros.push(`De: ${new Date(filtroAtual.dataInicio).toLocaleDateString('pt-BR')}`);
+            if (filtroAtual.dataFim) filtros.push(`Até: ${new Date(filtroAtual.dataFim).toLocaleDateString('pt-BR')}`);
+            
+            if (filtros.length > 0) {
+                doc.setFontSize(9);
+                doc.text(`Filtros: ${filtros.join(' | ')}`, 14, 28);
+            }
+
+            let startY = filtros.length > 0 ? 35 : 28;
+
+            switch(activeTab) {
+                case 'dashboard':
+                    exportarDashboardPDF(doc, startY);
+                    break;
+                case 'por-marca':
+                    exportarTabelaPDF(doc, 'Lucro por Marca', obterDadosPorMarcaTabela(), startY);
+                    break;
+                case 'por-produto':
+                    exportarTabelaPDF(doc, 'Lucro por Produto', obterDadosPorProdutoTabela(), startY);
+                    break;
+                case 'por-sabor':
+                    exportarTabelaPDF(doc, 'Lucro por Sabor', obterDadosPorSaborTabela(), startY);
+                    break;
+                case 'detalhado':
+                    exportarTabelaPDF(doc, 'Vendas Detalhadas', obterDadosDetalhadoTabela(), startY);
+                    break;
+            }
+
+            doc.save(`Analise_Lucros_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('PDF exportado com sucesso!', 'success');
+        }
+
+        function exportarDashboardPDF(doc, startY) {
+            // Resumo dos cards
+            doc.setFontSize(12);
+            doc.text('Resumo Geral', 14, startY);
+            
+            const resumo = [
+                ['Receita Total', document.getElementById('card-receita').textContent],
+                ['Custo Total', document.getElementById('card-custo').textContent],
+                ['Lucro Total', document.getElementById('card-lucro').textContent],
+                ['Margem Média', document.getElementById('card-margem').textContent]
+            ];
+
+            doc.autoTable({
+                startY: startY + 5,
+                head: [['Métrica', 'Valor']],
+                body: resumo,
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] }
+            });
+
+            // Top Marcas
+            const vendasPorMarca = {};
+            filtrarVendas().forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    const marca = produto.marca || 'SEM MARCA';
+                    if (!vendasPorMarca[marca]) vendasPorMarca[marca] = 0;
+                    vendasPorMarca[marca] += item.preco_unitario * item.quantidade;
+                });
+            });
+
+            const topMarcas = Object.entries(vendasPorMarca)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([marca, valor]) => [marca, `R$ ${valor.toFixed(2)}`]);
+
+            doc.autoTable({
+                startY: doc.lastAutoTable.finalY + 10,
+                head: [['Top 5 Marcas', 'Vendas']],
+                body: topMarcas,
+                theme: 'striped',
+                headStyles: { fillColor: [34, 197, 94] }
+            });
+        }
+
+        function exportarTabelaPDF(doc, titulo, dados, startY) {
+            doc.setFontSize(12);
+            doc.text(titulo, 14, startY);
+
+            doc.autoTable({
+                startY: startY + 5,
+                head: [dados.headers],
+                body: dados.rows,
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] },
+                styles: { fontSize: 8 }
+            });
+        }
+
+        // Funções auxiliares para obter dados
+        function obterDadosPorMarca() {
+            const vendas = filtrarVendas();
+            const lucrosPorMarca = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    if (!lucrosPorMarca[marca]) {
+                        lucrosPorMarca[marca] = { quantidade: 0, receita: 0, custo: 0 };
+                    }
+                    
+                    lucrosPorMarca[marca].quantidade += item.quantidade;
+                    lucrosPorMarca[marca].receita += item.preco_unitario * item.quantidade;
+                    lucrosPorMarca[marca].custo += (produto.preco_compra || 0) * item.quantidade;
+                });
+            });
+            
+            return Object.entries(lucrosPorMarca).map(([marca, dados]) => ({
+                'Marca': marca,
+                'Qtd Vendida': dados.quantidade.toFixed(2),
+                'Receita': `R$ ${dados.receita.toFixed(2)}`,
+                'Custo': `R$ ${dados.custo.toFixed(2)}`,
+                'Lucro': `R$ ${(dados.receita - dados.custo).toFixed(2)}`,
+                'Margem %': dados.receita > 0 ? ((dados.receita - dados.custo) / dados.receita * 100).toFixed(1) + '%' : '0%'
+            }));
+        }
+
+        function obterDadosPorMarcaTabela() {
+            const dados = obterDadosPorMarca();
+            return {
+                headers: ['Marca', 'Qtd Vendida', 'Receita', 'Custo', 'Lucro', 'Margem'],
+                rows: dados.map(d => [d.Marca, d['Qtd Vendida'], d.Receita, d.Custo, d.Lucro, d['Margem %']])
+            };
+        }
+
+        function obterDadosPorProduto() {
+            const vendas = filtrarVendas();
+            const lucrosPorProduto = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    
+                    const key = produto.id;
+                    if (!lucrosPorProduto[key]) {
+                        lucrosPorProduto[key] = { 
+                            marca: produto.marca,
+                            produto: produto.nome,
+                            quantidade: 0, 
+                            receita: 0, 
+                            custo: 0 
+                        };
+                    }
+                    
+                    lucrosPorProduto[key].quantidade += item.quantidade;
+                    lucrosPorProduto[key].receita += item.preco_unitario * item.quantidade;
+                    lucrosPorProduto[key].custo += (produto.preco_compra || 0) * item.quantidade;
+                });
+            });
+            
+            return Object.values(lucrosPorProduto).map(d => ({
+                'Marca': d.marca || '-',
+                'Produto': d.produto,
+                'Qtd Vendida': d.quantidade.toFixed(2),
+                'Receita': `R$ ${d.receita.toFixed(2)}`,
+                'Custo': `R$ ${d.custo.toFixed(2)}`,
+                'Lucro': `R$ ${(d.receita - d.custo).toFixed(2)}`,
+                'Margem %': d.receita > 0 ? ((d.receita - d.custo) / d.receita * 100).toFixed(1) + '%' : '0%'
+            }));
+        }
+
+        function obterDadosPorProdutoTabela() {
+            const dados = obterDadosPorProduto();
+            return {
+                headers: ['Marca', 'Produto', 'Qtd Vendida', 'Receita', 'Custo', 'Lucro', 'Margem'],
+                rows: dados.map(d => [d.Marca, d.Produto, d['Qtd Vendida'], d.Receita, d.Custo, d.Lucro, d['Margem %']])
+            };
+        }
+
+        function obterDadosPorSabor() {
+            const vendas = filtrarVendas();
+            const lucrosPorSabor = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto || !item.sabor_id) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    if (filtroAtual.sabor && item.sabor_id !== filtroAtual.sabor) return;
+                    
+                    const key = `${produto.id}-${item.sabor_id}`;
+                    if (!lucrosPorSabor[key]) {
+                        lucrosPorSabor[key] = {
+                            marca: produto.marca,
+                            produto: produto.nome,
+                            sabor: item.sabor?.sabor || '-',
+                            quantidade: 0,
+                            receita: 0,
+                            custo: 0
+                        };
+                    }
+                    
+                    lucrosPorSabor[key].quantidade += item.quantidade;
+                    lucrosPorSabor[key].receita += item.preco_unitario * item.quantidade;
+                    lucrosPorSabor[key].custo += (produto.preco_compra || 0) * item.quantidade;
+                });
+            });
+            
+            return Object.values(lucrosPorSabor).map(d => ({
+                'Marca': d.marca || '-',
+                'Produto': d.produto,
+                'Sabor': d.sabor,
+                'Qtd Vendida': d.quantidade.toFixed(2),
+                'Receita': `R$ ${d.receita.toFixed(2)}`,
+                'Custo': `R$ ${d.custo.toFixed(2)}`,
+                'Lucro': `R$ ${(d.receita - d.custo).toFixed(2)}`,
+                'Margem %': d.receita > 0 ? ((d.receita - d.custo) / d.receita * 100).toFixed(1) + '%' : '0%'
+            }));
+        }
+
+        function obterDadosPorSaborTabela() {
+            const dados = obterDadosPorSabor();
+            return {
+                headers: ['Marca', 'Produto', 'Sabor', 'Qtd', 'Receita', 'Custo', 'Lucro', 'Margem'],
+                rows: dados.map(d => [d.Marca, d.Produto, d.Sabor, d['Qtd Vendida'], d.Receita, d.Custo, d.Lucro, d['Margem %']])
+            };
+        }
+
+        function obterDadosDetalhado() {
+            const vendas = filtrarVendas();
+            const linhas = [];
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    if (filtroAtual.sabor && item.sabor_id !== filtroAtual.sabor) return;
+                    
+                    const custoUnitario = produto.preco_compra || 0;
+                    const lucroUnitario = item.preco_unitario - custoUnitario;
+                    
+                    linhas.push({
+                        'Data': new Date(venda.created_at).toLocaleDateString('pt-BR'),
+                        'Pedido': venda.numero,
+                        'Cliente': venda.cliente?.nome || '-',
+                        'Produto': produto.nome,
+                        'Sabor': item.sabor?.sabor || '-',
+                        'Qtd': item.quantidade,
+                        'Preço Un.': `R$ ${item.preco_unitario.toFixed(2)}`,
+                        'Custo Un.': `R$ ${custoUnitario.toFixed(2)}`,
+                        'Lucro Un.': `R$ ${lucroUnitario.toFixed(2)}`,
+                        'Lucro Total': `R$ ${(lucroUnitario * item.quantidade).toFixed(2)}`
+                    });
+                });
+            });
+            
+            return linhas;
+        }
+
+        function obterDadosDetalhadoTabela() {
+            const dados = obterDadosDetalhado();
+            return {
+                headers: ['Data', 'Pedido', 'Cliente', 'Produto', 'Sabor', 'Qtd', 'Preço', 'Custo', 'Lucro Un.', 'Lucro Total'],
+                rows: dados.map(d => [d.Data, d.Pedido, d.Cliente, d.Produto, d.Sabor, d.Qtd, d['Preço Un.'], d['Custo Un.'], d['Lucro Un.'], d['Lucro Total']])
+            };
+        }
+
+        // ========================================
+        // DASHBOARD COM GRÁFICOS
+        // ========================================
+        
+        let chartInstances = {};
+
+        function renderDashboard() {
+            // Destruir gráficos existentes
+            Object.values(chartInstances).forEach(chart => chart?.destroy());
+            chartInstances = {};
+
+            const vendas = filtrarVendas();
+            
+            // Criar todos os gráficos
+            criarGraficoEvolucao(vendas);
+            criarGraficoMarcas(vendas);
+            criarGraficoClientes(vendas);
+            criarGraficoSabores(vendas);
+            criarGraficoProdutos(vendas);
+            criarGraficoLucroReceita(vendas);
+            criarGraficoDiario(vendas);
+        }
+
+        function criarGraficoEvolucao(vendas) {
+            const vendasPorDia = {};
+            
+            vendas.forEach(venda => {
+                const data = new Date(venda.created_at).toLocaleDateString('pt-BR');
+                if (!vendasPorDia[data]) {
+                    vendasPorDia[data] = 0;
+                }
+                venda.itens.forEach(item => {
+                    vendasPorDia[data] += item.preco_unitario * item.quantidade;
+                });
+            });
+
+            const datasOrdenadas = Object.keys(vendasPorDia).sort((a, b) => {
+                const [dA, mA, yA] = a.split('/');
+                const [dB, mB, yB] = b.split('/');
+                return new Date(yA, mA - 1, dA) - new Date(yB, mB - 1, dB);
+            });
+
+            const ctx = document.getElementById('chart-evolucao');
+            chartInstances.evolucao = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datasOrdenadas,
+                    datasets: [{
+                        label: 'Vendas (R$)',
+                        data: datasOrdenadas.map(d => vendasPorDia[d]),
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => 'R$ ' + value.toFixed(0)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoMarcas(vendas) {
+            const vendasPorMarca = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    if (!vendasPorMarca[marca]) {
+                        vendasPorMarca[marca] = 0;
+                    }
+                    vendasPorMarca[marca] += item.preco_unitario * item.quantidade;
+                });
+            });
+
+            const marcas = Object.entries(vendasPorMarca)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8);
+
+            const cores = [
+                'rgba(255, 99, 132, 0.8)',
+                'rgba(54, 162, 235, 0.8)',
+                'rgba(255, 206, 86, 0.8)',
+                'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)',
+                'rgba(255, 159, 64, 0.8)',
+                'rgba(199, 199, 199, 0.8)',
+                'rgba(83, 102, 255, 0.8)'
+            ];
+
+            const ctx = document.getElementById('chart-marcas');
+            chartInstances.marcas = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: marcas.map(m => m[0]),
+                    datasets: [{
+                        data: marcas.map(m => m[1]),
+                        backgroundColor: cores
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const label = ctx.label || '';
+                                    const value = ctx.parsed || 0;
+                                    return label + ': R$ ' + value.toFixed(2);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoClientes(vendas) {
+            const vendasPorCliente = {};
+            
+            vendas.forEach(venda => {
+                const cliente = venda.cliente?.nome || 'Cliente Avulso';
+                if (!vendasPorCliente[cliente]) {
+                    vendasPorCliente[cliente] = 0;
+                }
+                venda.itens.forEach(item => {
+                    vendasPorCliente[cliente] += item.preco_unitario * item.quantidade;
+                });
+            });
+
+            const topClientes = Object.entries(vendasPorCliente)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const ctx = document.getElementById('chart-clientes');
+            chartInstances.clientes = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topClientes.map(c => c[0]),
+                    datasets: [{
+                        label: 'Total Vendido (R$)',
+                        data: topClientes.map(c => c[1]),
+                        backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => 'R$ ' + value.toFixed(0)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoSabores(vendas) {
+            const qtdPorSabor = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    if (!item.sabor_id) return;
+                    
+                    const sabor = item.sabor?.sabor || 'Sabor Desconhecido';
+                    if (!qtdPorSabor[sabor]) {
+                        qtdPorSabor[sabor] = 0;
+                    }
+                    qtdPorSabor[sabor] += item.quantidade;
+                });
+            });
+
+            const topSabores = Object.entries(qtdPorSabor)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const ctx = document.getElementById('chart-sabores');
+            chartInstances.sabores = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topSabores.map(s => s[0]),
+                    datasets: [{
+                        label: 'Quantidade Vendida',
+                        data: topSabores.map(s => s[1]),
+                        backgroundColor: 'rgba(168, 85, 247, 0.8)',
+                        borderColor: 'rgba(168, 85, 247, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoProdutos(vendas) {
+            const qtdPorProduto = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    if (!qtdPorProduto[produto.nome]) {
+                        qtdPorProduto[produto.nome] = 0;
+                    }
+                    qtdPorProduto[produto.nome] += item.quantidade;
+                });
+            });
+
+            const topProdutos = Object.entries(qtdPorProduto)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+
+            const ctx = document.getElementById('chart-produtos');
+            chartInstances.produtos = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topProdutos.map(p => p[0]),
+                    datasets: [{
+                        label: 'Quantidade Vendida',
+                        data: topProdutos.map(p => p[1]),
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoLucroReceita(vendas) {
+            const dadosPorMarca = {};
+            
+            vendas.forEach(venda => {
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    if (!produto) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    if (!dadosPorMarca[marca]) {
+                        dadosPorMarca[marca] = { receita: 0, custo: 0 };
+                    }
+                    
+                    dadosPorMarca[marca].receita += item.preco_unitario * item.quantidade;
+                    dadosPorMarca[marca].custo += (produto.preco_compra || 0) * item.quantidade;
+                });
+            });
+
+            const marcas = Object.keys(dadosPorMarca).sort();
+
+            const ctx = document.getElementById('chart-lucro-receita');
+            chartInstances.lucroReceita = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: marcas,
+                    datasets: [
+                        {
+                            label: 'Receita',
+                            data: marcas.map(m => dadosPorMarca[m].receita),
+                            backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                            borderColor: 'rgba(34, 197, 94, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Custo',
+                            data: marcas.map(m => dadosPorMarca[m].custo),
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Lucro',
+                            data: marcas.map(m => dadosPorMarca[m].receita - dadosPorMarca[m].custo),
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => 'R$ ' + value.toFixed(0)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoDiario(vendas) {
+            const dadosPorDia = {};
+            
+            vendas.forEach(venda => {
+                const data = new Date(venda.created_at).toLocaleDateString('pt-BR');
+                if (!dadosPorDia[data]) {
+                    dadosPorDia[data] = { receita: 0, custo: 0 };
+                }
+                
+                venda.itens.forEach(item => {
+                    const produto = todosProdutos.find(p => p.id === item.produto_id);
+                    dadosPorDia[data].receita += item.preco_unitario * item.quantidade;
+                    dadosPorDia[data].custo += (produto?.preco_compra || 0) * item.quantidade;
+                });
+            });
+
+            const datasOrdenadas = Object.keys(dadosPorDia).sort((a, b) => {
+                const [dA, mA, yA] = a.split('/');
+                const [dB, mB, yB] = b.split('/');
+                return new Date(yA, mA - 1, dA) - new Date(yB, mB - 1, dB);
+            });
+
+            const ctx = document.getElementById('chart-diario');
+            chartInstances.diario = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datasOrdenadas,
+                    datasets: [
+                        {
+                            label: 'Receita',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].receita),
+                            borderColor: 'rgb(34, 197, 94)',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Custo',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].custo),
+                            borderColor: 'rgb(239, 68, 68)',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Lucro',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].receita - dadosPorDia[d].custo),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: value => 'R$ ' + value.toFixed(0)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Estoque - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Gerenciamento de Estoque</h2>
+                <p class="text-gray-600 mt-2">Controle completo de estoque por produto e sabor</p>
+            </div>
+
+            <!-- Filtros Globais -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Filtros</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                        <select id="filter-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarProdutosFiltro()">
+                            <option value="">Todas as marcas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto</label>
+                        <select id="filter-produto" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarSaboresFiltro()" disabled>
+                            <option value="">Todos os produtos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Sabor</label>
+                        <select id="filter-sabor" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()" disabled>
+                            <option value="">Todos os sabores</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Situação</label>
+                        <select id="filter-situacao" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                            <option value="">Todas</option>
+                            <option value="OK">OK</option>
+                            <option value="BAIXO">Estoque Baixo</option>
+                            <option value="ZERADO">Zerado</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-4 flex space-x-2">
+                    <button onclick="aplicarFiltros()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        🔍 Filtrar
+                    </button>
+                    <button onclick="limparFiltros()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">
+                        🔄 Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px">
+                        <button onclick="switchTab('estoque-produto')" id="tab-estoque-produto" class="tab-button active py-4 px-6 font-medium text-sm border-b-2 border-blue-600 text-blue-600">
+                            📦 Estoque por Produto
+                        </button>
+                        <button onclick="switchTab('estoque-sabor')" id="tab-estoque-sabor" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            🍓 Estoque por Sabor
+                        </button>
+                        <button onclick="switchTab('mov-produto')" id="tab-mov-produto" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            📊 Movimentações Produto
+                        </button>
+                        <button onclick="switchTab('mov-sabor')" id="tab-mov-sabor" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700">
+                            📈 Movimentações Sabor
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab Content: Estoque por Produto -->
+                <div id="content-estoque-produto" class="tab-content p-6">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">Estoque Geral por Produto</h3>
+                        <button onclick="exportarCSV('produto')" class="text-green-600 hover:text-green-800 text-sm">📥 Exportar CSV</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque Total</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque Mínimo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Sabores</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-estoque-produto" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Estoque por Sabor -->
+                <div id="content-estoque-sabor" class="tab-content p-6 hidden">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">Estoque Detalhado por Sabor</h3>
+                        <button onclick="exportarCSV('sabor')" class="text-green-600 hover:text-green-800 text-sm">📥 Exportar CSV</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sabor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Situação</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço Compra</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço Venda</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-estoque-sabor" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Movimentações Produto -->
+                <div id="content-mov-produto" class="tab-content p-6 hidden">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">Movimentações por Produto</h3>
+                        <button onclick="exportarCSV('mov-produto')" class="text-green-600 hover:text-green-800 text-sm">📥 Exportar CSV</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Anterior</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Est. Novo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuário</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-mov-produto" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Movimentações Sabor -->
+                <div id="content-mov-sabor" class="tab-content p-6 hidden">
+                    <div class="mb-4 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold">Movimentações por Sabor</h3>
+                        <button onclick="exportarCSV('mov-sabor')" class="text-green-600 hover:text-green-800 text-sm">📥 Exportar CSV</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sabor</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantidade</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuário</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-mov-sabor" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/produtos.js"></script>
+    <script src="../js/services/estoque.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        let todosProdutos = [];
+        let todosSabores = [];
+        let todasMovimentacoes = [];
+        let filtroAtual = {
+            marca: '',
+            produto: '',
+            sabor: '',
+            situacao: ''
+        };
+
+        (async () => {
+            await checkAuth();
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            
+            await carregarMarcasFiltro();
+            await carregarDados();
+        })();
+
+        async function carregarMarcasFiltro() {
+            const marcas = await getMarcas();
+            const select = document.getElementById('filter-marca');
+            select.innerHTML = '<option value="">Todas as marcas</option>';
+            marcas.forEach(marca => {
+                const option = document.createElement('option');
+                option.value = marca;
+                option.textContent = marca;
+                select.appendChild(option);
+            });
+        }
+
+        async function carregarProdutosFiltro() {
+            const marca = document.getElementById('filter-marca').value;
+            const selectProduto = document.getElementById('filter-produto');
+            const selectSabor = document.getElementById('filter-sabor');
+            
+            // Resetar selects
+            selectProduto.innerHTML = '<option value="">Todos os produtos</option>';
+            selectSabor.innerHTML = '<option value="">Todos os sabores</option>';
+            selectSabor.disabled = true;
+            
+            if (!marca) {
+                selectProduto.disabled = true;
+                aplicarFiltros();
+                return;
+            }
+            
+            const produtos = todosProdutos.filter(p => p.marca === marca);
+            produtos.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.nome;
+                selectProduto.appendChild(option);
+            });
+            
+            selectProduto.disabled = false;
+            aplicarFiltros();
+        }
+
+        async function carregarSaboresFiltro() {
+            const produtoId = document.getElementById('filter-produto').value;
+            const selectSabor = document.getElementById('filter-sabor');
+            
+            selectSabor.innerHTML = '<option value="">Todos os sabores</option>';
+            
+            if (!produtoId) {
+                selectSabor.disabled = true;
+                aplicarFiltros();
+                return;
+            }
+            
+            const sabores = await getSaboresProduto(produtoId);
+            sabores.forEach(s => {
+                const option = document.createElement('option');
+                option.value = s.id;
+                option.textContent = s.sabor;
+                selectSabor.appendChild(option);
+            });
+            
+            selectSabor.disabled = false;
+            aplicarFiltros();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filter-marca').value = '';
+            document.getElementById('filter-produto').value = '';
+            document.getElementById('filter-produto').disabled = true;
+            document.getElementById('filter-sabor').value = '';
+            document.getElementById('filter-sabor').disabled = true;
+            document.getElementById('filter-situacao').value = '';
+            
+            filtroAtual = { marca: '', produto: '', sabor: '', situacao: '' };
+            aplicarFiltros();
+        }
+
+        function aplicarFiltros() {
+            filtroAtual.marca = document.getElementById('filter-marca').value;
+            filtroAtual.produto = document.getElementById('filter-produto').value;
+            filtroAtual.sabor = document.getElementById('filter-sabor').value;
+            filtroAtual.situacao = document.getElementById('filter-situacao').value;
+            
+            renderizarTabAtiva();
+        }
+
+        async function carregarDados() {
+            showLoading(true);
+            try {
+                // Carregar produtos
+                todosProdutos = await listProdutos();
+                
+                // Carregar todos os sabores
+                const { data: sabores, error } = await supabase
+                    .from('vw_estoque_sabores')
+                    .select('*')
+                    .order('marca, produto, sabor');
+                
+                if (error) throw error;
+                todosSabores = sabores || [];
+                
+                // Carregar movimentações
+                todasMovimentacoes = await listMovimentacoes({ limit: 500 });
+                
+                renderizarTabAtiva();
+            } catch (error) {
+                handleError(error, 'Erro ao carregar dados');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function switchTab(tabName) {
+            // Atualizar botões
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active', 'border-blue-600', 'text-blue-600');
+            document.getElementById(`tab-${tabName}`).classList.remove('border-transparent', 'text-gray-500');
+            
+            // Atualizar conteúdo
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
+            renderizarTabAtiva();
+        }
+
+        function renderizarTabAtiva() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            
+            switch(activeTab) {
+                case 'estoque-produto':
+                    renderEstoqueProduto();
+                    break;
+                case 'estoque-sabor':
+                    renderEstoqueSabor();
+                    break;
+                case 'mov-produto':
+                    renderMovimentacoesProduto();
+                    break;
+                case 'mov-sabor':
+                    renderMovimentacoesSabor();
+                    break;
+            }
+        }
+
+        function renderEstoqueProduto() {
+            let produtos = [...todosProdutos];
+            
+            // Aplicar filtros
+            if (filtroAtual.marca) {
+                produtos = produtos.filter(p => p.marca === filtroAtual.marca);
+            }
+            if (filtroAtual.produto) {
+                produtos = produtos.filter(p => p.id === filtroAtual.produto);
+            }
+            if (filtroAtual.situacao) {
+                produtos = produtos.filter(p => {
+                    const situacao = getSituacaoEstoque(p).tipo;
+                    return situacao === filtroAtual.situacao;
+                });
+            }
+            
+            const tbody = document.getElementById('tbody-estoque-produto');
+            
+            if (produtos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhum produto encontrado</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = produtos.map(p => {
+                const situacao = getSituacaoEstoque(p);
+                const qtdSabores = todosSabores.filter(s => s.produto_id === p.id).length;
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.codigo}</td>
+                        <td class="px-6 py-4 text-sm text-gray-700">${p.marca || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${p.nome}</td>
+                        <td class="px-6 py-4 text-sm"><span class="font-semibold ${situacao.color}">${p.estoque_atual} ${p.unidade}</span></td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${p.estoque_minimo} ${p.unidade}</td>
+                        <td class="px-6 py-4 text-sm">${situacao.badge}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${qtdSabores} sabor${qtdSabores != 1 ? 'es' : ''}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderEstoqueSabor() {
+            let sabores = [...todosSabores];
+            
+            // Aplicar filtros
+            if (filtroAtual.marca) {
+                sabores = sabores.filter(s => s.marca === filtroAtual.marca);
+            }
+            if (filtroAtual.produto) {
+                sabores = sabores.filter(s => s.produto_id === filtroAtual.produto);
+            }
+            if (filtroAtual.sabor) {
+                sabores = sabores.filter(s => s.sabor_id === filtroAtual.sabor);
+            }
+            if (filtroAtual.situacao) {
+                sabores = sabores.filter(s => s.status_estoque === filtroAtual.situacao);
+            }
+            
+            const tbody = document.getElementById('tbody-estoque-sabor');
+            
+            if (sabores.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum sabor encontrado</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = sabores.map(s => {
+                const situacao = s.status_estoque === 'BAIXO' ? 'text-red-600' : 'text-green-600';
+                const badge = s.status_estoque === 'BAIXO' 
+                    ? '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Baixo</span>'
+                    : '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">OK</span>';
+                const margem = s.preco_venda && s.preco_compra 
+                    ? ((s.preco_venda - s.preco_compra) / s.preco_compra * 100).toFixed(1) + '%'
+                    : '-';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm text-gray-700">${s.marca || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${s.produto}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-blue-600">${s.sabor}</td>
+                        <td class="px-6 py-4 text-sm"><span class="font-semibold ${situacao}">${s.quantidade}</span></td>
+                        <td class="px-6 py-4 text-sm">${badge}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${formatCurrency(s.preco_compra || 0)}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">${formatCurrency(s.preco_venda || 0)}</td>
+                        <td class="px-6 py-4 text-sm text-green-600">${margem}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function renderMovimentacoesProduto() {
+            let movimentacoes = [...todasMovimentacoes];
+            
+            // Aplicar filtros
+            if (filtroAtual.marca) {
+                const produtosIds = todosProdutos.filter(p => p.marca === filtroAtual.marca).map(p => p.id);
+                movimentacoes = movimentacoes.filter(m => produtosIds.includes(m.produto_id));
+            }
+            if (filtroAtual.produto) {
+                movimentacoes = movimentacoes.filter(m => m.produto_id === filtroAtual.produto);
+            }
+            
+            const tbody = document.getElementById('tbody-mov-produto');
+            
+            if (movimentacoes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhuma movimentação encontrada</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = movimentacoes.map(m => {
+                const tipoBadge = m.tipo === 'ENTRADA'
+                    ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Entrada</span>'
+                    : '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Saída</span>';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm text-gray-600">${formatDateTime(m.created_at)}</td>
+                        <td class="px-6 py-4 text-sm">${tipoBadge}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${m.produto?.nome || '-'}</td>
+                        <td class="px-6 py-4 text-sm font-medium">${m.quantidade}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${m.estoque_anterior}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${m.estoque_novo}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${m.usuario?.full_name || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${m.observacao || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function renderMovimentacoesSabor() {
+            let movimentacoes = todasMovimentacoes.filter(m => m.sabor_id !== null);
+            
+            // Aplicar filtros
+            if (filtroAtual.marca) {
+                const produtosIds = todosProdutos.filter(p => p.marca === filtroAtual.marca).map(p => p.id);
+                movimentacoes = movimentacoes.filter(m => produtosIds.includes(m.produto_id));
+            }
+            if (filtroAtual.produto) {
+                movimentacoes = movimentacoes.filter(m => m.produto_id === filtroAtual.produto);
+            }
+            if (filtroAtual.sabor) {
+                movimentacoes = movimentacoes.filter(m => m.sabor_id === filtroAtual.sabor);
+            }
+            
+            const tbody = document.getElementById('tbody-mov-sabor');
+            
+            if (movimentacoes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhuma movimentação de sabor encontrada</td></tr>';
+                return;
+            }
+            
+            // Buscar informações dos sabores
+            const movimentacoesComSabor = await Promise.all(movimentacoes.map(async m => {
+                if (m.sabor_id) {
+                    const { data: sabor } = await supabase
+                        .from('produto_sabores')
+                        .select('sabor')
+                        .eq('id', m.sabor_id)
+                        .single();
+                    m.sabor_nome = sabor?.sabor || '-';
+                }
+                return m;
+            }));
+            
+            tbody.innerHTML = movimentacoesComSabor.map(m => {
+                const tipoBadge = m.tipo === 'ENTRADA'
+                    ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Entrada</span>'
+                    : '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Saída</span>';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm text-gray-600">${formatDateTime(m.created_at)}</td>
+                        <td class="px-6 py-4 text-sm">${tipoBadge}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${m.produto?.nome || '-'}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-blue-600">${m.sabor_nome}</td>
+                        <td class="px-6 py-4 text-sm font-medium">${m.quantidade}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${m.usuario?.full_name || '-'}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">${m.observacao || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getSituacaoEstoque(produto) {
+            if (produto.estoque_atual === 0) {
+                return {
+                    tipo: 'ZERADO',
+                    badge: '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Zerado</span>',
+                    color: 'text-red-600'
+                };
+            } else if (produto.estoque_atual <= produto.estoque_minimo) {
+                return {
+                    tipo: 'BAIXO',
+                    badge: '<span class="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Baixo</span>',
+                    color: 'text-yellow-600'
+                };
+            } else {
+                return {
+                    tipo: 'OK',
+                    badge: '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">OK</span>',
+                    color: 'text-green-600'
+                };
+            }
+        }
+
+        function exportarCSV(tipo) {
+            // TODO: Implementar exportação CSV
+            showToast('Funcionalidade de exportação em desenvolvimento', 'info');
+        }
+
+        function formatDateTime(date) {
+            return new Date(date).toLocaleString('pt-BR');
+        }
+    </script>
+</body>
+</html>

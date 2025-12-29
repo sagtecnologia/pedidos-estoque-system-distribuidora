@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendas - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">Vendas</h2>
+                    <p class="text-gray-600 mt-1">Gerenciamento de vendas</p>
+                </div>
+                <button onclick="novaVenda()" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition">
+                    + Nova Venda
+                </button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select id="filter-status" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                            <option value="">Todos os status</option>
+                            <option value="RASCUNHO">Rascunho</option>
+                            <option value="ENVIADO">Enviado</option>
+                            <option value="APROVADO">Aprovado</option>
+                            <option value="REJEITADO">Rejeitado</option>
+                            <option value="FINALIZADO">Finalizado</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
+                        <select id="filter-cliente" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                            <option value="">Todos os clientes</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Número</label>
+                        <input type="text" id="search" placeholder="Buscar número..." class="w-full px-4 py-2 border border-gray-300 rounded-lg" onkeyup="loadVendas()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input type="date" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+                        <input type="date" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="limparFiltros()" class="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Limpar</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendedor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendas-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Nova Venda -->
+    <div id="modal-nova-venda" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Nova Venda</h3>
+                <button onclick="closeModal('modal-nova-venda')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-nova-venda" class="px-6 py-4">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cliente*</label>
+                        <select id="venda-cliente" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="">Selecione um cliente...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+                        <textarea id="venda-observacoes" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Informações sobre a entrega, forma de pagamento, etc..."></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeModal('modal-nova-venda')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Criar Venda</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/pedidos.js"></script>
+    <script src="../js/services/clientes.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/modal.js"></script>
+    
+    <script>
+        let currentUser = null;
+
+        (async () => {
+            await checkAuth();
+            currentUser = await getCurrentUser();
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            
+            // Definir data padrão (dia atual)
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-data-inicio').value = hoje;
+            document.getElementById('filter-data-fim').value = hoje;
+            
+            await loadClientesSelect();
+            await loadVendas();
+        })();
+
+        // Carregar clientes no select
+        async function loadClientesSelect() {
+            const clientes = await getClientes();
+            
+            // Select do modal
+            const select = document.getElementById('venda-cliente');
+            select.innerHTML = '<option value="">Selecione um cliente...</option>';
+            clientes.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = `${c.nome}${c.cpf_cnpj ? ' - ' + c.cpf_cnpj : ''}`;
+                select.appendChild(option);
+            });
+            
+            // Select do filtro
+            const filterSelect = document.getElementById('filter-cliente');
+            filterSelect.innerHTML = '<option value="">Todos os clientes</option>';
+            clientes.forEach(c => {
+                const option = document.createElement('option');
+                option.value = c.id;
+                option.textContent = c.nome;
+                filterSelect.appendChild(option);
+            });
+        }
+
+        // Carregar vendas
+        async function loadVendas() {
+            const status = document.getElementById('filter-status').value;
+            const search = document.getElementById('search').value;
+            const clienteId = document.getElementById('filter-cliente').value;
+            const dataInicio = document.getElementById('filter-data-inicio').value;
+            const dataFim = document.getElementById('filter-data-fim').value;
+            
+            showLoading(true);
+            
+            try {
+                let query = supabase
+                    .from('pedidos')
+                    .select(`
+                        *,
+                        cliente:clientes(nome),
+                        solicitante:users!pedidos_solicitante_id_fkey(full_name)
+                    `)
+                    .eq('tipo_pedido', 'VENDA');
+                
+                if (status) {
+                    query = query.eq('status', status);
+                }
+                
+                if (clienteId) {
+                    query = query.eq('cliente_id', clienteId);
+                }
+                
+                if (search) {
+                    query = query.ilike('numero', `%${search}%`);
+                }
+                
+                if (dataInicio) {
+                    // Início do dia às 00:00:00 no fuso local
+                    const dataInicioObj = new Date(dataInicio + 'T00:00:00');
+                    query = query.gte('created_at', dataInicioObj.toISOString());
+                }
+                
+                if (dataFim) {
+                    // Fim do dia às 23:59:59 no fuso local
+                    const dataFimObj = new Date(dataFim + 'T23:59:59');
+                    query = query.lte('created_at', dataFimObj.toISOString());
+                }
+                
+                const { data, error } = await query.order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                renderVendas(data || []);
+            } catch (error) {
+                handleError(error, 'Erro ao carregar vendas');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        // Limpar filtros
+        function limparFiltros() {
+            const hoje = new Date().toISOString().split('T')[0];
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-cliente').value = '';
+            document.getElementById('search').value = '';
+            document.getElementById('filter-data-inicio').value = hoje;
+            document.getElementById('filter-data-fim').value = hoje;
+            loadVendas();
+        }
+
+        // Renderizar vendas
+        function renderVendas(vendas) {
+            const tbody = document.getElementById('vendas-tbody');
+            
+            if (vendas.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = vendas.map(venda => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4">
+                        <div class="font-medium text-gray-900">${venda.numero}</div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        ${venda.solicitante?.full_name || '-'}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-900">
+                        ${venda.cliente?.nome || '-'}
+                    </td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                        ${formatCurrency(venda.total || 0)}
+                    </td>
+                    <td class="px-6 py-4">
+                        ${getStatusBadge(venda.status)}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        ${formatDate(venda.created_at)}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        <a href="/pages/venda-detalhe.html?id=${venda.id}" class="text-blue-600 hover:text-blue-800">
+                            Ver Detalhes
+                        </a>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Badge de status
+        function getStatusBadge(status) {
+            const badges = {
+                'RASCUNHO': '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Rascunho</span>',
+                'ENVIADO': '<span class="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">Enviado</span>',
+                'APROVADO': '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Aprovado</span>',
+                'REJEITADO': '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Rejeitado</span>',
+                'FINALIZADO': '<span class="px-2 py-1 text-xs rounded-full bg-purple-100 text-purple-800">Finalizado</span>'
+            };
+            return badges[status] || status;
+        }
+
+        // Nova venda
+        function novaVenda() {
+            openModal('modal-nova-venda');
+        }
+
+        // Form nova venda
+        document.getElementById('form-nova-venda').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const vendaData = {
+                tipo_pedido: 'VENDA',
+                cliente_id: document.getElementById('venda-cliente').value,
+                observacoes: document.getElementById('venda-observacoes').value || null
+            };
+
+            const venda = await createPedido(vendaData);
+            
+            if (venda) {
+                closeModal('modal-nova-venda');
+                window.location.href = `/pages/venda-detalhe.html?id=${venda.id}`;
+            }
+        });
+    </script>
+</body>
+</html>
