@@ -576,3 +576,41 @@ async function deletePedido(pedidoId) {
         showLoading(false);
     }
 }
+
+// Excluir item do pedido
+async function deleteItemPedido(itemId) {
+    try {
+        showLoading(true);
+        
+        // Buscar informações do item antes de excluir
+        const { data: item, error: errorItem } = await supabase
+            .from('pedido_itens')
+            .select('pedido_id, pedido:pedidos(status)')
+            .eq('id', itemId)
+            .single();
+            
+        if (errorItem) throw errorItem;
+        
+        // Verificar se o pedido está em RASCUNHO
+        if (item.pedido.status !== 'RASCUNHO') {
+            throw new Error('Apenas itens de pedidos em RASCUNHO podem ser removidos');
+        }
+        
+        // Excluir o item
+        const { error: errorDelete } = await supabase
+            .from('pedido_itens')
+            .delete()
+            .eq('id', itemId);
+            
+        if (errorDelete) throw errorDelete;
+        
+        showToast('Item removido com sucesso!', 'success');
+        return true;
+        
+    } catch (error) {
+        handleError(error, 'Erro ao remover item');
+        return false;
+    } finally {
+        showLoading(false);
+    }
+}

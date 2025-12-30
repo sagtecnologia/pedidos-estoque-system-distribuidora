@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vendas com Pagamento Pendente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar-container"></div>
+    
+    <div id="sidebar-container"></div>
+    
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Cabeçalho -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h1 class="text-2xl font-bold text-gray-800">Vendas com Pagamento Pendente</h1>
+                            <p class="text-gray-600 mt-1">Gerencie vendas com saldo a receber</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-600">Total Pendente</p>
+                            <p id="total-pendente" class="text-3xl font-bold text-orange-600">R$ 0,00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                            <input type="text" id="filtro-cliente" placeholder="Buscar por cliente..."
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Status Pagamento</label>
+                            <select id="filtro-status" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                                <option value="">Todos</option>
+                                <option value="PENDENTE">Pendente</option>
+                                <option value="PARCIAL" selected>Parcial</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end">
+                            <button onclick="loadVendasPendentes()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                <i class="fas fa-search mr-2"></i>Buscar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Vendas -->
+                <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nº Venda</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Total</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Pago</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Pendente</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vendas-tbody" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                                        <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                                        <p>Carregando vendas...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+    <!-- Modal de Pagamento -->
+    <div id="modal-pagamento" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-gray-800">Registrar Pagamento</h3>
+                    <button onclick="fecharModalPagamento()" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+
+                <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p class="text-gray-600">Valor Total:</p>
+                            <p id="modal-total" class="font-bold text-lg">R$ 0,00</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-600">Já Pago:</p>
+                            <p id="modal-pago" class="font-bold text-lg text-green-600">R$ 0,00</p>
+                        </div>
+                        <div class="col-span-2">
+                            <p class="text-gray-600">Saldo Pendente:</p>
+                            <p id="modal-pendente" class="font-bold text-2xl text-orange-600">R$ 0,00</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="form-pagamento" class="space-y-4">
+                    <input type="hidden" id="pagamento-venda-id">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Valor do Pagamento *</label>
+                        <input type="number" id="pagamento-valor" step="0.01" min="0.01" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            placeholder="0,00" oninput="atualizarRestante()">
+                        <p id="pagamento-restante" class="text-sm text-gray-600 mt-1"></p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento *</label>
+                        <select id="pagamento-forma" required
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500">
+                            <option value="">Selecione...</option>
+                            <option value="DINHEIRO">Dinheiro</option>
+                            <option value="PIX">PIX</option>
+                            <option value="CREDITO">Cartão de Crédito</option>
+                            <option value="DEBITO">Cartão de Débito</option>
+                            <option value="TRANSFERENCIA">Transferência</option>
+                            <option value="CHEQUE">Cheque</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                        <textarea id="pagamento-observacao" rows="3"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                            placeholder="Informações adicionais sobre o pagamento..."></textarea>
+                    </div>
+
+                    <div class="flex gap-3 pt-4">
+                        <button type="button" onclick="fecharModalPagamento()"
+                            class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300">
+                            Cancelar
+                        </button>
+                        <button type="submit"
+                            class="flex-1 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                            <i class="fas fa-check mr-2"></i>Registrar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script>
+        let vendas = [];
+        let vendaAtual = null;
+        let currentUser = null;
+
+        async function loadVendasPendentes() {
+            try {
+                const tbody = document.getElementById('vendas-tbody');
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            <i class="fas fa-spinner fa-spin text-3xl mb-3"></i>
+                            <p>Carregando vendas...</p>
+                        </td>
+                    </tr>
+                `;
+
+                const filtroCliente = document.getElementById('filtro-cliente').value;
+                const filtroStatus = document.getElementById('filtro-status').value;
+
+                let query = supabase
+                    .from('pedidos')
+                    .select(`
+                        *,
+                        cliente:clientes(nome, contato, whatsapp),
+                        solicitante:users!pedidos_solicitante_id_fkey(full_name)
+                    `)
+                    .eq('tipo_pedido', 'VENDA')
+                    .eq('status', 'FINALIZADO')
+                    .in('pagamento_status', ['PENDENTE', 'PARCIAL'])
+                    .order('created_at', { ascending: false });
+
+                if (filtroStatus) {
+                    query = query.eq('pagamento_status', filtroStatus);
+                }
+
+                const { data, error } = await query;
+
+                if (error) throw error;
+
+                // Filtrar por cliente (busca no texto)
+                vendas = data;
+                if (filtroCliente) {
+                    const busca = filtroCliente.toLowerCase();
+                    vendas = vendas.filter(v => 
+                        v.cliente?.nome?.toLowerCase().includes(busca)
+                    );
+                }
+
+                renderVendas();
+                calcularTotalPendente();
+
+            } catch (error) {
+                console.error('Erro ao carregar vendas:', error);
+                showToast('Erro ao carregar vendas pendentes', 'error');
+                document.getElementById('vendas-tbody').innerHTML = `
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-red-500">
+                            <i class="fas fa-exclamation-triangle text-3xl mb-3"></i>
+                            <p>Erro ao carregar vendas</p>
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+
+        function renderVendas() {
+            const tbody = document.getElementById('vendas-tbody');
+
+            if (vendas.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                            <i class="fas fa-check-circle text-3xl mb-3 text-green-500"></i>
+                            <p>Nenhuma venda com pagamento pendente</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = vendas.map(venda => {
+                const statusBadge = venda.pagamento_status === 'PENDENTE' 
+                    ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Pendente</span>'
+                    : '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">Parcial</span>';
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="font-medium text-gray-900">#${venda.numero}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900">${venda.cliente?.nome || '-'}</div>
+                            <div class="text-sm text-gray-500">${venda.cliente?.whatsapp || venda.cliente?.contato || ''}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${formatDate(venda.created_at)}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-semibold text-gray-900">${formatCurrency(venda.total || 0)}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-semibold text-green-600">${formatCurrency(venda.valor_pago || 0)}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span class="text-sm font-bold text-orange-600">${formatCurrency(venda.valor_pendente || 0)}</span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            ${statusBadge}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <button onclick="abrirModalPagamento('${venda.id}')"
+                                class="text-green-600 hover:text-green-900 mr-3" title="Registrar Pagamento">
+                                <i class="fas fa-money-bill-wave text-lg"></i>
+                            </button>
+                            <a href="venda-detalhe.html?id=${venda.id}&origem=pendentes"
+                                class="text-blue-600 hover:text-blue-900" title="Ver Detalhes">
+                                <i class="fas fa-eye text-lg"></i>
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function calcularTotalPendente() {
+            const total = vendas.reduce((sum, venda) => sum + (venda.valor_pendente || 0), 0);
+            document.getElementById('total-pendente').textContent = formatCurrency(total);
+        }
+
+        window.abrirModalPagamento = function(vendaId) {
+            vendaAtual = vendas.find(v => v.id == vendaId);
+            if (!vendaAtual) {
+                console.error('Venda não encontrada:', vendaId);
+                return;
+            }
+
+            document.getElementById('pagamento-venda-id').value = vendaId;
+            document.getElementById('modal-total').textContent = formatCurrency(vendaAtual.total || 0);
+            document.getElementById('modal-pago').textContent = formatCurrency(vendaAtual.valor_pago || 0);
+            document.getElementById('modal-pendente').textContent = formatCurrency(vendaAtual.valor_pendente || 0);
+            
+            document.getElementById('pagamento-valor').value = '';
+            document.getElementById('pagamento-forma').value = '';
+            document.getElementById('pagamento-observacao').value = '';
+            document.getElementById('pagamento-restante').textContent = '';
+            
+            document.getElementById('modal-pagamento').classList.remove('hidden');
+            document.getElementById('modal-pagamento').classList.add('flex');
+        };
+
+        window.fecharModalPagamento = function() {
+            document.getElementById('modal-pagamento').classList.add('hidden');
+            document.getElementById('modal-pagamento').classList.remove('flex');
+            vendaAtual = null;
+        };
+
+        window.atualizarRestante = function() {
+            if (!vendaAtual) return;
+            
+            const valorPagamento = parseFloat(document.getElementById('pagamento-valor').value) || 0;
+            const valorPendente = vendaAtual.valor_pendente || 0;
+            const restante = valorPendente - valorPagamento;
+            
+            const restanteEl = document.getElementById('pagamento-restante');
+            if (valorPagamento > 0) {
+                if (restante > 0) {
+                    restanteEl.textContent = `Restará: ${formatCurrency(restante)}`;
+                    restanteEl.className = 'text-sm text-orange-600 mt-1 font-semibold';
+                } else if (restante === 0) {
+                    restanteEl.textContent = 'Pagamento será quitado!';
+                    restanteEl.className = 'text-sm text-green-600 mt-1 font-semibold';
+                } else {
+                    restanteEl.textContent = `ATENÇÃO: Valor excede o pendente em ${formatCurrency(Math.abs(restante))}`;
+                    restanteEl.className = 'text-sm text-red-600 mt-1 font-semibold';
+                }
+            } else {
+                restanteEl.textContent = '';
+            }
+        };
+
+        // Form de pagamento
+        document.getElementById('form-pagamento').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const vendaId = parseInt(document.getElementById('pagamento-venda-id').value);
+            const valor = parseFloat(document.getElementById('pagamento-valor').value);
+            const forma = document.getElementById('pagamento-forma').value;
+            const observacao = document.getElementById('pagamento-observacao').value;
+
+            if (!vendaAtual) return;
+
+            // Validar valor
+            if (valor <= 0) {
+                showToast('Valor do pagamento deve ser maior que zero', 'error');
+                return;
+            }
+
+            if (valor > vendaAtual.valor_pendente) {
+                if (!confirm('O valor informado é maior que o saldo pendente. Deseja continuar?')) {
+                    return;
+                }
+            }
+
+            try {
+                // Registrar pagamento
+                const { error: pagamentoError } = await supabase
+                    .from('pagamentos')
+                    .insert({
+                        pedido_id: vendaId,
+                        valor: valor,
+                        forma_pagamento: forma,
+                        observacao: observacao
+                    });
+
+                if (pagamentoError) throw pagamentoError;
+
+                // Calcular novos valores
+                const novoValorPago = (vendaAtual.valor_pago || 0) + valor;
+                const novoValorPendente = (vendaAtual.total || 0) - novoValorPago;
+                const novoStatus = novoValorPendente <= 0 ? 'PAGO' : (novoValorPago > 0 ? 'PARCIAL' : 'PENDENTE');
+
+                // Atualizar pedido
+                const updateData = {
+                    valor_pago: novoValorPago,
+                    valor_pendente: Math.max(0, novoValorPendente),
+                    pagamento_status: novoStatus
+                };
+
+                if (novoStatus === 'PAGO') {
+                    updateData.data_pagamento_completo = new Date().toISOString();
+                }
+
+                const { error: updateError } = await supabase
+                    .from('pedidos')
+                    .update(updateData)
+                    .eq('id', vendaId);
+
+                if (updateError) throw updateError;
+
+                showToast('Pagamento registrado com sucesso!', 'success');
+                fecharModalPagamento();
+                loadVendasPendentes();
+
+            } catch (error) {
+                console.error('Erro ao registrar pagamento:', error);
+                showToast('Erro ao registrar pagamento', 'error');
+            }
+        });
+
+        // Inicialização
+        (async () => {
+            await checkAuth();
+            currentUser = await getCurrentUser();
+            document.getElementById('navbar-container').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            loadVendasPendentes();
+        })();
+    </script>
+</body>
+</html>

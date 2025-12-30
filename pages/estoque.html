@@ -22,6 +22,54 @@
                 <p class="text-gray-600 mt-2">Controle completo de estoque por produto e sabor</p>
             </div>
 
+            <!-- Cards de Totais -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Valor Total Compra</p>
+                            <p id="card-total-compra" class="text-2xl font-bold text-blue-600">R$ 0,00</p>
+                            <p class="text-xs text-gray-500 mt-1">Investimento em estoque</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Valor Total Venda</p>
+                            <p id="card-total-venda" class="text-2xl font-bold text-green-600">R$ 0,00</p>
+                            <p class="text-xs text-gray-500 mt-1">Valor potencial de venda</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Margem de Lucro</p>
+                            <p id="card-margem-lucro" class="text-2xl font-bold text-purple-600">R$ 0,00</p>
+                            <p id="card-margem-percentual" class="text-xs text-gray-500 mt-1">0%</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Filtros Globais -->
             <div class="bg-white rounded-lg shadow p-6 mb-6">
                 <h3 class="text-lg font-semibold mb-4">Filtros</h3>
@@ -328,6 +376,38 @@
             filtroAtual.situacao = document.getElementById('filter-situacao').value;
             
             renderizarTabAtiva();
+            calcularTotaisEstoque();
+        }
+
+        function calcularTotaisEstoque() {
+            let totalCompra = 0;
+            let totalVenda = 0;
+            
+            // Calcular com base nos sabores em estoque
+            todosSabores.forEach(sabor => {
+                const produto = todosProdutos.find(p => p.id === sabor.produto_id);
+                if (!produto) return;
+                
+                // Aplicar filtros
+                if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                if (filtroAtual.sabor && sabor.sabor_id !== filtroAtual.sabor) return;
+                
+                const quantidade = sabor.quantidade || 0;
+                const precoCompra = produto.preco_compra || 0;
+                const precoVenda = produto.preco_venda || 0;
+                
+                totalCompra += quantidade * precoCompra;
+                totalVenda += quantidade * precoVenda;
+            });
+            
+            const margemLucro = totalVenda - totalCompra;
+            const margemPercentual = totalCompra > 0 ? (margemLucro / totalCompra * 100) : 0;
+            
+            document.getElementById('card-total-compra').textContent = formatCurrency(totalCompra);
+            document.getElementById('card-total-venda').textContent = formatCurrency(totalVenda);
+            document.getElementById('card-margem-lucro').textContent = formatCurrency(margemLucro);
+            document.getElementById('card-margem-percentual').textContent = `${margemPercentual.toFixed(1)}% de margem`;
         }
 
         async function carregarDados() {
@@ -349,6 +429,7 @@
                 todasMovimentacoes = await listMovimentacoes({ limit: 500 });
                 
                 renderizarTabAtiva();
+                calcularTotaisEstoque();
             } catch (error) {
                 handleError(error, 'Erro ao carregar dados');
             } finally {

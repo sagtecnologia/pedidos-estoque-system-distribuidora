@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detalhes da Venda - Sistema de Compras</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body class="bg-gray-100">
@@ -15,7 +16,7 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <!-- Header -->
             <div class="mb-8">
-                <a href="/pages/vendas.html" class="text-green-600 hover:text-green-800 mb-4 inline-block">← Voltar</a>
+                <a href="#" id="btn-voltar" class="text-green-600 hover:text-green-800 mb-4 inline-block">← Voltar</a>
                 <div class="flex justify-between items-center">
                     <div>
                         <h2 id="venda-numero" class="text-3xl font-bold text-gray-900">Venda</h2>
@@ -71,6 +72,20 @@
                                 <dt class="text-gray-600">Total:</dt>
                                 <dd id="venda-total" class="font-bold text-2xl text-green-600">R$ 0,00</dd>
                             </div>
+                            <div id="pagamento-info" class="hidden pt-3 border-t space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <dt class="text-gray-600">Valor Pago:</dt>
+                                    <dd id="venda-valor-pago" class="font-medium text-green-600">R$ 0,00</dd>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <dt class="text-gray-600">Pendente:</dt>
+                                    <dd id="venda-valor-pendente" class="font-medium text-orange-600">R$ 0,00</dd>
+                                </div>
+                                <div class="flex justify-between pt-2 border-t">
+                                    <dt class="text-gray-600 text-xs uppercase">Status Pagamento:</dt>
+                                    <dd id="venda-pagamento-status" class="font-semibold"></dd>
+                                </div>
+                            </div>
                         </dl>
                     </div>
 
@@ -123,6 +138,58 @@
                     </button>
                 </div>
                 <button onclick="closeModal('modal-cancelar')" class="w-full mt-4 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Voltar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Editar Item -->
+    <div id="modal-editar-item" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Editar Item</h3>
+                <button onclick="closeModal('modal-editar-item')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="px-6 py-4">
+                <form id="form-editar-item">
+                    <input type="hidden" id="editar-item-id">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto</label>
+                        <input type="text" id="editar-item-nome" readonly class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade*</label>
+                        <input type="number" id="editar-item-quantidade" step="1" min="1" required 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço Unitário*</label>
+                        <input type="number" id="editar-item-preco" step="0.01" min="0.01" required 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Subtotal:</span>
+                            <span id="editar-item-subtotal" class="font-bold text-gray-900">R$ 0,00</span>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" onclick="closeModal('modal-editar-item')" 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -236,6 +303,64 @@
         </div>
     </div>
 
+    <!-- Modal Pagamento -->
+    <div id="modal-pagamento" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Registrar Pagamento</h3>
+                <button onclick="closeModal('modal-pagamento')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-pagamento" class="px-6 py-4">
+                <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <div class="flex justify-between mb-2">
+                        <span class="text-sm text-gray-600">Total da Venda:</span>
+                        <span id="pagamento-total" class="font-bold text-lg">R$ 0,00</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600">Já Pago:</span>
+                        <span id="pagamento-ja-pago" class="font-medium text-green-600">R$ 0,00</span>
+                    </div>
+                    <div class="flex justify-between mt-2 pt-2 border-t">
+                        <span class="text-sm font-medium text-gray-700">Pendente:</span>
+                        <span id="pagamento-pendente" class="font-bold text-lg text-orange-600">R$ 0,00</span>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Valor Recebido*</label>
+                        <input type="number" step="0.01" id="valor-pagamento" required min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="atualizarRestante()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Forma de Pagamento</label>
+                        <select id="forma-pagamento" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="DINHEIRO">Dinheiro</option>
+                            <option value="PIX">PIX</option>
+                            <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                            <option value="CARTAO_DEBITO">Cartão de Débito</option>
+                            <option value="TRANSFERENCIA">Transferência</option>
+                            <option value="OUTRO">Outro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Observação</label>
+                        <textarea id="obs-pagamento" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Observações sobre o pagamento..."></textarea>
+                    </div>
+                    <div id="info-restante" class="p-3 bg-blue-50 border border-blue-200 rounded-lg hidden">
+                        <p class="text-sm text-blue-800">Restará pendente: <span id="valor-restante" class="font-bold">R$ 0,00</span></p>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button type="button" onclick="closeModal('modal-pagamento')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Registrar Pagamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
     </div>
@@ -277,10 +402,26 @@
             // Obter ID da venda
             const params = new URLSearchParams(window.location.search);
             vendaId = params.get('id');
+            const origem = params.get('origem');
+            
+            // Configurar página de retorno
+            window.voltarParaLista = function() {
+                if (origem === 'pendentes') {
+                    window.location.href = '/pages/vendas-pendentes.html';
+                } else {
+                    window.location.href = '/pages/vendas.html';
+                }
+            };
+            
+            // Configurar botão voltar
+            document.getElementById('btn-voltar').onclick = function(e) {
+                e.preventDefault();
+                voltarParaLista();
+            };
             
             if (!vendaId) {
                 showToast('Venda não encontrada', 'error');
-                setTimeout(() => window.location.href = '/pages/vendas.html', 2000);
+                setTimeout(() => voltarParaLista(), 2000);
                 return;
             }
             
@@ -632,6 +773,23 @@
             document.getElementById('venda-cliente').textContent = venda.cliente?.nome || '-';
             document.getElementById('venda-data').textContent = formatDate(venda.created_at);
             
+            // Mostrar informações de pagamento se a venda estiver finalizada
+            if (venda.status === 'FINALIZADO') {
+                document.getElementById('pagamento-info').classList.remove('hidden');
+                document.getElementById('venda-valor-pago').textContent = formatCurrency(venda.valor_pago || 0);
+                document.getElementById('venda-valor-pendente').textContent = formatCurrency(venda.valor_pendente || 0);
+                
+                const statusPagamento = document.getElementById('venda-pagamento-status');
+                const status = venda.pagamento_status || 'PENDENTE';
+                const statusTexts = {
+                    'PENDENTE': { text: 'Pendente', color: 'text-red-600' },
+                    'PARCIAL': { text: 'Parcial', color: 'text-orange-600' },
+                    'PAGO': { text: 'Pago', color: 'text-green-600' }
+                };
+                statusPagamento.textContent = statusTexts[status].text;
+                statusPagamento.className = `font-semibold ${statusTexts[status].color}`;
+            }
+            
             if (venda.observacoes) {
                 document.getElementById('venda-observacoes').textContent = venda.observacoes;
             } else {
@@ -667,7 +825,12 @@
                         <td class="px-4 py-3 font-medium">${formatCurrency(item.subtotal)}</td>
                         <td class="px-4 py-3">
                             ${venda.status === 'RASCUNHO' ? `
-                                <button onclick="removerItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm">Remover</button>
+                                <button onclick="editarItem('${item.id}', ${item.quantidade}, ${item.preco_unitario})" class="text-blue-600 hover:text-blue-800 text-sm mr-2" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="removerItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             ` : '-'}
                         </td>
                     </tr>
@@ -727,6 +890,14 @@
                 botoes.push('<button onclick="finalizarVenda()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Finalizar Venda</button>');
             }
             
+            // Botão para registrar pagamento (vendas finalizadas com saldo pendente)
+            if (venda.status === 'FINALIZADO' && venda.pagamento_status !== 'PAGO' && ['ADMIN', 'VENDEDOR'].includes(currentUser.role)) {
+                const pendente = (venda.total || 0) - (venda.valor_pago || 0);
+                if (pendente > 0) {
+                    botoes.push(`<button onclick="abrirModalPagamento()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">💰 Registrar Pagamento</button>`);
+                }
+            }
+            
             // Botão de cancelar disponível para ADMIN em vendas APROVADAS ou FINALIZADAS
             if ((venda.status === 'APROVADO' || venda.status === 'FINALIZADO') && currentUser.role === 'ADMIN') {
                 botoes.push('<button onclick="openModal(\'modal-cancelar\')" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">🚫 Cancelar Venda</button>');
@@ -735,12 +906,86 @@
             acoesDiv.innerHTML = botoes.join('');
         }
 
-        async function removerItem(itemId) {
+        window.removerItem = async function(itemId) {
             if (confirm('Deseja remover este item?')) {
                 const success = await deleteItemPedido(itemId);
                 if (success) await loadVenda();
             }
+        };
+
+        window.editarItem = async function(itemId, quantidadeAtual, precoAtual) {
+            // Buscar informações completas do item
+            const item = itens.find(i => i.id === itemId);
+            if (!item) {
+                showToast('Item não encontrado', 'error');
+                return;
+            }
+
+            // Preencher o modal
+            document.getElementById('editar-item-id').value = itemId;
+            
+            const produtoNome = item.produto?.nome || 'N/A';
+            const sabor = item.sabor?.sabor ? ` - ${item.sabor.sabor}` : '';
+            document.getElementById('editar-item-nome').value = produtoNome + sabor;
+            
+            document.getElementById('editar-item-quantidade').value = quantidadeAtual;
+            document.getElementById('editar-item-preco').value = precoAtual;
+            
+            // Calcular e mostrar subtotal
+            atualizarSubtotalEdicao();
+            
+            // Abrir modal
+            openModal('modal-editar-item');
+        };
+
+        function atualizarSubtotalEdicao() {
+            const quantidade = parseFloat(document.getElementById('editar-item-quantidade').value) || 0;
+            const preco = parseFloat(document.getElementById('editar-item-preco').value) || 0;
+            const subtotal = quantidade * preco;
+            document.getElementById('editar-item-subtotal').textContent = formatCurrency(subtotal);
         }
+
+        // Event listeners para atualizar subtotal em tempo real
+        document.getElementById('editar-item-quantidade').addEventListener('input', atualizarSubtotalEdicao);
+        document.getElementById('editar-item-preco').addEventListener('input', atualizarSubtotalEdicao);
+
+        // Form de edição de item
+        document.getElementById('form-editar-item').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const itemId = document.getElementById('editar-item-id').value;
+            const quantidade = parseFloat(document.getElementById('editar-item-quantidade').value);
+            const preco = parseFloat(document.getElementById('editar-item-preco').value);
+
+            if (quantidade <= 0 || preco <= 0) {
+                showToast('Quantidade e preço devem ser maiores que zero', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                
+                const { error } = await supabase
+                    .from('pedido_itens')
+                    .update({
+                        quantidade: quantidade,
+                        preco_unitario: preco,
+                        subtotal: quantidade * preco
+                    })
+                    .eq('id', itemId);
+
+                if (error) throw error;
+
+                showToast('Item atualizado com sucesso!', 'success');
+                closeModal('modal-editar-item');
+                await loadVenda();
+            } catch (error) {
+                console.error('Erro ao atualizar item:', error);
+                showToast('Erro ao atualizar item', 'error');
+            } finally {
+                showLoading(false);
+            }
+        });
 
         async function enviarParaAprovacao() {
             if (itens.length === 0) {
@@ -767,6 +1012,111 @@
             if (success) {
                 closeModal('modal-rejeitar');
                 await loadVenda();
+            }
+        });
+
+        async function finalizarVenda() {
+            if (confirm('Finalizar venda? O estoque será REDUZIDO automaticamente.')) {
+                const success = await finalizarPedido(vendaId);
+                if (success) {
+                    await loadVenda();
+                    // Abrir modal de pagamento
+                    abrirModalPagamento();
+                }
+            }
+        }
+
+        function abrirModalPagamento() {
+            document.getElementById('pagamento-total').textContent = formatCurrency(venda.total || 0);
+            document.getElementById('pagamento-ja-pago').textContent = formatCurrency(venda.valor_pago || 0);
+            const pendente = (venda.total || 0) - (venda.valor_pago || 0);
+            document.getElementById('pagamento-pendente').textContent = formatCurrency(pendente);
+            document.getElementById('valor-pagamento').value = pendente.toFixed(2);
+            document.getElementById('valor-pagamento').max = pendente.toFixed(2);
+            atualizarRestante();
+            openModal('modal-pagamento');
+        }
+
+        function atualizarRestante() {
+            const total = venda.total || 0;
+            const jaPago = venda.valor_pago || 0;
+            const pendente = total - jaPago;
+            const valorDigitado = parseFloat(document.getElementById('valor-pagamento').value) || 0;
+            const restante = pendente - valorDigitado;
+            
+            const infoRestante = document.getElementById('info-restante');
+            const valorRestante = document.getElementById('valor-restante');
+            
+            if (valorDigitado > 0 && valorDigitado < pendente) {
+                infoRestante.classList.remove('hidden');
+                valorRestante.textContent = formatCurrency(restante);
+            } else {
+                infoRestante.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('form-pagamento').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const valorPagamento = parseFloat(document.getElementById('valor-pagamento').value);
+            const formaPagamento = document.getElementById('forma-pagamento').value;
+            const observacao = document.getElementById('obs-pagamento').value;
+            
+            const total = venda.total || 0;
+            const jaPago = venda.valor_pago || 0;
+            const pendente = total - jaPago;
+            
+            if (valorPagamento > pendente) {
+                showToast('Valor informado é maior que o pendente', 'error');
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                const novoValorPago = jaPago + valorPagamento;
+                const novoValorPendente = total - novoValorPago;
+                const pagamentoCompleto = novoValorPendente <= 0;
+                
+                // Registrar pagamento
+                const { error: pagamentoError } = await supabase
+                    .from('pagamentos')
+                    .insert({
+                        pedido_id: vendaId,
+                        valor: valorPagamento,
+                        forma_pagamento: formaPagamento,
+                        observacao: observacao,
+                        usuario_id: currentUser.id
+                    });
+                
+                if (pagamentoError) throw pagamentoError;
+                
+                // Atualizar pedido
+                const updateData = {
+                    valor_pago: novoValorPago,
+                    valor_pendente: novoValorPendente,
+                    pagamento_status: pagamentoCompleto ? 'PAGO' : 'PARCIAL'
+                };
+                
+                if (pagamentoCompleto) {
+                    updateData.data_pagamento_completo = new Date().toISOString();
+                }
+                
+                const { error: pedidoError } = await supabase
+                    .from('pedidos')
+                    .update(updateData)
+                    .eq('id', vendaId);
+                
+                if (pedidoError) throw pedidoError;
+                
+                showToast(`Pagamento de ${formatCurrency(valorPagamento)} registrado com sucesso!`, 'success');
+                closeModal('modal-pagamento');
+                document.getElementById('form-pagamento').reset();
+                await loadVenda();
+                
+            } catch (error) {
+                handleError(error, 'Erro ao registrar pagamento');
+            } finally {
+                showLoading(false);
             }
         });
 

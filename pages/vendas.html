@@ -250,7 +250,16 @@
                 return;
             }
 
-            tbody.innerHTML = vendas.map(venda => `
+            tbody.innerHTML = vendas.map(venda => {
+                // Badge de pagamento pendente
+                let badgePagamento = '';
+                if (venda.status === 'FINALIZADO' && (venda.pagamento_status === 'PENDENTE' || venda.pagamento_status === 'PARCIAL')) {
+                    const icon = venda.pagamento_status === 'PARCIAL' ? 'fa-clock' : 'fa-exclamation-circle';
+                    const color = venda.pagamento_status === 'PARCIAL' ? 'orange' : 'red';
+                    badgePagamento = `<i class="fas ${icon} text-${color}-600 ml-2" title="Pagamento ${venda.pagamento_status === 'PARCIAL' ? 'Parcial' : 'Pendente'}: ${formatCurrency(venda.valor_pendente || 0)}"></i>`;
+                }
+                
+                return `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4">
                         <div class="font-medium text-gray-900">${venda.numero}</div>
@@ -262,7 +271,7 @@
                         ${venda.cliente?.nome || '-'}
                     </td>
                     <td class="px-6 py-4 text-sm font-medium text-gray-900">
-                        ${formatCurrency(venda.total || 0)}
+                        ${formatCurrency(venda.total || 0)}${badgePagamento}
                     </td>
                     <td class="px-6 py-4">
                         ${getStatusBadge(venda.status)}
@@ -276,7 +285,8 @@
                         </a>
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         // Badge de status
