@@ -160,10 +160,18 @@
                         <input type="text" id="editar-item-nome" readonly class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
                     </div>
 
+                    <div id="editar-estoque-info" class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg hidden">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-blue-800">Estoque Disponível:</span>
+                            <span id="editar-estoque-disponivel" class="font-bold text-blue-900">0 UN</span>
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade*</label>
                         <input type="number" id="editar-item-quantidade" step="1" min="1" required 
                             class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <p id="editar-quantidade-aviso" class="text-xs text-red-600 mt-1 hidden">⚠️ Quantidade excede o estoque disponível!</p>
                     </div>
 
                     <div class="mb-4">
@@ -220,62 +228,36 @@
                     </div>
                 </div>
 
-                <!-- Adicionar Sabores -->
+                <!-- Lista de Sabores para Venda -->
                 <div id="area-adicionar-sabor" class="hidden">
-                    <h4 class="font-semibold text-gray-900 mb-3">Adicionar Sabores</h4>
-                    <div class="bg-gray-50 p-4 rounded-lg mb-4">
-                        <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
-                            <div class="md:col-span-5">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Sabor</label>
-                                <select id="item-sabor" onchange="atualizarEstoqueSabor()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                    <option value="">Selecione...</option>
-                                </select>
-                                <p class="text-xs text-gray-500 mt-1">Estoque: <span id="sabor-estoque">-</span></p>
-                            </div>
-                            <div class="md:col-span-3">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade</label>
-                                <input type="number" step="1" id="item-quantidade" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0" oninput="validarEstoqueDisponivel()">
-                                <p id="estoque-info" class="text-xs mt-1 hidden"></p>
-                            </div>
-                            <div class="md:col-span-3">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Preço Un.</label>
-                                <input type="number" step="0.01" id="item-preco" min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
-                            </div>
-                            <div class="md:col-span-1">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">&nbsp;</label>
-                                <button type="button" onclick="adicionarSaborNaLista()" id="btn-add-sabor" class="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">+</button>
-                            </div>
-                        </div>
+                    <h4 class="font-semibold text-gray-900 mb-3">Sabores do Produto</h4>
+                    <p class="text-sm text-gray-600 mb-3">Informe a quantidade e preço para os sabores que deseja vender:</p>
+                    
+                    <div class="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-left w-1/3">Sabor</th>
+                                    <th class="px-3 py-2 text-left">Estoque Atual</th>
+                                    <th class="px-3 py-2 text-left">Quantidade</th>
+                                    <th class="px-3 py-2 text-left">Preço Un.</th>
+                                    <th class="px-3 py-2 text-left">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-sabores-lista"></tbody>
+                        </table>
                     </div>
-
-                    <!-- Lista de Sabores Adicionados -->
-                    <div id="lista-sabores-temp" class="hidden mb-4">
-                        <h5 class="font-medium text-gray-700 mb-2">Sabores a serem salvos:</h5>
-                        <div class="border rounded-lg overflow-hidden">
-                            <table class="min-w-full text-sm">
-                                <thead class="bg-gray-100">
-                                    <tr>
-                                        <th class="px-3 py-2 text-left">Sabor</th>
-                                        <th class="px-3 py-2 text-left">Qtd</th>
-                                        <th class="px-3 py-2 text-left">Preço Un.</th>
-                                        <th class="px-3 py-2 text-left">Subtotal</th>
-                                        <th class="px-3 py-2"></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tbody-sabores-temp"></tbody>
-                            </table>
-                        </div>
-                        <div class="mt-2 flex justify-between items-center">
-                            <span class="text-sm text-gray-600"><span id="total-sabores">0</span> sabor(es)</span>
-                            <span class="font-bold text-lg text-gray-900">Total: <span id="total-temp">R$ 0,00</span></span>
-                        </div>
+                    
+                    <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg flex justify-between items-center">
+                        <span class="text-sm text-green-800">Total da Venda:</span>
+                        <span id="total-venda" class="font-bold text-xl text-green-900">R$ 0,00</span>
                     </div>
                 </div>
 
                 <!-- Botões de Ação -->
                 <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
                     <button type="button" onclick="cancelarEFecharModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-                    <button type="button" onclick="salvarTodosSabores()" id="btn-salvar-todos" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 hidden">Salvar Todos</button>
+                    <button type="button" onclick="salvarTodosSabores()" id="btn-salvar-todos" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 hidden">Salvar Venda</button>
                 </div>
             </div>
         </div>
@@ -446,46 +428,59 @@
         async function carregarProdutosPorMarca() {
             const marca = document.getElementById('item-marca').value;
             const selectProduto = document.getElementById('item-produto');
-            const selectSabor = document.getElementById('item-sabor');
+            const areaSabores = document.getElementById('area-adicionar-sabor');
             
-            // Resetar selects
+            console.log('Marca selecionada:', marca);
+            
+            // Resetar select de produto
             selectProduto.innerHTML = '<option value="">Selecione o produto...</option>';
-            selectSabor.innerHTML = '<option value="">Selecione o sabor...</option>';
-            selectSabor.disabled = true;
-            document.getElementById('sabor-estoque').textContent = '-';
+            
+            // Ocultar área de sabores e limpar tabela
+            if (areaSabores) {
+                areaSabores.classList.add('hidden');
+                const tbody = document.getElementById('tbody-sabores-lista');
+                if (tbody) tbody.innerHTML = '';
+            }
             
             if (!marca) {
                 selectProduto.disabled = true;
                 return;
             }
             
-            const produtos = await getProdutosPorMarca(marca);
-            if (produtos.length === 0) {
-                showToast('Nenhum produto encontrado para esta marca', 'warning');
+            try {
+                showLoading(true);
+                const produtos = await getProdutosPorMarca(marca);
+                console.log('Produtos encontrados:', produtos);
+                
+                if (produtos.length === 0) {
+                    showToast('Nenhum produto encontrado para esta marca', 'warning');
+                    selectProduto.disabled = true;
+                    return;
+                }
+                
+                produtos.forEach(p => {
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    option.textContent = `${p.nome}`;
+                    option.dataset.preco = p.preco_venda || p.preco || 0;
+                    selectProduto.appendChild(option);
+                });
+                
+                selectProduto.disabled = false;
+                console.log('Select produto habilitado');
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+                showToast('Erro ao carregar produtos', 'error');
                 selectProduto.disabled = true;
-                return;
+            } finally {
+                showLoading(false);
             }
-            
-            produtos.forEach(p => {
-                const option = document.createElement('option');
-                option.value = p.id;
-                option.textContent = `${p.nome}`;
-                option.dataset.preco = p.preco_venda || p.preco || 0;
-                selectProduto.appendChild(option);
-            });
-            
-            selectProduto.disabled = false;
         }
 
         // Carregar sabores ao selecionar produto
         async function carregarSaboresProduto() {
             const produtoId = document.getElementById('item-produto').value;
-            const selectSabor = document.getElementById('item-sabor');
             const areaAdicionar = document.getElementById('area-adicionar-sabor');
-            
-            // Resetar select de sabor
-            selectSabor.innerHTML = '<option value="">Selecione...</option>';
-            document.getElementById('sabor-estoque').textContent = '-';
             
             if (!produtoId) {
                 areaAdicionar.classList.add('hidden');
@@ -508,160 +503,182 @@
                 return;
             }
             
-            sabores.forEach(s => {
-                const opt = document.createElement('option');
-                opt.value = s.id;
-                opt.textContent = `${s.sabor} (Estoque: ${s.quantidade})`;
-                opt.dataset.sabor = s.sabor;
-                opt.dataset.estoque = s.quantidade;
-                selectSabor.appendChild(opt);
-            });
+            // Ordenar sabores alfabeticamente
+            sabores.sort((a, b) => a.sabor.localeCompare(b.sabor));
             
-            // Habilitar select de sabor
-            selectSabor.disabled = false;
+            // Renderizar lista de sabores
+            await renderListaSabores(sabores);
             
-            // Limpar lista temporária de sabores e mostrar área
-            saboresTemporarios = [];
-            renderSaboresTemporarios();
+            // Mostrar área e botão de salvar
             areaAdicionar.classList.remove('hidden');
-            
-            // Definir preço padrão
-            document.getElementById('item-preco').value = produtoAtual.preco.toFixed(2);
+            document.getElementById('btn-salvar-todos').classList.remove('hidden');
         }
 
-        // Atualizar estoque quando selecionar sabor
-        function atualizarEstoqueSabor() {
-            const selectSabor = document.getElementById('item-sabor');
+        // Renderizar lista de sabores com campos de quantidade
+        async function renderListaSabores(sabores) {
+            const tbody = document.getElementById('tbody-sabores-lista');
             
-            if (!selectSabor.value) {
-                document.getElementById('sabor-estoque').textContent = '-';
-                document.getElementById('estoque-info').classList.add('hidden');
-                return;
+            // Buscar itens já adicionados neste pedido para descontar do estoque disponível
+            const itensJaAdicionados = {};
+            for (const item of itens) {
+                if (item.sabor_id) {
+                    itensJaAdicionados[item.sabor_id] = (itensJaAdicionados[item.sabor_id] || 0) + item.quantidade;
+                }
             }
             
-            const option = selectSabor.options[selectSabor.selectedIndex];
-            const estoque = option.dataset.estoque || '-';
-            document.getElementById('sabor-estoque').textContent = estoque;
-            
-            // Atualizar preço com o valor padrão do produto
-            if (produtoAtual) {
-                document.getElementById('item-preco').value = produtoAtual.preco.toFixed(2);
-            }
-            
-            // Validar se já tem quantidade digitada
-            validarEstoqueDisponivel();
-        }
-
-        // Adicionar sabor na lista temporária
-        function adicionarSaborNaLista() {
-            const selectSabor = document.getElementById('item-sabor');
-            const quantidade = parseFloat(document.getElementById('item-quantidade').value);
-            const preco = parseFloat(document.getElementById('item-preco').value);
-            
-            if (!selectSabor.value) {
-                showToast('Selecione um sabor', 'warning');
-                return;
-            }
-            
-            if (!quantidade || quantidade <= 0) {
-                showToast('Informe uma quantidade válida', 'warning');
-                return;
-            }
-            
-            if (!preco || preco <= 0) {
-                showToast('Informe um preço válido', 'warning');
-                return;
-            }
-            
-            const option = selectSabor.options[selectSabor.selectedIndex];
-            const estoqueDisponivel = parseFloat(option.dataset.estoque || 0);
-            
-            // Validar estoque
-            if (quantidade > estoqueDisponivel) {
-                showToast(`Estoque insuficiente! Disponível: ${estoqueDisponivel}`, 'error');
-                return;
-            }
-            
-            // Verificar se o sabor já foi adicionado
-            const saborJaAdicionado = saboresTemporarios.find(s => s.sabor_id === selectSabor.value);
-            if (saborJaAdicionado) {
-                showToast('Este sabor já foi adicionado! Remova para adicionar novamente.', 'warning');
-                return;
-            }
-            
-            // Adicionar na lista temporária
-            saboresTemporarios.push({
-                sabor_id: selectSabor.value,
-                sabor_nome: option.dataset.sabor,
-                quantidade: quantidade,
-                preco_unitario: preco,
-                subtotal: quantidade * preco,
-                estoque: estoqueDisponivel
+            // Calcular estoque disponível considerando itens já adicionados
+            const saboresComEstoqueDisponivel = sabores.map(s => {
+                const quantidadeJaUsada = itensJaAdicionados[s.id] || 0;
+                const estoqueDisponivel = s.quantidade - quantidadeJaUsada;
+                return {
+                    ...s,
+                    estoqueDisponivel: Math.max(0, estoqueDisponivel),
+                    estoqueOriginal: s.quantidade
+                };
             });
             
-            // Resetar campos de sabor
-            selectSabor.value = '';
-            document.getElementById('item-quantidade').value = '';
-            document.getElementById('item-preco').value = produtoAtual.preco.toFixed(2);
-            document.getElementById('sabor-estoque').textContent = '-';
-            document.getElementById('estoque-info').classList.add('hidden');
+            // Filtrar apenas sabores com estoque disponível > 0
+            const saboresComEstoque = saboresComEstoqueDisponivel.filter(s => s.estoqueDisponivel > 0);
             
-            // Renderizar lista
-            renderSaboresTemporarios();
-            
-            showToast('Sabor adicionado! Adicione mais ou clique em "Salvar Todos"', 'success');
-        }
-        
-        // Renderizar lista de sabores temporários
-        function renderSaboresTemporarios() {
-            const tbody = document.getElementById('tbody-sabores-temp');
-            const lista = document.getElementById('lista-sabores-temp');
-            const btnSalvar = document.getElementById('btn-salvar-todos');
-            
-            if (saboresTemporarios.length === 0) {
-                lista.classList.add('hidden');
-                btnSalvar.classList.add('hidden');
+            if (saboresComEstoque.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">Nenhum sabor com estoque disponível</td></tr>';
+                document.getElementById('btn-salvar-todos').classList.add('hidden');
                 return;
             }
             
-            lista.classList.remove('hidden');
-            btnSalvar.classList.remove('hidden');
-            
-            const total = saboresTemporarios.reduce((sum, s) => sum + s.subtotal, 0);
-            
-            tbody.innerHTML = saboresTemporarios.map((s, index) => `
-                <tr class="border-t">
-                    <td class="px-3 py-2">${s.sabor_nome}</td>
-                    <td class="px-3 py-2">${s.quantidade}</td>
-                    <td class="px-3 py-2">${formatCurrency(s.preco_unitario)}</td>
-                    <td class="px-3 py-2 font-medium">${formatCurrency(s.subtotal)}</td>
-                    <td class="px-3 py-2 text-right">
-                        <button onclick="removerSaborTemporario(${index})" class="text-red-600 hover:text-red-800 text-sm">×</button>
+            tbody.innerHTML = saboresComEstoque.map(s => `
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="px-3 py-3 font-medium">${s.sabor}</td>
+                    <td class="px-3 py-3 text-gray-600">
+                        <span class="font-semibold">${s.estoqueDisponivel} UN</span>
+                        <span class="text-xs text-gray-500 block">Total: ${s.estoqueOriginal} UN</span>
+                    </td>
+                    <td class="px-3 py-3">
+                        <input type="number" 
+                            step="1" 
+                            min="0" 
+                            max="${s.estoqueDisponivel}"
+                            value="0"
+                            data-sabor-id="${s.id}"
+                            data-sabor-nome="${s.sabor}"
+                            data-estoque="${s.estoqueDisponivel}"
+                            class="sabor-quantidade w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-green-500" 
+                            placeholder="0"
+                            oninput="validarEstoqueVenda(this); calcularTotalVenda()">
+                    </td>
+                    <td class="px-3 py-3">
+                        <input type="number" 
+                            step="0.01" 
+                            min="0.01" 
+                            value="${produtoAtual.preco.toFixed(2)}"
+                            data-sabor-id="${s.id}"
+                            class="sabor-preco w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-green-500" 
+                            placeholder="0.00"
+                            oninput="calcularTotalVenda()">
+                    </td>
+                    <td class="px-3 py-3">
+                        <span class="sabor-subtotal font-medium text-gray-900" data-sabor-id="${s.id}">R$ 0,00</span>
                     </td>
                 </tr>
             `).join('');
             
-            document.getElementById('total-sabores').textContent = saboresTemporarios.length;
-            document.getElementById('total-temp').textContent = formatCurrency(total);
+            calcularTotalVenda();
+        }
+
+        // Validar estoque disponível para venda
+        function validarEstoqueVenda(input) {
+            const quantidade = parseFloat(input.value) || 0;
+            const estoqueDisponivel = parseFloat(input.dataset.estoque || 0);
+            
+            if (quantidade > estoqueDisponivel) {
+                input.value = estoqueDisponivel;
+                showToast(`Estoque insuficiente! Disponível: ${estoqueDisponivel} UN`, 'warning');
+            }
+        }
+
+        // Calcular total da venda
+        function calcularTotalVenda() {
+            let total = 0;
+            
+            const quantidadeInputs = document.querySelectorAll('.sabor-quantidade');
+            quantidadeInputs.forEach(input => {
+                const saborId = input.dataset.saborId;
+                const quantidade = parseFloat(input.value) || 0;
+                const precoInput = document.querySelector(`.sabor-preco[data-sabor-id="${saborId}"]`);
+                const preco = parseFloat(precoInput.value) || 0;
+                const subtotal = quantidade * preco;
+                
+                // Atualizar subtotal do sabor
+                const subtotalSpan = document.querySelector(`.sabor-subtotal[data-sabor-id="${saborId}"]`);
+                subtotalSpan.textContent = formatCurrency(subtotal);
+                
+                total += subtotal;
+            });
+            
+            document.getElementById('total-venda').textContent = formatCurrency(total);
+        }
+
+        // Atualizar estoque quando selecionar sabor (não usado mais)
+        function atualizarEstoqueSabor() {
+            // Função mantida para compatibilidade mas não é mais usada
+        }
+
+        // Adicionar sabor na lista temporária (não usado mais)
+        function adicionarSaborNaLista() {
+            // Função mantida para compatibilidade mas não é mais usada
         }
         
-        // Remover sabor da lista temporária
+        // Renderizar lista de sabores temporários (não usado mais)
+        function renderSaboresTemporarios() {
+            // Função mantida para compatibilidade mas não é mais usada
+        }
+        
+        // Remover sabor da lista temporária (não usado mais)
         function removerSaborTemporario(index) {
-            saboresTemporarios.splice(index, 1);
-            renderSaboresTemporarios();
+            // Função mantida para compatibilidade mas não é mais usada
         }
         
         // Salvar todos os sabores de uma vez
         async function salvarTodosSabores() {
-            if (saboresTemporarios.length === 0) {
-                showToast('Adicione pelo menos um sabor', 'warning');
-                return;
-            }
-            
             showLoading(true);
             try {
+                // Coletar todos os sabores com quantidade > 0
+                const quantidadeInputs = document.querySelectorAll('.sabor-quantidade');
+                const saboresParaSalvar = [];
+                
+                quantidadeInputs.forEach(input => {
+                    const quantidade = parseFloat(input.value) || 0;
+                    if (quantidade > 0) {
+                        const saborId = input.dataset.saborId;
+                        const saborNome = input.dataset.saborNome;
+                        const estoqueDisponivel = parseFloat(input.dataset.estoque || 0);
+                        const precoInput = document.querySelector(`.sabor-preco[data-sabor-id="${saborId}"]`);
+                        const preco = parseFloat(precoInput.value) || 0;
+                        
+                        if (preco > 0) {
+                            // Validar estoque novamente antes de salvar
+                            if (quantidade > estoqueDisponivel) {
+                                throw new Error(`Estoque insuficiente para ${saborNome}! Disponível: ${estoqueDisponivel}`);
+                            }
+                            
+                            saboresParaSalvar.push({
+                                sabor_id: saborId,
+                                sabor_nome: saborNome,
+                                quantidade: quantidade,
+                                preco_unitario: preco
+                            });
+                        }
+                    }
+                });
+                
+                if (saboresParaSalvar.length === 0) {
+                    showToast('Informe a quantidade e preço para pelo menos um sabor', 'warning');
+                    showLoading(false);
+                    return;
+                }
+                
                 // Salvar cada sabor
-                for (const sabor of saboresTemporarios) {
+                for (const sabor of saboresParaSalvar) {
                     const itemData = {
                         produto_id: produtoAtual.id,
                         sabor_id: sabor.sabor_id,
@@ -675,7 +692,7 @@
                     }
                 }
                 
-                showToast(`${saboresTemporarios.length} sabor(es) adicionado(s) com sucesso!`, 'success');
+                showToast(`${saboresParaSalvar.length} sabor(es) adicionado(s) com sucesso!`, 'success');
                 
                 // Resetar modal
                 cancelarEFecharModal();
@@ -697,58 +714,16 @@
             document.getElementById('item-produto').value = '';
             document.getElementById('item-produto').disabled = true;
             document.getElementById('item-produto').innerHTML = '<option value="">Selecione o produto...</option>';
-            document.getElementById('item-sabor').value = '';
-            document.getElementById('item-sabor').innerHTML = '<option value="">Selecione...</option>';
-            document.getElementById('item-quantidade').value = '';
-            document.getElementById('item-preco').value = '';
-            document.getElementById('sabor-estoque').textContent = '-';
-            document.getElementById('estoque-info').classList.add('hidden');
+            document.getElementById('tbody-sabores-lista').innerHTML = '';
+            document.getElementById('total-venda').textContent = 'R$ 0,00';
             document.getElementById('area-adicionar-sabor').classList.add('hidden');
-            renderSaboresTemporarios();
+            document.getElementById('btn-salvar-todos').classList.add('hidden');
             closeModal('modal-item');
         }
 
+        // Validar estoque disponível (não usado mais)
         function validarEstoqueDisponivel() {
-            const selectSabor = document.getElementById('item-sabor');
-            const quantidadeInput = document.getElementById('item-quantidade');
-            const estoqueInfo = document.getElementById('estoque-info');
-            const btnAddSabor = document.getElementById('btn-add-sabor');
-            
-            // Verificar se um sabor foi selecionado
-            if (!selectSabor.value) {
-                estoqueInfo.classList.add('hidden');
-                document.getElementById('sabor-estoque').textContent = '-';
-                btnAddSabor.disabled = false;
-                btnAddSabor.classList.remove('opacity-50', 'cursor-not-allowed');
-                return;
-            }
-            
-            // Pegar a opção selecionada corretamente
-            const option = selectSabor.options[selectSabor.selectedIndex];
-            const quantidade = parseFloat(quantidadeInput.value) || 0;
-            const estoqueDisponivel = parseFloat(option.dataset.estoque || 0);
-            
-            // Atualizar texto de estoque
-            document.getElementById('sabor-estoque').textContent = estoqueDisponivel;
-            
-            estoqueInfo.classList.remove('hidden');
-            
-            if (quantidade > estoqueDisponivel) {
-                estoqueInfo.textContent = `❌ Estoque insuficiente! Disponível: ${estoqueDisponivel} UN`;
-                estoqueInfo.className = 'text-xs mt-1 text-red-600 font-medium';
-                btnAddSabor.disabled = true;
-                btnAddSabor.classList.add('opacity-50', 'cursor-not-allowed');
-            } else if (quantidade > 0) {
-                estoqueInfo.textContent = `✅ Estoque disponível: ${estoqueDisponivel} UN`;
-                estoqueInfo.className = 'text-xs mt-1 text-green-600';
-                btnAddSabor.disabled = false;
-                btnAddSabor.classList.remove('opacity-50', 'cursor-not-allowed');
-            } else {
-                estoqueInfo.textContent = `Estoque disponível: ${estoqueDisponivel} UN`;
-                estoqueInfo.className = 'text-xs mt-1 text-gray-600';
-                btnAddSabor.disabled = false;
-                btnAddSabor.classList.remove('opacity-50', 'cursor-not-allowed');
-            }
+            // Função mantida para compatibilidade mas não é mais usada
         }
 
         async function loadVenda() {
@@ -768,7 +743,11 @@
         function renderVenda() {
             document.getElementById('venda-numero').textContent = venda.numero;
             document.getElementById('venda-status').textContent = getStatusText(venda.status);
-            document.getElementById('venda-total').textContent = formatCurrency(venda.total || 0);
+            
+            // Calcular total baseado nos itens carregados para garantir precisão
+            const totalCalculado = itens.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+            document.getElementById('venda-total').textContent = formatCurrency(totalCalculado);
+            
             document.getElementById('venda-vendedor').textContent = venda.solicitante?.full_name || '-';
             document.getElementById('venda-cliente').textContent = venda.cliente?.nome || '-';
             document.getElementById('venda-data').textContent = formatDate(venda.created_at);
@@ -928,7 +907,47 @@
             const sabor = item.sabor?.sabor ? ` - ${item.sabor.sabor}` : '';
             document.getElementById('editar-item-nome').value = produtoNome + sabor;
             
-            document.getElementById('editar-item-quantidade').value = quantidadeAtual;
+            const inputQuantidade = document.getElementById('editar-item-quantidade');
+            inputQuantidade.value = quantidadeAtual;
+            
+            // Buscar estoque atual do sabor
+            if (item.sabor_id) {
+                try {
+                    const { data: saborAtual } = await supabase
+                        .from('produto_sabores')
+                        .select('quantidade')
+                        .eq('id', item.sabor_id)
+                        .single();
+                    
+                    if (saborAtual) {
+                        // Calcular quanto deste sabor já está sendo usado em outros itens do pedido
+                        let quantidadeJaUsadaEmOutrosItens = 0;
+                        for (const outroItem of itens) {
+                            if (outroItem.sabor_id === item.sabor_id && outroItem.id !== itemId) {
+                                quantidadeJaUsadaEmOutrosItens += outroItem.quantidade;
+                            }
+                        }
+                        
+                        // Estoque disponível = estoque atual - quantidade usada em outros itens
+                        // (não contamos o item atual pois ele está sendo editado)
+                        const estoqueDisponivel = saborAtual.quantidade - quantidadeJaUsadaEmOutrosItens;
+                        inputQuantidade.max = estoqueDisponivel;
+                        inputQuantidade.dataset.estoqueMax = estoqueDisponivel;
+                        inputQuantidade.dataset.quantidadeOriginal = quantidadeAtual;
+                        inputQuantidade.dataset.saborId = item.sabor_id;
+                        
+                        // Mostrar informação de estoque disponível
+                        document.getElementById('editar-estoque-info').classList.remove('hidden');
+                        document.getElementById('editar-estoque-disponivel').textContent = `${estoqueDisponivel} UN`;
+                    }
+                } catch (error) {
+                    console.error('Erro ao buscar estoque:', error);
+                }
+            } else {
+                // Se não tem sabor_id, ocultar info de estoque
+                document.getElementById('editar-estoque-info').classList.add('hidden');
+            }
+            
             document.getElementById('editar-item-preco').value = precoAtual;
             
             // Calcular e mostrar subtotal
@@ -939,9 +958,27 @@
         };
 
         function atualizarSubtotalEdicao() {
-            const quantidade = parseFloat(document.getElementById('editar-item-quantidade').value) || 0;
+            const inputQuantidade = document.getElementById('editar-item-quantidade');
+            const quantidade = parseFloat(inputQuantidade.value) || 0;
+            const estoqueMax = parseFloat(inputQuantidade.dataset.estoqueMax);
+            const avisoElement = document.getElementById('editar-quantidade-aviso');
+            
+            // Validar estoque se houver limite configurado
+            if (estoqueMax && quantidade > estoqueMax) {
+                // Mostrar aviso visual
+                avisoElement.classList.remove('hidden');
+                inputQuantidade.classList.add('border-red-500', 'bg-red-50');
+                inputQuantidade.classList.remove('border-gray-300');
+            } else {
+                // Ocultar aviso e remover estilo de erro
+                avisoElement.classList.add('hidden');
+                inputQuantidade.classList.remove('border-red-500', 'bg-red-50');
+                inputQuantidade.classList.add('border-gray-300');
+            }
+            
+            const quantidadeFinal = parseFloat(inputQuantidade.value) || 0;
             const preco = parseFloat(document.getElementById('editar-item-preco').value) || 0;
-            const subtotal = quantidade * preco;
+            const subtotal = quantidadeFinal * preco;
             document.getElementById('editar-item-subtotal').textContent = formatCurrency(subtotal);
         }
 
@@ -954,11 +991,19 @@
             e.preventDefault();
             
             const itemId = document.getElementById('editar-item-id').value;
-            const quantidade = parseFloat(document.getElementById('editar-item-quantidade').value);
+            const inputQuantidade = document.getElementById('editar-item-quantidade');
+            const quantidade = parseFloat(inputQuantidade.value);
             const preco = parseFloat(document.getElementById('editar-item-preco').value);
 
             if (quantidade <= 0 || preco <= 0) {
                 showToast('Quantidade e preço devem ser maiores que zero', 'error');
+                return;
+            }
+
+            // Validar estoque novamente antes de salvar
+            const estoqueMax = parseFloat(inputQuantidade.dataset.estoqueMax);
+            if (estoqueMax && quantidade > estoqueMax) {
+                showToast(`Estoque insuficiente! Máximo disponível: ${estoqueMax} UN`, 'error');
                 return;
             }
 

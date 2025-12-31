@@ -127,6 +127,39 @@ function gerarHTMLPedidoCompra(pedido, itens, empresaConfig) {
     const total = itens.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
     const totalQuantidade = itens.reduce((sum, item) => sum + item.quantidade, 0);
 
+    // Agrupar itens por marca e produto
+    const itensAgrupados = {};
+    itens.forEach(item => {
+        const marca = item.produto.marca || 'Sem Marca';
+        const produtoId = item.produto.id;
+        const produtoNome = item.produto.nome;
+        
+        if (!itensAgrupados[marca]) {
+            itensAgrupados[marca] = {};
+        }
+        
+        if (!itensAgrupados[marca][produtoId]) {
+            itensAgrupados[marca][produtoId] = {
+                codigo: item.produto.codigo,
+                nome: produtoNome,
+                unidade: item.produto.unidade,
+                sabores: [],
+                totalProduto: 0,
+                totalQuantidade: 0
+            };
+        }
+        
+        itensAgrupados[marca][produtoId].sabores.push({
+            sabor: item.sabor?.sabor || 'Padrão',
+            quantidade: item.quantidade,
+            preco_unitario: item.preco_unitario,
+            subtotal: item.quantidade * item.preco_unitario
+        });
+        
+        itensAgrupados[marca][produtoId].totalProduto += item.quantidade * item.preco_unitario;
+        itensAgrupados[marca][produtoId].totalQuantidade += item.quantidade;
+    });
+
     return `
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -425,24 +458,37 @@ function gerarHTMLPedidoCompra(pedido, itens, empresaConfig) {
     <table>
         <thead>
             <tr>
-                <th style="width: 15%;">Código</th>
-                <th style="width: 35%;">Produto</th>
-                <th style="width: 10%;">Unidade</th>
-                <th style="width: 12%;" class="text-right">Quantidade</th>
-                <th style="width: 14%;" class="text-right">Preço Unit.</th>
+                <th style="width: 12%;">Código</th>
+                <th style="width: 38%;">Produto / Sabor</th>
+                <th style="width: 8%;">Unid.</th>
+                <th style="width: 10%;" class="text-right">Qtd</th>
+                <th style="width: 14%;" class="text-right">Preço Un.</th>
                 <th style="width: 14%;" class="text-right">Subtotal</th>
             </tr>
         </thead>
         <tbody>
-            ${itens.map(item => `
-                <tr>
-                    <td>${item.produto.codigo}</td>
-                    <td>${item.produto.nome}</td>
-                    <td>${item.produto.unidade}</td>
-                    <td class="text-right">${item.quantidade}</td>
-                    <td class="text-right">${formatCurrency(item.preco_unitario)}</td>
-                    <td class="text-right"><strong>${formatCurrency(item.quantidade * item.preco_unitario)}</strong></td>
+            ${Object.keys(itensAgrupados).map(marca => `
+                <tr style="background-color: #e5e7eb;">
+                    <td colspan="6" style="font-weight: bold; padding: 8px; font-size: 13px;">🏷️ ${marca}</td>
                 </tr>
+                ${Object.values(itensAgrupados[marca]).map(produto => `
+                    <tr style="background-color: #f9fafb;">
+                        <td style="font-weight: bold;">${produto.codigo}</td>
+                        <td style="font-weight: bold;" colspan="2">${produto.nome}</td>
+                        <td class="text-right" style="font-weight: bold;">${produto.totalQuantidade} ${produto.unidade}</td>
+                        <td colspan="2" class="text-right" style="font-weight: bold; color: #1e40af;">${formatCurrency(produto.totalProduto)}</td>
+                    </tr>
+                    ${produto.sabores.map(sabor => `
+                        <tr>
+                            <td></td>
+                            <td style="padding-left: 20px; font-size: 11px; color: #666;">└─ ${sabor.sabor}</td>
+                            <td style="font-size: 11px;">${produto.unidade}</td>
+                            <td class="text-right" style="font-size: 11px;">${sabor.quantidade}</td>
+                            <td class="text-right" style="font-size: 11px;">${formatCurrency(sabor.preco_unitario)}</td>
+                            <td class="text-right" style="font-size: 11px;">${formatCurrency(sabor.subtotal)}</td>
+                        </tr>
+                    `).join('')}
+                `).join('')}
             `).join('')}
         </tbody>
     </table>

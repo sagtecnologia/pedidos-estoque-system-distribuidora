@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Detalhes do Pedido - Sistema de Compras</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body class="bg-gray-100">
@@ -78,6 +79,58 @@
         </div>
     </main>
 
+    <!-- Modal Editar Item -->
+    <div id="modal-editar-item" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Editar Item</h3>
+                <button onclick="closeModal('modal-editar-item')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="px-6 py-4">
+                <form id="form-editar-item">
+                    <input type="hidden" id="editar-item-id">
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto</label>
+                        <input type="text" id="editar-item-nome" readonly class="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade*</label>
+                        <input type="number" id="editar-item-quantidade" step="1" min="1" required 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço Unitário*</label>
+                        <input type="number" id="editar-item-preco" step="0.01" min="0.01" required 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Subtotal:</span>
+                            <span id="editar-item-subtotal" class="font-bold text-gray-900">R$ 0,00</span>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" onclick="closeModal('modal-editar-item')" 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Cancelar
+                        </button>
+                        <button type="submit" 
+                            class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Salvar Alterações
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Cancelar Pedido -->
     <div id="modal-cancelar" class="modal-backdrop hidden">
         <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
@@ -87,6 +140,7 @@
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
+
             <div class="px-6 py-4">
                 <p class="text-gray-600 mb-6">Como deseja cancelar este pedido?</p>
                 <div class="space-y-3">
@@ -106,48 +160,62 @@
 
     <!-- Modal Adicionar Item -->
     <div id="modal-item" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-            <div class="flex justify-between items-center px-6 py-4 border-b">
-                <h3 class="text-lg font-semibold text-gray-900">Adicionar Item</h3>
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b sticky top-0 bg-white z-10">
+                <h3 class="text-lg font-semibold text-gray-900">Adicionar Itens</h3>
                 <button onclick="closeModal('modal-item')" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <form id="form-item" class="px-6 py-4">
-                <div class="space-y-4">
+            <div class="px-6 py-4">
+                <!-- Seleção de Marca e Produto -->
+                <div class="grid grid-cols-2 gap-4 mb-4 pb-4 border-b">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
-                        <select id="item-marca" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarProdutosPorMarca()">
+                        <select id="item-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarProdutosPorMarca()">
                             <option value="">Selecione a marca...</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Produto*</label>
-                        <select id="item-produto" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarSaboresProduto()" disabled>
+                        <select id="item-produto" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarSaboresProduto()" disabled>
                             <option value="">Selecione o produto...</option>
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Sabor*</label>
-                        <select id="item-sabor" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="atualizarPrecoItem()" disabled>
-                            <option value="">Selecione o sabor...</option>
-                        </select>
-                        <p class="text-xs text-gray-500 mt-1">Estoque: <span id="sabor-estoque">-</span></p>
+                </div>
+
+                <!-- Lista de Sabores para Compra -->
+                <div id="area-adicionar-sabor" class="hidden">
+                    <h4 class="font-semibold text-gray-900 mb-3">Sabores do Produto</h4>
+                    <p class="text-sm text-gray-600 mb-3">Informe a quantidade e preço para os sabores que deseja comprar:</p>
+                    
+                    <div class="border rounded-lg overflow-hidden max-h-96 overflow-y-auto">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-left w-1/3">Sabor</th>
+                                    <th class="px-3 py-2 text-left">Estoque Atual</th>
+                                    <th class="px-3 py-2 text-left">Quantidade</th>
+                                    <th class="px-3 py-2 text-left">Preço Un.</th>
+                                    <th class="px-3 py-2 text-left">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-sabores-lista"></tbody>
+                        </table>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade*</label>
-                        <input type="number" step="0.01" id="item-quantidade" required min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço Unitário*</label>
-                        <input type="number" step="0.01" id="item-preco" required min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    
+                    <div class="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex justify-between items-center">
+                        <span class="text-sm text-blue-800">Total da Compra:</span>
+                        <span id="total-compra" class="font-bold text-xl text-blue-900">R$ 0,00</span>
                     </div>
                 </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                    <button type="button" onclick="closeModal('modal-item')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Adicionar</button>
+
+                <!-- Botões de Ação -->
+                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                    <button type="button" onclick="cancelarEFecharModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="button" onclick="salvarTodosSabores()" id="btn-salvar-todos" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hidden">Salvar Compra</button>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 
@@ -170,6 +238,8 @@
         let pedidoId = null;
         let pedido = null;
         let currentUser = null;
+        let saboresTemporarios = []; // Lista temporária de sabores antes de salvar
+        let produtoAtual = null; // Produto selecionado no modal
 
         (async () => {
             await checkAuth();
@@ -194,90 +264,262 @@
         // Carregar marcas no select
         async function loadMarcasSelect() {
             const marcas = await getMarcas();
-            const select = document.getElementById('item-marca');
-            marcas.forEach(m => {
+            const selectMarca = document.getElementById('item-marca');
+            selectMarca.innerHTML = '<option value="">Selecione a marca...</option>';
+            marcas.forEach(marca => {
                 const option = document.createElement('option');
-                option.value = m;
-                option.textContent = m;
-                select.appendChild(option);
+                option.value = marca;
+                option.textContent = marca;
+                selectMarca.appendChild(option);
             });
         }
 
-        // Carregar produtos da marca selecionada
+        // Carregar produtos ao selecionar marca
         async function carregarProdutosPorMarca() {
             const marca = document.getElementById('item-marca').value;
             const selectProduto = document.getElementById('item-produto');
-            const selectSabor = document.getElementById('item-sabor');
+            const areaSabores = document.getElementById('area-adicionar-sabor');
             
-            // Resetar selects
+            console.log('Marca selecionada:', marca);
+            
+            // Resetar select de produto
             selectProduto.innerHTML = '<option value="">Selecione o produto...</option>';
-            selectSabor.innerHTML = '<option value="">Selecione o sabor...</option>';
-            selectProduto.disabled = true;
-            selectSabor.disabled = true;
-            document.getElementById('sabor-estoque').textContent = '-';
             
-            if (!marca) return;
+            // Ocultar área de sabores e limpar tabela
+            if (areaSabores) {
+                areaSabores.classList.add('hidden');
+                const tbody = document.getElementById('tbody-sabores-lista');
+                if (tbody) tbody.innerHTML = '';
+            }
             
-            const produtos = await getProdutosPorMarca(marca);
-            produtos.forEach(p => {
-                const precoCompra = p.preco_compra || p.preco || 0;
-                const option = document.createElement('option');
-                option.value = p.id;
-                option.textContent = `${p.nome} (${formatCurrency(precoCompra)})`;
-                option.dataset.preco = precoCompra;
-                selectProduto.appendChild(option);
-            });
+            if (!marca) {
+                selectProduto.disabled = true;
+                return;
+            }
             
-            selectProduto.disabled = false;
+            try {
+                showLoading(true);
+                const produtos = await getProdutosPorMarca(marca);
+                console.log('Produtos encontrados:', produtos);
+                
+                if (produtos.length === 0) {
+                    showToast('Nenhum produto encontrado para esta marca', 'warning');
+                    selectProduto.disabled = true;
+                    return;
+                }
+                
+                produtos.forEach(p => {
+                    const precoCompra = p.preco_compra || p.preco || 0;
+                    const option = document.createElement('option');
+                    option.value = p.id;
+                    option.textContent = `${p.nome}`;
+                    option.dataset.preco = precoCompra;
+                    selectProduto.appendChild(option);
+                });
+                
+                selectProduto.disabled = false;
+                console.log('Select produto habilitado');
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+                showToast('Erro ao carregar produtos', 'error');
+                selectProduto.disabled = true;
+            } finally {
+                showLoading(false);
+            }
         }
 
-        // Carregar sabores do produto selecionado
+        // Carregar sabores ao selecionar produto
         async function carregarSaboresProduto() {
             const produtoId = document.getElementById('item-produto').value;
-            const selectSabor = document.getElementById('item-sabor');
+            const areaAdicionar = document.getElementById('area-adicionar-sabor');
             
-            // Resetar select
-            selectSabor.innerHTML = '<option value="">Selecione o sabor...</option>';
-            selectSabor.disabled = true;
-            document.getElementById('sabor-estoque').textContent = '-';
+            if (!produtoId) {
+                areaAdicionar.classList.add('hidden');
+                return;
+            }
             
-            if (!produtoId) return;
+            // Pegar dados do produto selecionado
+            const selectProduto = document.getElementById('item-produto');
+            const option = selectProduto.options[selectProduto.selectedIndex];
+            produtoAtual = {
+                id: produtoId,
+                nome: option.textContent,
+                preco: parseFloat(option.dataset.preco || 0)
+            };
             
             const sabores = await getSaboresProduto(produtoId);
             if (sabores.length === 0) {
                 showToast('Este produto não possui sabores cadastrados', 'warning');
+                areaAdicionar.classList.add('hidden');
                 return;
             }
             
-            sabores.forEach(s => {
-                const option = document.createElement('option');
-                option.value = s.id;
-                option.textContent = `${s.sabor} (Estoque: ${s.quantidade})`;
-                option.dataset.estoque = s.quantidade;
-                selectSabor.appendChild(option);
+            // Ordenar sabores alfabeticamente
+            sabores.sort((a, b) => a.sabor.localeCompare(b.sabor));
+            
+            // Renderizar lista de sabores
+            renderListaSabores(sabores);
+            
+            // Mostrar área e botão de salvar
+            areaAdicionar.classList.remove('hidden');
+            document.getElementById('btn-salvar-todos').classList.remove('hidden');
+        }
+
+        // Renderizar lista de sabores com campos de quantidade
+        function renderListaSabores(sabores) {
+            const tbody = document.getElementById('tbody-sabores-lista');
+            
+            tbody.innerHTML = sabores.map(s => `
+                <tr class="border-t hover:bg-gray-50">
+                    <td class="px-3 py-3 font-medium">${s.sabor}</td>
+                    <td class="px-3 py-3 text-gray-600">${s.quantidade} UN</td>
+                    <td class="px-3 py-3">
+                        <input type="number" 
+                            step="1" 
+                            min="0" 
+                            value="0"
+                            data-sabor-id="${s.id}"
+                            data-sabor-nome="${s.sabor}"
+                            class="sabor-quantidade w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500" 
+                            placeholder="0"
+                            oninput="calcularTotalCompra()">
+                    </td>
+                    <td class="px-3 py-3">
+                        <input type="number" 
+                            step="0.01" 
+                            min="0.01" 
+                            value="${produtoAtual.preco.toFixed(2)}"
+                            data-sabor-id="${s.id}"
+                            class="sabor-preco w-24 px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500" 
+                            placeholder="0.00"
+                            oninput="calcularTotalCompra()">
+                    </td>
+                    <td class="px-3 py-3">
+                        <span class="sabor-subtotal font-medium text-gray-900" data-sabor-id="${s.id}">R$ 0,00</span>
+                    </td>
+                </tr>
+            `).join('');
+            
+            calcularTotalCompra();
+        }
+
+        // Calcular total da compra
+        function calcularTotalCompra() {
+            let total = 0;
+            
+            const quantidadeInputs = document.querySelectorAll('.sabor-quantidade');
+            quantidadeInputs.forEach(input => {
+                const saborId = input.dataset.saborId;
+                const quantidade = parseFloat(input.value) || 0;
+                const precoInput = document.querySelector(`.sabor-preco[data-sabor-id="${saborId}"]`);
+                const preco = parseFloat(precoInput.value) || 0;
+                const subtotal = quantidade * preco;
+                
+                // Atualizar subtotal do sabor
+                const subtotalSpan = document.querySelector(`.sabor-subtotal[data-sabor-id="${saborId}"]`);
+                subtotalSpan.textContent = formatCurrency(subtotal);
+                
+                total += subtotal;
             });
             
-            selectSabor.disabled = false;
+            document.getElementById('total-compra').textContent = formatCurrency(total);
         }
 
-        // Atualizar preço e exibir estoque do sabor
-        function atualizarPrecoItem() {
-            const selectProduto = document.getElementById('item-produto');
-            const selectSabor = document.getElementById('item-sabor');
-            
-            // Atualizar preço baseado no produto
-            const preco = selectProduto.options[selectProduto.selectedIndex]?.dataset.preco;
-            if (preco) {
-                document.getElementById('item-preco').value = preco;
+        // Atualizar estoque quando selecionar sabor (não usado mais)
+        function atualizarEstoqueSabor() {
+            // Função mantida para compatibilidade mas não é mais usada
+        }
+
+        // Adicionar sabor na lista temporária (não usado mais)
+        function adicionarSaborNaLista() {
+            // Função mantida para compatibilidade mas não é mais usada
+        }
+        
+        // Renderizar lista de sabores temporários (não usado mais)
+        function renderSaboresTemporarios() {
+            // Função mantida para compatibilidade mas não é mais usada
+        }
+        
+        // Remover sabor da lista temporária (não usado mais)
+        function removerSaborTemporario(index) {
+            // Função mantida para compatibilidade mas não é mais usada
+        }
+        
+        // Salvar todos os sabores de uma vez
+        async function salvarTodosSabores() {
+            showLoading(true);
+            try {
+                // Coletar todos os sabores com quantidade > 0
+                const quantidadeInputs = document.querySelectorAll('.sabor-quantidade');
+                const saboresParaSalvar = [];
+                
+                quantidadeInputs.forEach(input => {
+                    const quantidade = parseFloat(input.value) || 0;
+                    if (quantidade > 0) {
+                        const saborId = input.dataset.saborId;
+                        const saborNome = input.dataset.saborNome;
+                        const precoInput = document.querySelector(`.sabor-preco[data-sabor-id="${saborId}"]`);
+                        const preco = parseFloat(precoInput.value) || 0;
+                        
+                        if (preco > 0) {
+                            saboresParaSalvar.push({
+                                sabor_id: saborId,
+                                sabor_nome: saborNome,
+                                quantidade: quantidade,
+                                preco_unitario: preco
+                            });
+                        }
+                    }
+                });
+                
+                if (saboresParaSalvar.length === 0) {
+                    showToast('Informe a quantidade e preço para pelo menos um sabor', 'warning');
+                    showLoading(false);
+                    return;
+                }
+                
+                // Salvar cada sabor
+                for (const sabor of saboresParaSalvar) {
+                    const itemData = {
+                        produto_id: produtoAtual.id,
+                        sabor_id: sabor.sabor_id,
+                        quantidade: sabor.quantidade,
+                        preco_unitario: sabor.preco_unitario
+                    };
+                    
+                    const result = await addItemPedido(pedidoId, itemData);
+                    if (!result) {
+                        throw new Error('Erro ao adicionar item');
+                    }
+                }
+                
+                showToast(`${saboresParaSalvar.length} sabor(es) adicionado(s) com sucesso!`, 'success');
+                
+                // Resetar modal
+                cancelarEFecharModal();
+                
+                // Recarregar pedido
+                await loadPedido();
+            } catch (error) {
+                handleError(error, 'Erro ao salvar sabores');
+            } finally {
+                showLoading(false);
             }
-            
-            // Exibir estoque do sabor
-            const estoque = selectSabor.options[selectSabor.selectedIndex]?.dataset.estoque || '-';
-            document.getElementById('sabor-estoque').textContent = estoque;
         }
-
-        async function loadProdutosSelect() {
-            // Função antiga removida - agora usa seleção em cascata
+        
+        // Cancelar e fechar modal
+        function cancelarEFecharModal() {
+            saboresTemporarios = [];
+            produtoAtual = null;
+            document.getElementById('item-marca').value = '';
+            document.getElementById('item-produto').value = '';
+            document.getElementById('item-produto').disabled = true;
+            document.getElementById('item-produto').innerHTML = '<option value="">Selecione o produto...</option>';
+            document.getElementById('tbody-sabores-lista').innerHTML = '';
+            document.getElementById('total-compra').textContent = 'R$ 0,00';
+            document.getElementById('area-adicionar-sabor').classList.add('hidden');
+            document.getElementById('btn-salvar-todos').classList.add('hidden');
+            closeModal('modal-item');
         }
 
         async function loadPedido() {
@@ -333,48 +575,109 @@
                 return `
                     <tr class="border-t">
                         <td class="px-4 py-3 text-sm">
-                            <div>${produtoNome}</div>
+                            <div class="font-medium">${produtoNome}</div>
                             ${sabor ? `<div class="text-xs text-gray-500">${sabor}</div>` : ''}
+                            <div class="text-xs text-gray-500">${item.produto?.codigo || ''}</div>
                         </td>
                         <td class="px-4 py-3 text-sm">${item.quantidade} ${item.produto?.unidade || ''}</td>
                         <td class="px-4 py-3 text-sm">${formatCurrency(item.preco_unitario)}</td>
                         <td class="px-4 py-3 text-sm font-semibold">${formatCurrency(item.subtotal)}</td>
                         <td class="px-4 py-3 text-sm">
-                            ${pedido.status === 'RASCUNHO' ? 
-                                `<button onclick="removeItem('${item.id}')" class="text-red-600 hover:text-red-800">Remover</button>` : '-'}
+                            ${pedido.status === 'RASCUNHO' ? `
+                                <button onclick="editarItem('${item.id}', ${item.quantidade}, ${item.preco_unitario})" class="text-blue-600 hover:text-blue-800 text-sm mr-2" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="removeItem('${item.id}')" class="text-red-600 hover:text-red-800 text-sm" title="Remover">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            ` : '-'}
                         </td>
                     </tr>
                 `;
             }).join('');
         }
 
-        document.getElementById('form-item').addEventListener('submit', async (e) => {
+        async function removeItem(itemId) {
+            if (confirm('Deseja remover este item?')) {
+                const success = await removeItemPedido(itemId);
+                if (success) await loadPedido();
+            }
+        }
+
+        window.editarItem = async function(itemId, quantidadeAtual, precoAtual) {
+            // Buscar informações completas do item
+            const itens = await getItensPedido(pedidoId);
+            const item = itens.find(i => i.id === itemId);
+            if (!item) {
+                showToast('Item não encontrado', 'error');
+                return;
+            }
+
+            // Preencher o modal
+            document.getElementById('editar-item-id').value = itemId;
+            
+            const produtoNome = item.produto?.nome || 'N/A';
+            const sabor = item.sabor?.sabor ? ` - ${item.sabor.sabor}` : '';
+            document.getElementById('editar-item-nome').value = produtoNome + sabor;
+            
+            document.getElementById('editar-item-quantidade').value = quantidadeAtual;
+            document.getElementById('editar-item-preco').value = precoAtual;
+            
+            // Calcular e mostrar subtotal
+            atualizarSubtotalEdicao();
+            
+            // Abrir modal
+            openModal('modal-editar-item');
+        };
+
+        function atualizarSubtotalEdicao() {
+            const quantidade = parseFloat(document.getElementById('editar-item-quantidade').value) || 0;
+            const preco = parseFloat(document.getElementById('editar-item-preco').value) || 0;
+            const subtotal = quantidade * preco;
+            document.getElementById('editar-item-subtotal').textContent = formatCurrency(subtotal);
+        }
+
+        // Event listeners para atualizar subtotal em tempo real
+        document.getElementById('editar-item-quantidade').addEventListener('input', atualizarSubtotalEdicao);
+        document.getElementById('editar-item-preco').addEventListener('input', atualizarSubtotalEdicao);
+
+        // Form de edição de item
+        document.getElementById('form-editar-item').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const item = {
-                produto_id: document.getElementById('item-produto').value,
-                sabor_id: document.getElementById('item-sabor').value,
-                quantidade: parseFloat(document.getElementById('item-quantidade').value),
-                preco_unitario: parseFloat(document.getElementById('item-preco').value)
-            };
+            const itemId = document.getElementById('editar-item-id').value;
+            const quantidade = parseFloat(document.getElementById('editar-item-quantidade').value);
+            const preco = parseFloat(document.getElementById('editar-item-preco').value);
 
-            await addItemPedido(pedidoId, item);
-            closeModal('modal-item');
-            document.getElementById('form-item').reset();
-            // Resetar selects em cascata
-            document.getElementById('item-marca').value = '';
-            document.getElementById('item-produto').innerHTML = '<option value="">Selecione o produto...</option>';
-            document.getElementById('item-sabor').innerHTML = '<option value="">Selecione o sabor...</option>';
-            document.getElementById('item-produto').disabled = true;
-            document.getElementById('item-sabor').disabled = true;
-            document.getElementById('sabor-estoque').textContent = '-';
-            await loadPedido();
+            if (quantidade <= 0 || preco <= 0) {
+                showToast('Quantidade e preço devem ser maiores que zero', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                
+                const { error } = await supabase
+                    .from('pedido_itens')
+                    .update({
+                        quantidade: quantidade,
+                        preco_unitario: preco,
+                        subtotal: quantidade * preco
+                    })
+                    .eq('id', itemId);
+
+                if (error) throw error;
+
+                showToast('Item atualizado com sucesso!', 'success');
+                closeModal('modal-editar-item');
+                await loadPedido();
+            } catch (error) {
+                console.error('Erro ao atualizar item:', error);
+                showToast('Erro ao atualizar item', 'error');
+            } finally {
+                showLoading(false);
+            }
         });
-
-        async function removeItem(itemId) {
-            const success = await removeItemPedido(itemId);
-            if (success) await loadPedido();
-        }
 
         async function finalizarPedidoHandler() {
             const success = await finalizarPedido(pedidoId);
