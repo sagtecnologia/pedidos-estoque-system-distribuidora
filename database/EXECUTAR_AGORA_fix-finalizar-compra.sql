@@ -13,14 +13,9 @@ BEGIN
     FROM pedidos 
     WHERE id = p_pedido_id;
     
-    -- COMPRA: pode finalizar de RASCUNHO (sem aprovação)
-    -- VENDA: precisa estar APROVADO
-    IF v_tipo_pedido = 'VENDA' AND v_status != 'APROVADO' THEN
-        RAISE EXCEPTION 'Vendas precisam ser aprovadas antes de finalizar';
-    END IF;
-    
-    IF v_tipo_pedido = 'COMPRA' AND v_status NOT IN ('RASCUNHO', 'APROVADO') THEN
-        RAISE EXCEPTION 'Pedido de compra não pode ser finalizado neste status';
+    -- COMPRA e VENDA: podem finalizar de RASCUNHO ou APROVADO (sem obrigar aprovação)
+    IF v_status NOT IN ('RASCUNHO', 'APROVADO') THEN
+        RAISE EXCEPTION 'Pedido não pode ser finalizado neste status';
     END IF;
 
     -- Processar itens do pedido

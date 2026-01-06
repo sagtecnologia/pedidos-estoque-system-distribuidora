@@ -239,16 +239,16 @@
                     
                     <!-- Replicação de Preço -->
                     <div class="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div class="flex items-center gap-4">
+                        <div class="flex items-end gap-4">
                             <div class="flex-1">
                                 <label class="block text-sm font-medium text-blue-900 mb-1">Preço de Venda Padrão</label>
                                 <input type="number" step="0.01" min="0.01" id="preco-padrao-replicar" 
                                     class="w-full px-3 py-2 border border-blue-300 rounded focus:ring-2 focus:ring-blue-500" 
                                     placeholder="0.00">
                             </div>
-                            <div class="flex items-end">
+                            <div>
                                 <button type="button" onclick="replicarPrecoTodosSabores()" 
-                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium whitespace-nowrap">
                                     Aplicar a Todos
                                 </button>
                             </div>
@@ -907,7 +907,7 @@
             
             // Botão de envio por WhatsApp
             const whatsappConfigurado = empresaConfig?.whatsapp_api_provider && empresaConfig?.whatsapp_api_url && empresaConfig?.whatsapp_api_key;
-            const statusPermitido = ['APROVADO', 'FINALIZADO'].includes(venda.status);
+            const statusPermitido = venda.status === 'FINALIZADO';
             const clienteTemWhatsApp = venda.cliente?.whatsapp;
             
             console.log('whatsappConfigurado:', whatsappConfigurado);
@@ -920,24 +920,18 @@
             }
             
             const podeEditar = venda.status === 'RASCUNHO' && venda.solicitante.id === currentUser.id;
-            const podeAprovar = venda.status === 'ENVIADO' && ['APROVADOR', 'ADMIN'].includes(currentUser.role);
-            const podeFinalizar = venda.status === 'APROVADO' && currentUser.role === 'ADMIN';
+            // Permite finalizar vendas em RASCUNHO (novo fluxo) ou APROVADO (pedidos antigos já aprovados)
+            const podeFinalizar = ['RASCUNHO', 'APROVADO'].includes(venda.status) && ['ADMIN', 'VENDEDOR'].includes(currentUser.role);
             
             if (podeEditar) {
                 document.getElementById('btn-add-item').style.display = 'block';
-                botoes.push('<button onclick="enviarParaAprovacao()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Enviar para Aprovação</button>');
                 botoes.push('<button onclick="excluirVenda()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">🗑️ Excluir Venda</button>');
             } else {
                 document.getElementById('btn-add-item').style.display = 'none';
             }
             
-            if (podeAprovar) {
-                botoes.push('<button onclick="aprovarVenda()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Aprovar</button>');
-                botoes.push('<button onclick="openModal(\'modal-rejeitar\')" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Rejeitar</button>');
-            }
-            
             if (podeFinalizar) {
-                botoes.push('<button onclick="finalizarVenda()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">Finalizar Venda</button>');
+                botoes.push('<button onclick="finalizarVenda()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">✅ Finalizar Venda</button>');
             }
             
             // Botão para registrar pagamento (vendas finalizadas com saldo pendente)
@@ -948,8 +942,8 @@
                 }
             }
             
-            // Botão de cancelar disponível para ADMIN em vendas APROVADAS ou FINALIZADAS
-            if ((venda.status === 'APROVADO' || venda.status === 'FINALIZADO') && currentUser.role === 'ADMIN') {
+            // Botão de cancelar disponível para ADMIN em vendas FINALIZADAS
+            if (venda.status === 'FINALIZADO' && currentUser.role === 'ADMIN') {
                 botoes.push('<button onclick="openModal(\'modal-cancelar\')" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">🚫 Cancelar Venda</button>');
             }
             
@@ -1116,35 +1110,14 @@
             }
         });
 
-        async function enviarParaAprovacao() {
-            if (itens.length === 0) {
-                showToast('Adicione pelo menos um item antes de enviar', 'error');
-                return;
-            }
-            if (confirm('Enviar venda para aprovação?')) {
-                const success = await enviarPedidoParaAprovacao(vendaId);
-                if (success) await loadVenda();
-            }
-        }
-
-        async function aprovarVenda() {
-            if (confirm('Aprovar esta venda?')) {
-                const success = await aprovarPedido(vendaId);
-                if (success) await loadVenda();
-            }
-        }
-
-        document.getElementById('form-rejeitar').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const motivo = document.getElementById('motivo-rejeicao').value;
-            const success = await rejeitarPedido(vendaId, motivo);
-            if (success) {
-                closeModal('modal-rejeitar');
-                await loadVenda();
-            }
-        });
+        // Funções de aprovação removidas - vendas agora finalizam diretamente do RASCUNHO
 
         async function finalizarVenda() {
+            if (itens.length === 0) {
+                showToast('Adicione pelo menos um item antes de finalizar a venda', 'error');
+                return;
+            }
+            
             if (confirm('Finalizar venda? O estoque será REDUZIDO automaticamente.')) {
                 const success = await finalizarPedido(vendaId);
                 if (success) {
