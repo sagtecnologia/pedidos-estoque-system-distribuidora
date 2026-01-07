@@ -63,6 +63,10 @@
                                 <dt class="text-gray-600">Total:</dt>
                                 <dd id="pedido-total" class="font-bold text-xl text-gray-900">R$ 0,00</dd>
                             </div>
+                            <div class="flex justify-between pt-2 border-t">
+                                <dt class="text-gray-600 text-sm">Quantidade Total:</dt>
+                                <dd id="pedido-quantidade-total" class="font-medium text-gray-700">0 UN</dd>
+                            </div>
                         </dl>
                     </div>
 
@@ -566,8 +570,13 @@
             
             if (itens.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Nenhum item adicionado</td></tr>';
+                document.getElementById('pedido-quantidade-total').textContent = '0 UN';
                 return;
             }
+            
+            // Calcular quantidade total de itens
+            const quantidadeTotal = itens.reduce((sum, item) => sum + parseFloat(item.quantidade || 0), 0);
+            document.getElementById('pedido-quantidade-total').textContent = `${quantidadeTotal.toFixed(2)} UN`;
 
             tbody.innerHTML = itens.map(item => {
                 const produtoNome = item.produto?.nome || 'N/A';
@@ -657,23 +666,36 @@
             try {
                 showLoading(true);
                 
-                const { error } = await supabase
+                console.log('📝 Atualizando item:', itemId, {quantidade, preco});
+                
+                const { data, error } = await supabase
                     .from('pedido_itens')
                     .update({
                         quantidade: quantidade,
-                        preco_unitario: preco,
-                        subtotal: quantidade * preco
+                        preco_unitario: preco
+                        // subtotal é calculado automaticamente pelo banco (coluna GENERATED)
                     })
-                    .eq('id', itemId);
+                    .eq('id', itemId)
+                    .select();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('❌ Erro no Supabase:', error);
+                    throw error;
+                }
+                
+                if (!data || data.length === 0) {
+                    console.warn('⚠️ Nenhum item foi atualizado. Possível problema de RLS.');
+                    throw new Error('Não foi possível atualizar o item. Verifique suas permissões.');
+                }
 
+                console.log('✅ Item atualizado:', data);
                 showToast('Item atualizado com sucesso!', 'success');
                 closeModal('modal-editar-item');
                 await loadPedido();
             } catch (error) {
-                console.error('Erro ao atualizar item:', error);
-                showToast('Erro ao atualizar item', 'error');
+                console.error('❌ Erro completo ao atualizar item:', error);
+                const mensagemErro = error.message || 'Erro ao atualizar item';
+                showToast(mensagemErro, 'error');
             } finally {
                 showLoading(false);
             }
@@ -697,6 +719,19 @@
         }
 
         async function cancelarPedidoHandler(novoStatus) {
+            // VALIDAÇÃO: Impedir cancelamento de pedidos já cancelados ou em rascunho
+            if (pedido.status === 'CANCELADO') {
+                showToast('❌ Este pedido já foi cancelado anteriormente!', 'error');
+                closeModal('modal-cancelar');
+                return;
+            }
+            
+            if (pedido.status === 'RASCUNHO') {
+                showToast('❌ Este pedido já está em rascunho!', 'error');
+                closeModal('modal-cancelar');
+                return;
+            }
+            
             const mensagem = novoStatus === 'CANCELADO' 
                 ? 'Tem certeza que deseja CANCELAR DEFINITIVAMENTE este pedido?' 
                 : 'Tem certeza que deseja CANCELAR e REABRIR este pedido como rascunho?';
@@ -762,12 +797,21 @@
                     updateData.aprovador_id = currentUser.id;
                 }
                 
-                const { error } = await supabase
+                console.log('📝 Atualizando pedido:', pedidoId, 'Status atual:', pedido.status, 'Novo status:', novoStatus);
+                console.log('📝 Dados para atualizar:', updateData);
+                
+                const { data, error } = await supabase
                     .from('pedidos')
                     .update(updateData)
-                    .eq('id', pedidoId);
+                    .eq('id', pedidoId)
+                    .select();
                 
-                if (error) throw error;
+                if (error) {
+                    console.error('❌ Erro ao atualizar status:', error);
+                    throw error;
+                }
+                
+                console.log('✅ Pedido atualizado com sucesso:', data);
                 
                 const msgSucesso = novoStatus === 'CANCELADO' 
                     ? 'Pedido cancelado definitivamente! Estoque ajustado.' 
@@ -775,7 +819,11 @@
                 
                 showToast(msgSucesso, 'success');
                 closeModal('modal-cancelar');
+                
+                // Recarregar dados do pedido para exibir novo status
+                console.log('🔄 Recarregando dados do pedido...');
                 await loadPedido();
+                console.log('✅ Pedido recarregado. Novo status:', pedido.status);
             } catch (error) {
                 handleError(error, 'Erro ao cancelar pedido');
             } finally {

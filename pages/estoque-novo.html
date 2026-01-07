@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gerenciamento de Estoque - Sistema de Compras</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 <body class="bg-gray-100">
@@ -17,6 +20,54 @@
             <div class="mb-8">
                 <h2 class="text-3xl font-bold text-gray-900">Gerenciamento de Estoque</h2>
                 <p class="text-gray-600 mt-2">Controle completo de estoque por produto e sabor</p>
+            </div>
+
+            <!-- Cards de Totais -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Valor Total Compra</p>
+                            <p id="card-total-compra" class="text-2xl font-bold text-blue-600">R$ 0,00</p>
+                            <p class="text-xs text-gray-500 mt-1">Investimento em estoque</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Valor Total Venda</p>
+                            <p id="card-total-venda" class="text-2xl font-bold text-green-600">R$ 0,00</p>
+                            <p class="text-xs text-gray-500 mt-1">Valor potencial de venda</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Margem de Lucro</p>
+                            <p id="card-margem-lucro" class="text-2xl font-bold text-purple-600">R$ 0,00</p>
+                            <p id="card-margem-percentual" class="text-xs text-gray-500 mt-1">0%</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Filtros Globais -->
@@ -48,6 +99,7 @@
                             <option value="OK">OK</option>
                             <option value="BAIXO">Estoque Baixo</option>
                             <option value="ZERADO">Zerado</option>
+                            <option value="BAIXO,OK">Baixo e OK</option>
                         </select>
                     </div>
                 </div>
@@ -57,6 +109,12 @@
                     </button>
                     <button onclick="limparFiltros()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">
                         🔄 Limpar
+                    </button>
+                    <button onclick="exportarExcel()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                        📊 Exportar Excel
+                    </button>
+                    <button onclick="exportarPDF()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">
+                        📄 Exportar PDF
                     </button>
                 </div>
             </div>
@@ -276,10 +334,21 @@
                 return;
             }
             
-            const sabores = await getSaboresProduto(produtoId);
+            // Buscar sabores diretamente da view para ter consistência
+            const { data: sabores, error } = await supabase
+                .from('vw_estoque_sabores')
+                .select('sabor_id, sabor')
+                .eq('produto_id', produtoId)
+                .order('sabor');
+            
+            if (error) {
+                console.error('Erro ao buscar sabores:', error);
+                return;
+            }
+            
             sabores.forEach(s => {
                 const option = document.createElement('option');
-                option.value = s.id;
+                option.value = s.sabor_id;
                 option.textContent = s.sabor;
                 selectSabor.appendChild(option);
             });
@@ -307,6 +376,38 @@
             filtroAtual.situacao = document.getElementById('filter-situacao').value;
             
             renderizarTabAtiva();
+            calcularTotaisEstoque();
+        }
+
+        function calcularTotaisEstoque() {
+            let totalCompra = 0;
+            let totalVenda = 0;
+            
+            // Calcular com base nos sabores em estoque
+            todosSabores.forEach(sabor => {
+                const produto = todosProdutos.find(p => p.id === sabor.produto_id);
+                if (!produto) return;
+                
+                // Aplicar filtros
+                if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                if (filtroAtual.sabor && sabor.sabor_id !== filtroAtual.sabor) return;
+                
+                const quantidade = sabor.quantidade || 0;
+                const precoCompra = produto.preco_compra || 0;
+                const precoVenda = produto.preco_venda || 0;
+                
+                totalCompra += quantidade * precoCompra;
+                totalVenda += quantidade * precoVenda;
+            });
+            
+            const margemLucro = totalVenda - totalCompra;
+            const margemPercentual = totalCompra > 0 ? (margemLucro / totalCompra * 100) : 0;
+            
+            document.getElementById('card-total-compra').textContent = formatCurrency(totalCompra);
+            document.getElementById('card-total-venda').textContent = formatCurrency(totalVenda);
+            document.getElementById('card-margem-lucro').textContent = formatCurrency(margemLucro);
+            document.getElementById('card-margem-percentual').textContent = `${margemPercentual.toFixed(1)}% de margem`;
         }
 
         async function carregarDados() {
@@ -328,6 +429,7 @@
                 todasMovimentacoes = await listMovimentacoes({ limit: 500 });
                 
                 renderizarTabAtiva();
+                calcularTotaisEstoque();
             } catch (error) {
                 handleError(error, 'Erro ao carregar dados');
             } finally {
@@ -383,9 +485,11 @@
                 produtos = produtos.filter(p => p.id === filtroAtual.produto);
             }
             if (filtroAtual.situacao) {
+                // Suportar múltiplos status separados por vírgula
+                const situacoes = filtroAtual.situacao.split(',');
                 produtos = produtos.filter(p => {
                     const situacao = getSituacaoEstoque(p).tipo;
-                    return situacao === filtroAtual.situacao;
+                    return situacoes.includes(situacao);
                 });
             }
             
@@ -416,6 +520,13 @@
         function renderEstoqueSabor() {
             let sabores = [...todosSabores];
             
+            // Recalcular status para incluir ZERADO
+            sabores = sabores.map(s => ({
+                ...s,
+                status_estoque: s.quantidade === 0 ? 'ZERADO' : 
+                               (s.quantidade <= s.estoque_minimo ? 'BAIXO' : 'OK')
+            }));
+            
             // Aplicar filtros
             if (filtroAtual.marca) {
                 sabores = sabores.filter(s => s.marca === filtroAtual.marca);
@@ -427,7 +538,9 @@
                 sabores = sabores.filter(s => s.sabor_id === filtroAtual.sabor);
             }
             if (filtroAtual.situacao) {
-                sabores = sabores.filter(s => s.status_estoque === filtroAtual.situacao);
+                // Suportar múltiplos status separados por vírgula
+                const situacoes = filtroAtual.situacao.split(',');
+                sabores = sabores.filter(s => situacoes.includes(s.status_estoque));
             }
             
             const tbody = document.getElementById('tbody-estoque-sabor');
@@ -438,10 +551,17 @@
             }
             
             tbody.innerHTML = sabores.map(s => {
-                const situacao = s.status_estoque === 'BAIXO' ? 'text-red-600' : 'text-green-600';
-                const badge = s.status_estoque === 'BAIXO' 
-                    ? '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Baixo</span>'
-                    : '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">OK</span>';
+                let situacao, badge;
+                if (s.status_estoque === 'ZERADO') {
+                    situacao = 'text-gray-600';
+                    badge = '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Zerado</span>';
+                } else if (s.status_estoque === 'BAIXO') {
+                    situacao = 'text-red-600';
+                    badge = '<span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">Baixo</span>';
+                } else {
+                    situacao = 'text-green-600';
+                    badge = '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">OK</span>';
+                }
                 const margem = s.preco_venda && s.preco_compra 
                     ? ((s.preco_venda - s.preco_compra) / s.preco_compra * 100).toFixed(1) + '%'
                     : '-';
@@ -449,7 +569,7 @@
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 text-sm text-gray-700">${s.marca || '-'}</td>
-                        <td class="px-6 py-4 text-sm text-gray-900">${s.produto}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${s.produto_nome || s.produto || '-'}</td>
                         <td class="px-6 py-4 text-sm font-medium text-blue-600">${s.sabor}</td>
                         <td class="px-6 py-4 text-sm"><span class="font-semibold ${situacao}">${s.quantidade}</span></td>
                         <td class="px-6 py-4 text-sm">${badge}</td>
@@ -579,6 +699,252 @@
         function exportarCSV(tipo) {
             // TODO: Implementar exportação CSV
             showToast('Funcionalidade de exportação em desenvolvimento', 'info');
+        }
+
+        // ========================================
+        // FUNÇÕES DE EXPORTAÇÃO
+        // ========================================
+
+        function exportarExcel() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            const timestamp = new Date().toLocaleString('pt-BR').replace(/[/:]/g, '-');
+            let dados = [];
+            let nomeArquivo = '';
+
+            switch(activeTab) {
+                case 'estoque-produto':
+                    dados = obterDadosEstoqueProduto();
+                    nomeArquivo = `Estoque_Produto_${timestamp}.xlsx`;
+                    break;
+                case 'estoque-sabor':
+                    dados = obterDadosEstoqueSabor();
+                    nomeArquivo = `Estoque_Sabor_${timestamp}.xlsx`;
+                    break;
+                case 'mov-produto':
+                    dados = obterDadosMovimentacoesProduto();
+                    nomeArquivo = `Movimentacoes_Produto_${timestamp}.xlsx`;
+                    break;
+                case 'mov-sabor':
+                    dados = obterDadosMovimentacoesSabor();
+                    nomeArquivo = `Movimentacoes_Sabor_${timestamp}.xlsx`;
+                    break;
+            }
+
+            if (dados.length === 0) {
+                showToast('Nenhum dado para exportar', 'warning');
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(dados);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+            XLSX.writeFile(wb, nomeArquivo);
+            showToast('Arquivo Excel exportado com sucesso!', 'success');
+        }
+
+        function exportarPDF() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            const timestamp = new Date().toLocaleString('pt-BR');
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Cabeçalho
+            doc.setFontSize(18);
+            doc.text('Gerenciamento de Estoque', 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${timestamp}`, 14, 22);
+
+            // Filtros aplicados
+            let filtros = [];
+            if (filtroAtual.marca) filtros.push(`Marca: ${document.getElementById('filter-marca').selectedOptions[0].text}`);
+            if (filtroAtual.produto) filtros.push(`Produto: ${document.getElementById('filter-produto').selectedOptions[0].text}`);
+            if (filtroAtual.sabor) filtros.push(`Sabor: ${document.getElementById('filter-sabor').selectedOptions[0].text}`);
+            if (filtroAtual.situacao) filtros.push(`Situação: ${filtroAtual.situacao}`);
+            
+            if (filtros.length > 0) {
+                doc.setFontSize(9);
+                doc.text(`Filtros: ${filtros.join(' | ')}`, 14, 28);
+            }
+
+            let startY = filtros.length > 0 ? 35 : 28;
+
+            switch(activeTab) {
+                case 'estoque-produto':
+                    exportarTabelaPDF(doc, 'Estoque por Produto', obterDadosEstoqueProdutoTabela(), startY);
+                    break;
+                case 'estoque-sabor':
+                    exportarTabelaPDF(doc, 'Estoque por Sabor', obterDadosEstoqueSaborTabela(), startY);
+                    break;
+                case 'mov-produto':
+                    exportarTabelaPDF(doc, 'Movimentações por Produto', obterDadosMovimentacoesProdutoTabela(), startY);
+                    break;
+                case 'mov-sabor':
+                    exportarTabelaPDF(doc, 'Movimentações por Sabor', obterDadosMovimentacoesSaborTabela(), startY);
+                    break;
+            }
+
+            doc.save(`Estoque_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('PDF exportado com sucesso!', 'success');
+        }
+
+        function exportarTabelaPDF(doc, titulo, dados, startY) {
+            doc.setFontSize(12);
+            doc.text(titulo, 14, startY);
+
+            doc.autoTable({
+                startY: startY + 5,
+                head: [dados.headers],
+                body: dados.rows,
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] },
+                styles: { fontSize: 7 }
+            });
+        }
+
+        // Funções auxiliares para obter dados
+        function obterDadosEstoqueProduto() {
+            let produtosFiltrados = todosProdutos.filter(p => {
+                if (filtroAtual.marca && p.marca !== filtroAtual.marca) return false;
+                if (filtroAtual.produto && p.id !== filtroAtual.produto) return false;
+                
+                const situacao = getSituacaoEstoque(p);
+                if (filtroAtual.situacao && situacao.tipo !== filtroAtual.situacao) return false;
+                
+                return true;
+            });
+
+            return produtosFiltrados.map(p => {
+                const sabores = todosSabores.filter(s => s.produto_id === p.id);
+                const situacao = getSituacaoEstoque(p);
+                
+                return {
+                    'Código': p.codigo || '-',
+                    'Marca': p.marca || '-',
+                    'Produto': p.nome,
+                    'Estoque Total': p.estoque_atual,
+                    'Estoque Mínimo': p.estoque_minimo,
+                    'Situação': situacao.tipo,
+                    'Qtd Sabores': sabores.length
+                };
+            });
+        }
+
+        function obterDadosEstoqueProdutoTabela() {
+            const dados = obterDadosEstoqueProduto();
+            return {
+                headers: ['Código', 'Marca', 'Produto', 'Estoque', 'Mínimo', 'Situação', 'Sabores'],
+                rows: dados.map(d => [d.Código, d.Marca, d.Produto, d['Estoque Total'], d['Estoque Mínimo'], d.Situação, d['Qtd Sabores']])
+            };
+        }
+
+        function obterDadosEstoqueSabor() {
+            // Não aplicar filtros aqui, pegar todos os sabores disponíveis
+            let saboresFiltrados = todosSabores.filter(s => {
+                // Remover filtro de ativo - a view já traz apenas sabores ativos
+                const produto = todosProdutos.find(p => p.id === s.produto_id);
+                if (!produto) return false;
+                
+                if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return false;
+                if (filtroAtual.produto && s.produto_id !== filtroAtual.produto) return false;
+                if (filtroAtual.sabor && s.id !== filtroAtual.sabor) return false;
+                if (filtroAtual.situacao && s.status_estoque !== filtroAtual.situacao) return false;
+                
+                return true;
+            });
+
+            return saboresFiltrados.map(s => {
+                const produto = todosProdutos.find(p => p.id === s.produto_id);
+                const margemBruta = s.preco_venda && s.preco_compra
+                    ? ((s.preco_venda - s.preco_compra) / s.preco_compra * 100)
+                    : 0;
+                
+                return {
+                    'Marca': produto?.marca || s.marca || '-',
+                    'Produto': s.produto_nome || s.produto || produto?.nome || '-',
+                    'Sabor': s.sabor || '-',
+                    'Quantidade': s.quantidade || 0,
+                    'Situação': s.status_estoque || '-',
+                    'Preço Compra': s.preco_compra ? `R$ ${s.preco_compra.toFixed(2)}` : '-',
+                    'Preço Venda': s.preco_venda ? `R$ ${s.preco_venda.toFixed(2)}` : '-',
+                    'Margem %': margemBruta.toFixed(1) + '%'
+                };
+            });
+        }
+
+        function obterDadosEstoqueSaborTabela() {
+            const dados = obterDadosEstoqueSabor();
+            return {
+                headers: ['Marca', 'Produto', 'Sabor', 'Qtd', 'Situação', 'P. Compra', 'P. Venda', 'Margem'],
+                rows: dados.map(d => [d.Marca, d.Produto, d.Sabor, d.Quantidade, d.Situação, d['Preço Compra'], d['Preço Venda'], d['Margem %']])
+            };
+        }
+
+        function obterDadosMovimentacoesProduto() {
+            let movsFiltradas = todasMovimentacoes.filter(m => {
+                const produto = todosProdutos.find(p => p.id === m.produto_id);
+                if (!produto) return false;
+                
+                if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return false;
+                if (filtroAtual.produto && m.produto_id !== filtroAtual.produto) return false;
+                
+                return true;
+            });
+
+            return movsFiltradas.map(m => ({
+                'Data': formatDateTime(m.created_at),
+                'Tipo': m.tipo,
+                'Produto': m.produto?.nome || '-',
+                'Quantidade': m.quantidade,
+                'Estoque Anterior': m.estoque_anterior,
+                'Estoque Novo': m.estoque_novo,
+                'Usuário': m.usuario?.full_name || '-',
+                'Observação': m.observacao || '-'
+            }));
+        }
+
+        function obterDadosMovimentacoesProdutoTabela() {
+            const dados = obterDadosMovimentacoesProduto();
+            return {
+                headers: ['Data', 'Tipo', 'Produto', 'Qtd', 'Est. Ant.', 'Est. Novo', 'Usuário', 'Obs'],
+                rows: dados.map(d => [d.Data, d.Tipo, d.Produto, d.Quantidade, d['Estoque Anterior'], d['Estoque Novo'], d.Usuário, d.Observação])
+            };
+        }
+
+        function obterDadosMovimentacoesSabor() {
+            let movsFiltradas = todasMovimentacoes.filter(m => {
+                if (!m.sabor_id) return false;
+                
+                const produto = todosProdutos.find(p => p.id === m.produto_id);
+                if (!produto) return false;
+                
+                if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return false;
+                if (filtroAtual.produto && m.produto_id !== filtroAtual.produto) return false;
+                if (filtroAtual.sabor && m.sabor_id !== filtroAtual.sabor) return false;
+                
+                return true;
+            });
+
+            return movsFiltradas.map(m => {
+                const saborInfo = todosSabores.find(s => s.id === m.sabor_id);
+                return {
+                    'Data': formatDateTime(m.created_at),
+                    'Tipo': m.tipo,
+                    'Produto': m.produto?.nome || '-',
+                    'Sabor': saborInfo?.sabor || '-',
+                    'Quantidade': m.quantidade,
+                    'Usuário': m.usuario?.full_name || '-',
+                    'Observação': m.observacao || '-'
+                };
+            });
+        }
+
+        function obterDadosMovimentacoesSaborTabela() {
+            const dados = obterDadosMovimentacoesSabor();
+            return {
+                headers: ['Data', 'Tipo', 'Produto', 'Sabor', 'Qtd', 'Usuário', 'Obs'],
+                rows: dados.map(d => [d.Data, d.Tipo, d.Produto, d.Sabor, d.Quantidade, d.Usuário, d.Observação])
+            };
         }
 
         function formatDateTime(date) {
