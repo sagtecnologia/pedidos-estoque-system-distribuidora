@@ -51,9 +51,16 @@ BEGIN
 
     -- Processar itens do pedido
     FOR v_item IN 
-        SELECT produto_id, sabor_id, quantidade 
-        FROM pedido_itens 
-        WHERE pedido_id = p_pedido_id
+        SELECT 
+            pi.produto_id, 
+            pi.sabor_id, 
+            pi.quantidade,
+            p.codigo as produto_codigo,
+            ps.sabor as sabor_nome
+        FROM pedido_itens pi
+        LEFT JOIN produtos p ON p.id = pi.produto_id
+        LEFT JOIN produto_sabores ps ON ps.id = pi.sabor_id
+        WHERE pi.pedido_id = p_pedido_id
     LOOP
         IF v_item.sabor_id IS NOT NULL THEN
             DECLARE
@@ -75,8 +82,11 @@ BEGIN
                     
                     -- VALIDAÇÃO: Estoque suficiente para venda
                     IF v_estoque_anterior < v_item.quantidade THEN
-                        RAISE EXCEPTION 'Estoque insuficiente para finalizar venda. Disponível: %, Necessário: %',
-                            v_estoque_anterior, v_item.quantidade;
+                        RAISE EXCEPTION 'Estoque insuficiente para % (%). Necessário: %, Disponível: %',
+                            v_item.produto_codigo, 
+                            v_item.sabor_nome,
+                            v_item.quantidade,
+                            v_estoque_anterior;
                     END IF;
                 ELSE
                     RAISE EXCEPTION 'Tipo de pedido inválido: %', v_tipo_pedido;

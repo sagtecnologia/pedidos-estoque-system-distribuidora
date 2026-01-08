@@ -350,7 +350,33 @@ async function finalizarPedido(pedidoId) {
                 p_usuario_id: user.id
             });
 
-        if (error) throw error;
+        if (error) {
+            // Tratar erros de validação de estoque de forma mais amigável
+            if (error.message && error.message.includes('Estoque insuficiente')) {
+                // Extrair informações do erro (formato: "Estoque insuficiente para CODIGO (SABOR). Necessário: X, Disponível: Y")
+                const match = error.message.match(/para (.+?) \((.+?)\)\. Necessário: ([\d.]+), Disponível: ([\d.]+)/);
+                
+                if (match) {
+                    const [_, codigo, sabor, necessario, disponivel] = match;
+                    const faltam = (parseFloat(necessario) - parseFloat(disponivel)).toFixed(2);
+                    
+                    throw new Error(
+                        `❌ ESTOQUE INSUFICIENTE!\n\n` +
+                        `📦 Produto: ${codigo}\n` +
+                        `🎨 Sabor: ${sabor}\n` +
+                        `📊 Necessário: ${necessario} unidades\n` +
+                        `📉 Disponível: ${disponivel} unidades\n` +
+                        `⚠️  Faltam: ${faltam} unidades\n\n` +
+                        `Por favor, reduza a quantidade ou abasteça o estoque antes de finalizar.`
+                    );
+                } else {
+                    // Se não conseguir extrair, mostrar mensagem original melhorada
+                    throw new Error(`❌ Erro de estoque:\n${error.message}`);
+                }
+            }
+            
+            throw error;
+        }
 
         showToast('Pedido finalizado e estoque atualizado!', 'success');
         return true;
