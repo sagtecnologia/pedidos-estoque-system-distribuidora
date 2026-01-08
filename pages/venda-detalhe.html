@@ -694,6 +694,17 @@
         
         // Salvar todos os sabores de uma vez
         async function salvarTodosSabores() {
+            // ✅ PROTEÇÃO: Impedir cliques duplos
+            const btnSalvar = document.getElementById('btn-salvar-todos');
+            if (btnSalvar.disabled) {
+                console.warn('⚠️ Salvamento já em andamento, ignorando clique duplo');
+                return;
+            }
+            
+            btnSalvar.disabled = true;
+            btnSalvar.textContent = '⏳ Salvando...';
+            btnSalvar.classList.add('opacity-50', 'cursor-not-allowed');
+            
             showLoading(true);
             try {
                 // Coletar todos os sabores com quantidade > 0
@@ -727,9 +738,10 @@
                 
                 if (saboresParaSalvar.length === 0) {
                     showToast('Informe a quantidade e preço para pelo menos um sabor', 'warning');
-                    showLoading(false);
                     return;
                 }
+                
+                console.log('📦 Salvando', saboresParaSalvar.length, 'sabor(es)...');
                 
                 // Salvar cada sabor
                 for (const sabor of saboresParaSalvar) {
@@ -740,12 +752,15 @@
                         preco_unitario: sabor.preco_unitario
                     };
                     
+                    console.log('  → Adicionando:', sabor.sabor_nome, '-', sabor.quantidade, 'UN');
+                    
                     const result = await addItemPedido(vendaId, itemData);
                     if (!result) {
                         throw new Error('Erro ao adicionar item');
                     }
                 }
                 
+                console.log('✅ Todos os sabores salvos com sucesso!');
                 showToast(`${saboresParaSalvar.length} sabor(es) adicionado(s) com sucesso!`, 'success');
                 
                 // Resetar modal
@@ -757,6 +772,10 @@
                 handleError(error, 'Erro ao salvar sabores');
             } finally {
                 showLoading(false);
+                // Reabilitar botão
+                btnSalvar.disabled = false;
+                btnSalvar.textContent = 'Salvar Venda';
+                btnSalvar.classList.remove('opacity-50', 'cursor-not-allowed');
             }
         }
         

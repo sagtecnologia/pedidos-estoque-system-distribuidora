@@ -133,9 +133,11 @@ async function createPedido(pedido) {
 }
 
 // Adicionar item ao pedido
+// Adicionar item ao pedido
 async function addItemPedido(pedidoId, item) {
     try {
-        showLoading(true);
+        // ✅ NÃO mostrar loading aqui - já é mostrado pela função chamadora
+        // showLoading(true);
 
         const itemData = {
             pedido_id: pedidoId,
@@ -157,14 +159,16 @@ async function addItemPedido(pedidoId, item) {
 
         if (error) throw error;
 
-        showToast('Item adicionado com sucesso!', 'success');
+        // ✅ NÃO mostrar toast aqui - será mostrado pela função chamadora
+        // showToast('Item adicionado com sucesso!', 'success');
         return data;
         
     } catch (error) {
-        handleError(error, 'Erro ao adicionar item');
-        return null;
+        console.error('Erro ao adicionar item:', error);
+        throw error; // ✅ Propagar erro para função chamadora tratar
     } finally {
-        showLoading(false);
+        // ✅ NÃO remover loading aqui
+        // showLoading(false);
     }
 }
 
