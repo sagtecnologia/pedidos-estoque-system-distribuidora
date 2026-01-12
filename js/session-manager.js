@@ -22,6 +22,12 @@ class SessionManager {
         // Controle de estado
         this.isWarningShown = false;
         this.lastActivity = Date.now();
+        this.sessionStartTime = Date.now();
+        this.logoutScheduledAt = null;
+        this.warningScheduledAt = null;
+        
+        // Debug mode
+        this.debugMode = options.debugMode !== false; // Ativo por padrão
         
         // Eventos que resetam o temporizador
         this.activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
@@ -31,9 +37,15 @@ class SessionManager {
     }
 
     init() {
-        console.log('🔒 Session Manager inicializado');
+        const now = new Date().toLocaleTimeString();
+        console.log('═══════════════════════════════════════════');
+        console.log('🔒 SESSION MANAGER INICIALIZADO');
+        console.log('═══════════════════════════════════════════');
+        console.log(`⏰ Hora de início: ${now}`);
         console.log(`⏰ Timeout de inatividade: ${this.inactivityTimeout / 1000 / 60} minutos`);
         console.log(`⚠️  Aviso antes do logout: ${this.warningTime / 1000 / 60} minutos`);
+        console.log(`🐛 Debug mode: ${this.debugMode ? 'ATIVO' : 'INATIVO'}`);
+        console.log('═══════════════════════════════════════════');
         
         // Registrar eventos de atividade
         this.registerActivityListeners();
@@ -46,16 +58,30 @@ class SessionManager {
         
         // Verificar se há sessão válida ao iniciar
         this.checkSession();
+        
+        // Log periódico de status (a cada 2 minutos) para debug
+        if (this.debugMode) {
+            setInterval(() => this.logStatus(), 2 * 60 * 1000);
+        }
     }
 
     registerActivityListeners() {
+        // Bind do método para manter o contexto
+        this.boundOnActivity = this.onActivity.bind(this);
+        
         this.activityEvents.forEach(event => {
-            document.addEventListener(event, () => this.onActivity(), { passive: true });
+            document.addEventListener(event, this.boundOnActivity, { passive: true });
         });
     }
 
     onActivity() {
         const now = Date.now();
+        const timeSinceLastActivity = now - this.lastActivity;
+        
+        // Log apenas se passou mais de 10 segundos desde a última atividade
+        if (this.debugMode && timeSinceLastActivity > 10000) {
+            console.log(`🖱️  Atividade detectada após ${Math.floor(timeSinceLastActivity / 1000)}s de inatividade`);
+        }
         
         // Atualizar última atividade
         this.lastActivity = now;
@@ -78,16 +104,32 @@ class SessionManager {
             clearTimeout(this.warningTimer);
         }
 
+        const now = Date.now();
+        
         // Calcular tempo até o aviso
         const timeUntilWarning = this.inactivityTimeout - this.warningTime;
         
+        // Calcular horários agendados
+        this.warningScheduledAt = now + timeUntilWarning;
+        this.logoutScheduledAt = now + this.inactivityTimeout;
+        
+        if (this.debugMode) {
+            const warningTime = new Date(this.warningScheduledAt).toLocaleTimeString();
+            const logoutTime = new Date(this.logoutScheduledAt).toLocaleTimeString();
+            console.log(`⏱️  Timer resetado:`);
+            console.log(`   → Aviso agendado para: ${warningTime} (em ${timeUntilWarning / 1000 / 60} min)`);
+            console.log(`   → Logout agendado para: ${logoutTime} (em ${this.inactivityTimeout / 1000 / 60} min)`);
+        }
+        
         // Agendar aviso
         this.warningTimer = setTimeout(() => {
+            console.log('⚠️  EXECUTANDO AVISO DE SESSÃO');
             this.showWarning();
         }, timeUntilWarning);
         
         // Agendar logout
         this.inactivityTimer = setTimeout(() => {
+            console.log('🚪 EXECUTANDO LOGOUT AUTOMÁTICO POR INATIVIDADE');
             this.performLogout('inatividade');
         }, this.inactivityTimeout);
     }
@@ -315,6 +357,74 @@ class SessionManager {
         }
     }
 
+    // Obter tempo restante até o logout
+    getTimeUntilLogout() {
+        if (!this.logoutScheduledAt) return 0;
+        const remaining = this.logoutScheduledAt - Date.now();
+        return Math.max(0, remaining);
+    }
+
+    // Obter tempo restante até o aviso
+    getTimeUntilWarning() {
+        if (!this.warningScheduledAt) return 0;
+        const remaining = this.warningScheduledAt - Date.now();
+        return Math.max(0, remaining);
+    }
+
+    // Obter tempo desde a última atividade
+    getTimeSinceLastActivity() {
+        return Date.now() - this.lastActivity;
+    }
+
+    // Obter tempo total de sessão
+    getSessionDuration() {
+        return Date.now() - this.sessionStartTime;
+    }
+
+    // Formatar tempo em formato legível
+    formatTime(milliseconds) {
+        const seconds = Math.floor(milliseconds / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${minutes % 60}m`;
+        } else if (minutes > 0) {
+            return `${minutes}m ${seconds % 60}s`;
+        } else {
+            return `${seconds}s`;
+        }
+    }
+
+    // Log de status para debug
+    logStatus() {
+        const now = new Date().toLocaleTimeString();
+        console.log('═══════════════════════════════════════════');
+        console.log(`📊 STATUS DA SESSÃO - ${now}`);
+        console.log('═══════════════════════════════════════════');
+        console.log(`⏱️  Tempo de sessão: ${this.formatTime(this.getSessionDuration())}`);
+        console.log(`🖱️  Última atividade: ${this.formatTime(this.getTimeSinceLastActivity())} atrás`);
+        console.log(`⚠️  Aviso em: ${this.formatTime(this.getTimeUntilWarning())}`);
+        console.log(`🚪 Logout em: ${this.formatTime(this.getTimeUntilLogout())}`);
+        console.log(`🔔 Aviso mostrado: ${this.isWarningShown ? 'SIM' : 'NÃO'}`);
+        console.log('═══════════════════════════════════════════');
+    }
+
+    // Obter informações completas da sessão
+    getSessionInfo() {
+        return {
+            sessionDuration: this.getSessionDuration(),
+            timeSinceLastActivity: this.getTimeSinceLastActivity(),
+            timeUntilWarning: this.getTimeUntilWarning(),
+            timeUntilLogout: this.getTimeUntilLogout(),
+            isWarningShown: this.isWarningShown,
+            lastActivity: this.lastActivity,
+            sessionStartTime: this.sessionStartTime,
+            inactivityTimeout: this.inactivityTimeout,
+            warningTime: this.warningTime
+        };
+    }
+
     destroy() {
         // Limpar temporizadores
         if (this.inactivityTimer) {
@@ -325,9 +435,11 @@ class SessionManager {
         }
         
         // Remover event listeners
-        this.activityEvents.forEach(event => {
-            document.removeEventListener(event, this.onActivity);
-        });
+        if (this.boundOnActivity) {
+            this.activityEvents.forEach(event => {
+                document.removeEventListener(event, this.boundOnActivity);
+            });
+        }
         
         // Remover modal
         this.hideWarning();

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Sessão</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h1 class="text-3xl font-bold text-gray-900 mb-4">🔒 Teste do Sistema de Sessão</h1>
+            <p class="text-gray-600 mb-4">Use esta página para testar o sistema de gerenciamento de sessão.</p>
+        </div>
+
+        <!-- Indicador de Sessão -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">📊 Status da Sessão</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-blue-50 p-4 rounded-lg">
+                    <p class="text-xs text-blue-600 font-semibold mb-1">⏱️ TEMPO DE SESSÃO</p>
+                    <p id="session-duration" class="text-lg font-bold text-blue-900">--</p>
+                </div>
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-xs text-gray-600 font-semibold mb-1">🖱️ ÚLTIMA ATIVIDADE</p>
+                    <p id="last-activity" class="text-lg font-bold text-gray-900">--</p>
+                </div>
+                <div class="bg-yellow-50 p-4 rounded-lg">
+                    <p class="text-xs text-yellow-600 font-semibold mb-1">⚠️ AVISO EM</p>
+                    <p id="warning-time" class="text-lg font-bold text-yellow-900">--</p>
+                </div>
+                <div class="bg-red-50 p-4 rounded-lg">
+                    <p class="text-xs text-red-600 font-semibold mb-1">🚪 LOGOUT EM</p>
+                    <p id="logout-time" class="text-lg font-bold text-red-900">--</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controles de Teste -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">🧪 Controles de Teste</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button onclick="testRapido()" class="bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition">
+                    ⚡ Teste Rápido (2min)
+                </button>
+                <button onclick="testNormal()" class="bg-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-green-700 transition">
+                    ⏰ Teste Normal (15min)
+                </button>
+                <button onclick="mostrarStatus()" class="bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition">
+                    📋 Mostrar Status (Console)
+                </button>
+                <button onclick="forcarAviso()" class="bg-yellow-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-yellow-700 transition">
+                    ⚠️ Forçar Aviso
+                </button>
+            </div>
+        </div>
+
+        <!-- Logs -->
+        <div class="bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">📜 Logs de Eventos</h2>
+            <div id="logs" class="bg-gray-50 p-4 rounded-lg font-mono text-xs h-64 overflow-y-auto">
+                <p class="text-gray-500">Aguardando eventos...</p>
+            </div>
+            <button onclick="limparLogs()" class="mt-4 bg-gray-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-gray-700 transition text-sm">
+                🗑️ Limpar Logs
+            </button>
+        </div>
+    </div>
+
+    <script src="js/session-manager.js"></script>
+    <script>
+        // Interceptar logs do console
+        const logsDiv = document.getElementById('logs');
+        const originalLog = console.log;
+        
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const message = args.join(' ');
+            const p = document.createElement('p');
+            p.className = 'text-gray-700 mb-1';
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(p);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        };
+
+        // Atualizar status a cada segundo
+        setInterval(() => {
+            if (!window.sessionManager) {
+                document.getElementById('session-duration').textContent = 'N/A';
+                document.getElementById('last-activity').textContent = 'N/A';
+                document.getElementById('warning-time').textContent = 'N/A';
+                document.getElementById('logout-time').textContent = 'N/A';
+                return;
+            }
+
+            const info = window.sessionManager.getSessionInfo();
+            document.getElementById('session-duration').textContent = window.sessionManager.formatTime(info.sessionDuration);
+            document.getElementById('last-activity').textContent = window.sessionManager.formatTime(info.timeSinceLastActivity) + ' atrás';
+            document.getElementById('warning-time').textContent = window.sessionManager.formatTime(info.timeUntilWarning);
+            document.getElementById('logout-time').textContent = window.sessionManager.formatTime(info.timeUntilLogout);
+        }, 1000);
+
+        function testRapido() {
+            console.log('🔥 Iniciando teste rápido (2 minutos)');
+            if (window.sessionManager) {
+                window.sessionManager.destroy();
+            }
+            window.sessionManager = new SessionManager({
+                inactivityTimeout: 2 * 60 * 1000,  // 2 minutos
+                warningTime: 30 * 1000,            // 30 segundos
+                debugMode: true
+            });
+            console.log('✅ Configurado! Não mexa por 1min30s para ver o aviso.');
+        }
+
+        function testNormal() {
+            console.log('⏰ Iniciando teste normal (15 minutos)');
+            if (window.sessionManager) {
+                window.sessionManager.destroy();
+            }
+            window.sessionManager = new SessionManager({
+                inactivityTimeout: 15 * 60 * 1000, // 15 minutos
+                warningTime: 2 * 60 * 1000,        // 2 minutos
+                debugMode: true
+            });
+            console.log('✅ Configurado! Não mexa por 13 minutos para ver o aviso.');
+        }
+
+        function mostrarStatus() {
+            if (window.sessionManager) {
+                window.sessionManager.logStatus();
+            } else {
+                console.log('❌ SessionManager não está inicializado');
+            }
+        }
+
+        function forcarAviso() {
+            if (window.sessionManager) {
+                console.log('⚠️ Forçando exibição do aviso...');
+                window.sessionManager.showWarning();
+            } else {
+                console.log('❌ SessionManager não está inicializado');
+            }
+        }
+
+        function limparLogs() {
+            logsDiv.innerHTML = '<p class="text-gray-500">Logs limpos.</p>';
+        }
+
+        // Inicializar automaticamente em modo rápido para testes
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                console.log('🎯 Página de teste carregada!');
+                console.log('💡 Clique em "Teste Rápido" para iniciar um teste de 2 minutos');
+                console.log('💡 Ou em "Teste Normal" para o tempo padrão de 15 minutos');
+            }, 100);
+        });
+    </script>
+</body>
+</html>
