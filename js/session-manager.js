@@ -29,8 +29,14 @@ class SessionManager {
         // Debug mode
         this.debugMode = options.debugMode !== false; // Ativo por padrão
         
+        // Controle de throttling
+        this.lastResetTime = 0;
+        this.resetThrottleTime = options.resetThrottleTime || 5000; // 5 segundos por padrão
+        
         // Eventos que resetam o temporizador
-        this.activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        // NOTA: mousemove foi REMOVIDO para evitar resets excessivos
+        // Apenas ações INTENCIONAIS renovam a sessão
+        this.activityEvents = ['mousedown', 'keypress', 'scroll', 'touchstart', 'click'];
         
         // Inicializar
         this.init();
@@ -76,15 +82,24 @@ class SessionManager {
 
     onActivity() {
         const now = Date.now();
+        const timeSinceLastReset = now - this.lastResetTime;
+        
+        // THROTTLING: Ignorar se resetou recentemente (menos de 5 segundos)
+        // Isso evita centenas de resets por scroll/cliques rápidos
+        if (timeSinceLastReset < this.resetThrottleTime) {
+            return;
+        }
+        
         const timeSinceLastActivity = now - this.lastActivity;
         
         // Log apenas se passou mais de 10 segundos desde a última atividade
         if (this.debugMode && timeSinceLastActivity > 10000) {
-            console.log(`🖱️  Atividade detectada após ${Math.floor(timeSinceLastActivity / 1000)}s de inatividade`);
+            console.log(`🖱️  Atividade detectada após ${Math.floor(timeSinceLastActivity / 1000)}s`);
         }
         
-        // Atualizar última atividade
+        // Atualizar última atividade e último reset
         this.lastActivity = now;
+        this.lastResetTime = now;
         
         // Se o aviso estiver sendo mostrado, fechá-lo
         if (this.isWarningShown) {

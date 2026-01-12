@@ -1,5 +1,35 @@
 # 🔒 Guia de Debug do Sistema de Sessão
 
+## ⚙️ Como funciona a renovação da sessão?
+
+### 🎯 Eventos que RENOVAM a sessão:
+- ✅ **Cliques** (mousedown, click)
+- ✅ **Digitação** (keypress)
+- ✅ **Scroll** da página
+- ✅ **Toque** em telas touch (touchstart)
+
+### ❌ Eventos que NÃO renovam:
+- ❌ **Movimento do mouse** (mousemove) - REMOVIDO propositalmente
+  - Muito sensível, causava resets constantes
+  - Movimento involuntário não significa uso ativo
+
+### 🛡️ Proteção contra resets excessivos:
+- **Throttling de 5 segundos**: Mesmo fazendo ações válidas, o timer só reseta a cada 5 segundos
+- Isso evita centenas de resets ao fazer scroll rápido ou múltiplos cliques
+- Exemplo: Se você clicar 10 vezes em 2 segundos, conta como apenas 1 renovação
+
+### 💡 Configuração:
+Você pode ajustar o throttling em [js/session-manager.js](js/session-manager.js):
+```javascript
+sessionManager = new SessionManager({
+    inactivityTimeout: 15 * 60 * 1000,  // 15 minutos
+    warningTime: 2 * 60 * 1000,         // 2 minutos de aviso
+    resetThrottleTime: 5 * 1000         // 5 segundos entre resets (ajustável)
+});
+```
+
+---
+
 ## ✅ O que foi implementado:
 
 ### 1. **Indicador Visual de Sessão na Navbar**

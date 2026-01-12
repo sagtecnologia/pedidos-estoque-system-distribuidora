@@ -4,7 +4,7 @@
 
 function createSidebar() {
     return `
-        <aside id="sidebar" class="sidebar fixed top-16 left-0 h-full w-64 bg-gray-800 text-white z-30 overflow-y-auto">
+        <aside id="sidebar" class="sidebar fixed top-16 left-0 h-full w-64 bg-gray-800 text-white z-30 overflow-y-auto pb-20">
             <nav class="mt-5 px-2">
                 <a href="/pages/dashboard.html" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition mb-1">
                     <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -106,7 +106,7 @@ function createSidebar() {
                     </a>
                 </div>
 
-                <div class="mt-6">
+                <div class="mt-6 pb-8">
                     <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Sistema</h3>
                     
                     <a href="/pages/reprocessar-estoque.html" id="menu-reprocessar-estoque" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition mt-1">
