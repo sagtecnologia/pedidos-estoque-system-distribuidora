@@ -95,11 +95,6 @@
         </button>
     </div>
 
-    <!-- Botão Debug (remover depois) -->
-    <button onclick="debugModal()" class="fixed bottom-6 left-6 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
-        🔧 DEBUG
-    </button>
-
     <!-- Modal do Carrinho -->
     <div id="modal-carrinho" class="modal-backdrop hidden">
         <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -336,7 +331,7 @@
                                 </button>
                             ` : `
                                 <div class="flex space-x-2">
-                                    <input type="number" id="qtd-${produto.id}" min="1" max="${produto.estoque_atual}" value="1" class="w-20 px-2 py-2 border rounded-lg text-center">
+                                    <input type="number" id="qtd-${produto.id}" min="0" max="${produto.estoque_atual}" value="0" class="w-20 px-2 py-2 border rounded-lg text-center">
                                     <button onclick="adicionarAoCarrinho('${produto.id}')" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
                                         Adicionar
                                     </button>
@@ -354,27 +349,26 @@
 
             const html = saboresProduto.map(sabor => `
                 <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
-                    <div>
+                    <div class="flex-1">
                         <p class="font-medium">${sabor.sabor}</p>
                         <p class="text-sm text-gray-600">${formatCurrency(sabor.preco_venda)} | Estoque: ${sabor.quantidade}</p>
                     </div>
-                    <div class="flex space-x-2">
-                        <input type="number" id="qtd-sabor-${sabor.id}" min="1" max="${sabor.quantidade}" value="1" class="w-16 px-2 py-1 border rounded text-center">
-                        <button onclick="adicionarSaborAoCarrinho('${produtoId}', '${sabor.id}')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
-                            +
-                        </button>
+                    <div>
+                        <label class="text-xs text-gray-500">Quantidade</label>
+                        <input type="number" id="qtd-sabor-${sabor.id}" data-sabor-id="${sabor.id}" data-produto-id="${produtoId}" min="0" max="${sabor.quantidade}" value="0" class="w-20 px-2 py-2 border rounded-lg text-center">
                     </div>
                 </div>
             `).join('');
 
             const modal = document.createElement('div');
             modal.className = 'modal-backdrop';
+            modal.id = 'modal-sabores-' + produtoId;
             modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 1rem;';
             modal.innerHTML = `
                 <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 my-4" style="max-height: 85vh; display: flex; flex-direction: column;">
                     <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50 flex-shrink-0">
                         <h3 class="text-xl font-bold text-gray-900">${produto.nome}</h3>
-                        <button onclick="this.closest('.modal-backdrop').remove()" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                        <button onclick="document.getElementById('modal-sabores-${produtoId}').remove()" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                             </svg>
@@ -384,9 +378,14 @@
                         ${html}
                     </div>
                     <div class="px-6 py-4 border-t bg-gray-50 flex-shrink-0">
-                        <button onclick="this.closest('.modal-backdrop').remove()" class="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 font-medium">
-                            Fechar
-                        </button>
+                        <div class="flex space-x-3">
+                            <button onclick="document.getElementById('modal-sabores-${produtoId}').remove()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 font-medium">
+                                Cancelar
+                            </button>
+                            <button onclick="adicionarSaboresSelecionados('${produtoId}')" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 font-bold">
+                                Adicionar ao Carrinho
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -398,7 +397,12 @@
 
         function adicionarAoCarrinho(produtoId) {
             const produto = produtos.find(p => p.id === produtoId);
-            const qtd = parseInt(document.getElementById(`qtd-${produtoId}`).value) || 1;
+            const qtd = parseInt(document.getElementById(`qtd-${produtoId}`).value) || 0;
+
+            if (qtd === 0) {
+                alert('Informe a quantidade desejada');
+                return;
+            }
 
             if (qtd > produto.estoque_atual) {
                 alert(`Quantidade solicitada (${qtd}) excede o estoque disponível (${produto.estoque_atual})`);
@@ -420,10 +424,67 @@
             showToast(`${produto.nome} adicionado ao carrinho!`, 'success');
         }
 
+        function adicionarSaboresSelecionados(produtoId) {
+            const produto = produtos.find(p => p.id === produtoId);
+            const saboresProduto = sabores.filter(s => s.produto_id === produtoId);
+            
+            let adicionados = 0;
+            let erros = [];
+
+            saboresProduto.forEach(sabor => {
+                const inputElement = document.getElementById(`qtd-sabor-${sabor.id}`);
+                if (!inputElement) return;
+                
+                const qtd = parseInt(inputElement.value) || 0;
+                
+                if (qtd > 0) {
+                    if (qtd > sabor.quantidade) {
+                        erros.push(`${sabor.sabor}: quantidade (${qtd}) excede estoque (${sabor.quantidade})`);
+                    } else {
+                        carrinho.push({
+                            produto_id: produtoId,
+                            sabor_id: sabor.id,
+                            nome: produto.nome,
+                            marca: produto.marca,
+                            sabor: sabor.sabor,
+                            quantidade: qtd,
+                            preco_unitario: sabor.preco_venda,
+                            estoque_disponivel: sabor.quantidade
+                        });
+                        adicionados++;
+                    }
+                }
+            });
+
+            if (erros.length > 0) {
+                alert('Erros encontrados:\n\n' + erros.join('\n'));
+                return;
+            }
+
+            if (adicionados === 0) {
+                alert('Informe a quantidade para pelo menos um sabor');
+                return;
+            }
+
+            // Fechar modal específico
+            const modalElement = document.getElementById('modal-sabores-' + produtoId);
+            if (modalElement) {
+                modalElement.remove();
+            }
+            
+            atualizarCarrinho();
+            showToast(`${adicionados} ${adicionados === 1 ? 'sabor adicionado' : 'sabores adicionados'} ao carrinho!`, 'success');
+        }
+
         function adicionarSaborAoCarrinho(produtoId, saborId) {
             const produto = produtos.find(p => p.id === produtoId);
             const sabor = sabores.find(s => s.id === saborId);
-            const qtd = parseInt(document.getElementById(`qtd-sabor-${saborId}`).value) || 1;
+            const qtd = parseInt(document.getElementById(`qtd-sabor-${saborId}`).value) || 0;
+
+            if (qtd === 0) {
+                alert('Informe a quantidade desejada');
+                return;
+            }
 
             if (qtd > sabor.quantidade) {
                 alert(`Quantidade solicitada (${qtd}) excede o estoque disponível (${sabor.quantidade})`);
@@ -791,32 +852,7 @@
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
         }
 
-        // Função de DEBUG - remover depois
-        function debugModal() {
-            const modal = document.getElementById('modal-carrinho');
-            const info = `
-═══════════════════════════════════════
-🔧 DEBUG DO MODAL
-═══════════════════════════════════════
-
-✓ Modal Carregado: ${modalCarregado}
-✓ Modal Existe: ${modal !== null}
-✓ Modal é: ${modal}
-
-IDs disponíveis:
-${Array.from(document.querySelectorAll('[id]')).map(el => `  - ${el.id}`).join('\n')}
-
-Por classe (.modal-backdrop):
-${document.querySelector('.modal-backdrop')}
-
-HTML contém 'modal-carrinho': ${document.body.innerHTML.includes('modal-carrinho')}
-
-Total de elementos no body: ${document.body.children.length}
-═══════════════════════════════════════
-            `;
-            alert(info);
-            console.log(info);
-        }
+        // Debug function removed
     </script>
 </body>
 </html>
