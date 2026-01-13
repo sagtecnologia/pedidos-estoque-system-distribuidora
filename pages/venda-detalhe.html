@@ -659,7 +659,7 @@
             });
             
             document.getElementById('total-venda').textContent = formatCurrency(total);
-            document.getElementById('quantidade-modal-total').textContent = `${quantidadeTotal.toFixed(2)} UN`;
+            document.getElementById('quantidade-modal-total').textContent = `${Math.round(quantidadeTotal)} UN`;
         }
         
         // Replicar preço para todos os sabores
@@ -897,7 +897,7 @@
             
             // Calcular quantidade total de itens
             const quantidadeTotal = itens.reduce((sum, item) => sum + parseFloat(item.quantidade || 0), 0);
-            document.getElementById('venda-quantidade-total').textContent = `${quantidadeTotal.toFixed(2)} UN`;
+            document.getElementById('venda-quantidade-total').textContent = `${Math.round(quantidadeTotal)} UN`;
             
             tbody.innerHTML = itens.map(item => {
                 const produtoNome = item.produto?.nome || 'N/A';

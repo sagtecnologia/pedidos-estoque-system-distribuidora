@@ -610,7 +610,7 @@
             
             // Calcular quantidade total de itens
             const quantidadeTotal = itens.reduce((sum, item) => sum + parseFloat(item.quantidade || 0), 0);
-            document.getElementById('pedido-quantidade-total').textContent = `${quantidadeTotal.toFixed(2)} UN`;
+            document.getElementById('pedido-quantidade-total').textContent = `${Math.round(quantidadeTotal)} UN`;
 
             tbody.innerHTML = itens.map(item => {
                 const produtoNome = item.produto?.nome || 'N/A';

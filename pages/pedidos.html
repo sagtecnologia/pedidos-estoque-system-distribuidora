@@ -278,7 +278,7 @@
                     <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.numero}</td>
                     <td class="px-6 py-4 text-sm text-gray-600">${p.solicitante?.full_name || 'N/A'}</td>
                     <td class="px-6 py-4 text-sm text-gray-600">${p.fornecedor?.nome || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">${quantidadeTotal}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${Math.round(quantidadeTotal)}</td>
                     <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(p.total)}</td>
                     <td class="px-6 py-4 text-sm">${getStatusBadge(p.status)}</td>
                     <td class="px-6 py-4 text-sm text-gray-600">${formatDate(p.created_at)}</td>
@@ -290,7 +290,7 @@
             }).join('');
 
             // Atualizar totais no rodapé
-            document.getElementById('total-quantidade').textContent = somaQuantidade;
+            document.getElementById('total-quantidade').textContent = Math.round(somaQuantidade);
             document.getElementById('total-valor').textContent = formatCurrency(somaValor);
         }
         
