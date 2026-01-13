@@ -131,6 +131,9 @@
                     <button onclick="exportarPDF()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">
                         📄 Exportar PDF
                     </button>
+                    <button onclick="exportarPDFSimplificado()" class="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700">
+                        📋 PDF Simplificado
+                    </button>
                 </div>
             </div>
 
@@ -860,7 +863,11 @@
                 if (filtroAtual.produto && p.id !== filtroAtual.produto) return false;
                 
                 const situacao = getSituacaoEstoque(p);
-                if (filtroAtual.situacao && situacao.tipo !== filtroAtual.situacao) return false;
+                if (filtroAtual.situacao) {
+                    // Suportar múltiplos status separados por vírgula
+                    const situacoes = filtroAtual.situacao.split(',');
+                    if (!situacoes.includes(situacao.tipo)) return false;
+                }
                 
                 return true;
             });
@@ -891,7 +898,11 @@
 
         function obterDadosEstoqueSabor() {
             // Não aplicar filtros aqui, pegar todos os sabores disponíveis
-            let saboresFiltrados = todosSabores.filter(s => {
+            let saboresFiltrados = todosSabores.map(s => ({
+                ...s,
+                status_estoque: s.quantidade === 0 ? 'ZERADO' : 
+                               (s.quantidade <= s.estoque_minimo ? 'BAIXO' : 'OK')
+            })).filter(s => {
                 // Remover filtro de ativo - a view já traz apenas sabores ativos
                 const produto = todosProdutos.find(p => p.id === s.produto_id);
                 if (!produto) return false;
@@ -899,7 +910,11 @@
                 if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return false;
                 if (filtroAtual.produto && s.produto_id !== filtroAtual.produto) return false;
                 if (filtroAtual.sabor && s.id !== filtroAtual.sabor) return false;
-                if (filtroAtual.situacao && s.status_estoque !== filtroAtual.situacao) return false;
+                if (filtroAtual.situacao) {
+                    // Suportar múltiplos status separados por vírgula
+                    const situacoes = filtroAtual.situacao.split(',');
+                    if (!situacoes.includes(s.status_estoque)) return false;
+                }
                 
                 return true;
             });
@@ -1000,6 +1015,198 @@
 
         function formatDateTime(date) {
             return new Date(date).toLocaleString('pt-BR');
+        }
+
+        // ========================================
+        // EXPORTAÇÃO PDF SIMPLIFICADO
+        // ========================================
+
+        function exportarPDFSimplificado() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            const timestamp = new Date().toLocaleString('pt-BR');
+            
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Cabeçalho
+            doc.setFontSize(18);
+            doc.text('Gerenciamento de Estoque - Simplificado', 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${timestamp}`, 14, 22);
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text('(Sem preços de compra e margens)', 14, 27);
+            doc.setTextColor(0, 0, 0);
+
+            // Filtros aplicados
+            let filtros = [];
+            if (filtroAtual.marca) filtros.push(`Marca: ${document.getElementById('filter-marca').selectedOptions[0].text}`);
+            if (filtroAtual.produto) filtros.push(`Produto: ${document.getElementById('filter-produto').selectedOptions[0].text}`);
+            if (filtroAtual.sabor) filtros.push(`Sabor: ${document.getElementById('filter-sabor').selectedOptions[0].text}`);
+            if (filtroAtual.situacao) filtros.push(`Situação: ${filtroAtual.situacao}`);
+            
+            if (filtros.length > 0) {
+                doc.setFontSize(9);
+                doc.text(`Filtros: ${filtros.join(' | ')}`, 14, 33);
+            }
+
+            let startY = filtros.length > 0 ? 40 : 33;
+
+            switch(activeTab) {
+                case 'estoque-produto':
+                    exportarPDFPorMarcaProduto(doc, startY);
+                    break;
+                case 'estoque-sabor':
+                    exportarPDFPorMarcaProduto(doc, startY);
+                    break;
+                case 'mov-produto':
+                    exportarTabelaPDFSimplificado(doc, 'Movimentações por Produto', obterDadosMovimentacoesProdutoTabela(), startY);
+                    break;
+                case 'mov-sabor':
+                    exportarTabelaPDFSimplificado(doc, 'Movimentações por Sabor', obterDadosMovimentacoesSaborTabela(), startY);
+                    break;
+            }
+
+            doc.save(`Estoque_Simplificado_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('PDF simplificado exportado com sucesso!', 'success');
+        }
+
+        function exportarPDFPorMarcaProduto(doc, startY) {
+            // Obter dados de sabores filtrados
+            const dados = obterDadosEstoqueSabor();
+            
+            if (dados.length === 0) {
+                doc.setFontSize(10);
+                doc.text('Nenhum dado para exibir', 14, startY);
+                return;
+            }
+
+            // Agrupar por marca e produto
+            const dadosAgrupados = {};
+            
+            dados.forEach(item => {
+                const marca = item.Marca || 'Sem Marca';
+                const produto = item.Produto || 'Sem Produto';
+                
+                if (!dadosAgrupados[marca]) {
+                    dadosAgrupados[marca] = {};
+                }
+                
+                if (!dadosAgrupados[marca][produto]) {
+                    dadosAgrupados[marca][produto] = [];
+                }
+                
+                dadosAgrupados[marca][produto].push(item);
+            });
+
+            let currentY = startY;
+            const pageHeight = doc.internal.pageSize.height;
+
+            // Iterar sobre marcas
+            Object.keys(dadosAgrupados).sort().forEach(marca => {
+                // Verificar se precisa de nova página
+                if (currentY > pageHeight - 40) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+
+                // Título da Marca
+                doc.setFontSize(14);
+                doc.setTextColor(147, 51, 234); // Purple
+                doc.setFont(undefined, 'bold');
+                doc.text(`MARCA: ${marca.toUpperCase()}`, 14, currentY);
+                doc.setFont(undefined, 'normal');
+                doc.setTextColor(0, 0, 0);
+                currentY += 8;
+
+                // Iterar sobre produtos da marca
+                Object.keys(dadosAgrupados[marca]).sort().forEach(produto => {
+                    const sabores = dadosAgrupados[marca][produto];
+                    
+                    // Verificar se precisa de nova página
+                    if (currentY > pageHeight - 50) {
+                        doc.addPage();
+                        currentY = 20;
+                    }
+
+                    // Título do Produto
+                    doc.setFontSize(11);
+                    doc.setTextColor(59, 130, 246); // Blue
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`> ${produto}`, 20, currentY);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(0, 0, 0);
+                    currentY += 5;
+
+                    // Tabela de sabores
+                    const rows = sabores.map(s => [
+                        s.Sabor,
+                        s.Quantidade.toString(),
+                        s.Situação,
+                        s['Preço Venda']
+                    ]);
+
+                    doc.autoTable({
+                        startY: currentY,
+                        head: [['Sabor', 'Quantidade', 'Situação', 'Preço Venda']],
+                        body: rows,
+                        theme: 'striped',
+                        headStyles: { 
+                            fillColor: [243, 244, 246],
+                            textColor: [55, 65, 81],
+                            fontSize: 8,
+                            fontStyle: 'bold'
+                        },
+                        styles: { 
+                            fontSize: 8,
+                            cellPadding: 2
+                        },
+                        margin: { left: 20 },
+                        tableWidth: 'auto',
+                        columnStyles: {
+                            0: { cellWidth: 60 },
+                            1: { cellWidth: 25, halign: 'center' },
+                            2: { cellWidth: 25, halign: 'center' },
+                            3: { cellWidth: 30, halign: 'right' }
+                        }
+                    });
+
+                    currentY = doc.lastAutoTable.finalY + 8;
+                });
+
+                currentY += 3; // Espaço entre marcas
+            });
+        }
+
+        function exportarTabelaPDFSimplificado(doc, titulo, dados, startY) {
+            doc.setFontSize(12);
+            doc.text(titulo, 14, startY);
+
+            doc.autoTable({
+                startY: startY + 5,
+                head: [dados.headers],
+                body: dados.rows,
+                theme: 'grid',
+                headStyles: { fillColor: [147, 51, 234] }, // Purple
+                styles: { fontSize: 7 }
+            });
+        }
+
+        function obterDadosEstoqueProdutoSimplificado() {
+            const dados = obterDadosEstoqueProduto();
+            return {
+                headers: ['Código', 'Marca', 'Produto', 'Estoque', 'Mínimo', 'Situação', 'Sabores'],
+                rows: dados.map(d => [d.Código, d.Marca, d.Produto, d['Estoque Total'], d['Estoque Mínimo'], d.Situação, d['Qtd Sabores']])
+            };
+        }
+
+        function obterDadosEstoqueSaborSimplificado() {
+            const dados = obterDadosEstoqueSabor();
+            // Remove preço de compra e margem, mantém apenas preço de venda
+            return {
+                headers: ['Marca', 'Produto', 'Sabor', 'Qtd', 'Situação', 'P. Venda'],
+                rows: dados.map(d => [d.Marca, d.Produto, d.Sabor, d.Quantidade, d.Situação, d['Preço Venda']])
+            };
         }
     </script>
 </body>

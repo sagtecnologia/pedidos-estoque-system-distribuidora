@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Produtos - Solicitar Pedido</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .produto-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .produto-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .carrinho-float {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9000;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+        .modal-backdrop.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold text-gray-900 mb-2">
+                    🛒 Catálogo de Produtos
+                </h1>
+                <p class="text-gray-600 text-lg">
+                    Selecione os produtos desejados e envie sua solicitação
+                </p>
+                <p class="text-sm text-gray-500 mt-2">
+                    ⏱️ Pedidos ficam disponíveis para análise por 24 horas
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Filtros -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">🏷️ Filtrar por Marca</label>
+                    <select id="filter-marca" onchange="aplicarFiltros()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Todas as marcas</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">🔍 Buscar Produto</label>
+                    <input type="text" id="busca-produto" onkeyup="aplicarFiltros()" placeholder="Digite o nome do produto..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex items-end">
+                    <button onclick="limparFiltros()" class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
+                        🔄 Limpar Filtros
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Grid de Produtos -->
+        <div id="produtos-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="col-span-full text-center py-12">
+                <div class="spinner mx-auto mb-4"></div>
+                <p class="text-gray-600">Carregando produtos...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Botão Carrinho Flutuante -->
+    <div id="carrinho-float" class="fixed bottom-6 right-6 hidden">
+        <button onclick="abrirCarrinho()" class="bg-blue-600 text-white px-6 py-4 rounded-full shadow-2xl hover:bg-blue-700 transition transform hover:scale-105 flex items-center space-x-2">
+            <span class="text-2xl">🛒</span>
+            <span class="font-bold">Carrinho</span>
+            <span id="qtd-itens-badge" class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">0</span>
+        </button>
+    </div>
+
+    <!-- Botão Debug (remover depois) -->
+    <button onclick="debugModal()" class="fixed bottom-6 left-6 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+        🔧 DEBUG
+    </button>
+
+    <!-- Modal do Carrinho -->
+    <div id="modal-carrinho" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50">
+                <h3 class="text-2xl font-bold text-gray-900">🛒 Seu Carrinho</h3>
+                <button onclick="fecharCarrinho()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="carrinho-itens" class="px-6 py-4">
+                <p class="text-center text-gray-500 py-8">Seu carrinho está vazio</p>
+            </div>
+            <div class="px-6 py-4 border-t bg-gray-50">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="text-xl font-bold">Total:</span>
+                    <span id="carrinho-total" class="text-2xl font-bold text-blue-600">R$ 0,00</span>
+                </div>
+                <button onclick="abrirFormularioPedido()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold text-lg transition">
+                    ✅ Finalizar Pedido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Finalizar Pedido -->
+    <div id="modal-finalizar" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-green-50">
+                <h3 class="text-2xl font-bold text-gray-900">📋 Finalizar Solicitação</h3>
+                <button onclick="fecharFormularioPedido()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <form id="form-pedido-publico" class="px-6 py-6" onsubmit="enviarPedido(event)">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            👤 Nome Completo *
+                        </label>
+                        <input type="text" id="nome-solicitante" required 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
+                               placeholder="Digite seu nome completo">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            📧 Email (opcional)
+                        </label>
+                        <input type="email" id="email-contato" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
+                               placeholder="seu@email.com">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            📱 Telefone (opcional)
+                        </label>
+                        <input type="tel" id="telefone-contato" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
+                               placeholder="(00) 00000-0000">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            💬 Observações (opcional)
+                        </label>
+                        <textarea id="observacoes-pedido" rows="3" 
+                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
+                                  placeholder="Alguma observação sobre seu pedido?"></textarea>
+                    </div>
+                </div>
+
+                <!-- Resumo do Pedido -->
+                <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                    <h4 class="font-bold text-gray-900 mb-3">📦 Resumo do Pedido:</h4>
+                    <div id="resumo-itens" class="space-y-2 mb-3"></div>
+                    <div class="border-t pt-3 flex justify-between items-center">
+                        <span class="font-bold text-lg">Total:</span>
+                        <span id="resumo-total" class="text-xl font-bold text-blue-600">R$ 0,00</span>
+                    </div>
+                </div>
+
+                <div class="flex space-x-3 mt-6">
+                    <button type="button" onclick="fecharFormularioPedido()" class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+                        Voltar
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
+                        🚀 Enviar Solicitação
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Sucesso -->
+    <div id="modal-sucesso" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-8 text-center">
+            <div class="text-6xl mb-4">✅</div>
+            <h3 class="text-2xl font-bold text-gray-900 mb-4">Pedido Enviado com Sucesso!</h3>
+            <p class="text-gray-600 mb-6">
+                Seu pedido foi recebido e será analisado em breve.
+            </p>
+            <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                <p class="text-sm font-medium text-gray-700 mb-2">Número do Pedido:</p>
+                <p id="numero-pedido-sucesso" class="text-2xl font-bold text-blue-600 mb-3"></p>
+                <p class="text-xs text-gray-500">Guarde este número para acompanhamento</p>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-bold">
+                Fazer Novo Pedido
+            </button>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index: 99999 !important;">
+        <div class="bg-white p-6 rounded-lg shadow-2xl">
+            <div class="spinner mx-auto"></div>
+            <p class="mt-4 text-gray-700 font-medium">Processando...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/services/pre-pedidos.js"></script>
+    
+    <script>
+        let carrinho = [];
+        let produtos = [];
+        let sabores = [];
+        let modalCarregado = false;
+
+        // Verificar se DOM está carregado
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', inicializar);
+        } else {
+            inicializar();
+        }
+
+        function inicializar() {
+            console.log('DOM carregado, inicializando...');
+            modalCarregado = true;
+            console.log('Modal existe?', document.getElementById('modal-carrinho'));
+            carregarDados();
+        }
+
+        async function carregarDados() {
+            try {
+                // Carregar marcas
+                const marcas = await listarMarcasPublicas();
+                const selectMarca = document.getElementById('filter-marca');
+                selectMarca.innerHTML = '<option value="">Todas as marcas</option>' +
+                    marcas.map(m => `<option value="${m}">${m}</option>`).join('');
+
+                // Carregar produtos e sabores
+                produtos = await listarProdutosPublicos();
+                sabores = await listarSaboresPublicos();
+
+                renderizarProdutos();
+            } catch (error) {
+                console.error('Erro ao carregar:', error);
+                document.getElementById('produtos-container').innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-red-600">Erro ao carregar produtos. Tente novamente.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function aplicarFiltros() {
+            const marca = document.getElementById('filter-marca').value;
+            const busca = document.getElementById('busca-produto').value.toLowerCase();
+
+            let produtosFiltrados = produtos;
+
+            if (marca) {
+                produtosFiltrados = produtosFiltrados.filter(p => p.marca === marca);
+            }
+
+            if (busca) {
+                produtosFiltrados = produtosFiltrados.filter(p => 
+                    p.nome.toLowerCase().includes(busca) || 
+                    (p.descricao && p.descricao.toLowerCase().includes(busca))
+                );
+            }
+
+            renderizarProdutos(produtosFiltrados);
+        }
+
+        function limparFiltros() {
+            document.getElementById('filter-marca').value = '';
+            document.getElementById('busca-produto').value = '';
+            renderizarProdutos();
+        }
+
+        function renderizarProdutos(produtosRender = produtos) {
+            const container = document.getElementById('produtos-container');
+
+            if (produtosRender.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <p class="text-gray-600 text-lg">Nenhum produto encontrado</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = produtosRender.map(produto => {
+                const statusBadge = produto.status_estoque === 'BAIXO' 
+                    ? '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">Estoque Baixo</span>'
+                    : '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Disponível</span>';
+
+                const saboresProduto = sabores.filter(s => s.produto_id === produto.id);
+                const temSabores = saboresProduto.length > 0;
+
+                return `
+                    <div class="produto-card bg-white rounded-lg shadow-md overflow-hidden">
+                        <div class="p-6">
+                            <div class="flex justify-between items-start mb-3">
+                                <div>
+                                    <p class="text-xs text-gray-500 uppercase">${produto.marca}</p>
+                                    <h3 class="text-xl font-bold text-gray-900">${produto.nome}</h3>
+                                </div>
+                                ${statusBadge}
+                            </div>
+                            ${produto.descricao ? `<p class="text-sm text-gray-600 mb-3">${produto.descricao}</p>` : ''}
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-2xl font-bold text-blue-600">${formatCurrency(produto.preco_venda)}</span>
+                                <span class="text-sm text-gray-500">Estoque: ${produto.estoque_atual}</span>
+                            </div>
+                            ${temSabores ? `
+                                <button onclick="abrirSabores('${produto.id}')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
+                                    Ver Sabores (${saboresProduto.length})
+                                </button>
+                            ` : `
+                                <div class="flex space-x-2">
+                                    <input type="number" id="qtd-${produto.id}" min="1" max="${produto.estoque_atual}" value="1" class="w-20 px-2 py-2 border rounded-lg text-center">
+                                    <button onclick="adicionarAoCarrinho('${produto.id}')" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
+                                        Adicionar
+                                    </button>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function abrirSabores(produtoId) {
+            const produto = produtos.find(p => p.id === produtoId);
+            const saboresProduto = sabores.filter(s => s.produto_id === produtoId);
+
+            const html = saboresProduto.map(sabor => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
+                    <div>
+                        <p class="font-medium">${sabor.sabor}</p>
+                        <p class="text-sm text-gray-600">${formatCurrency(sabor.preco_venda)} | Estoque: ${sabor.quantidade}</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <input type="number" id="qtd-sabor-${sabor.id}" min="1" max="${sabor.quantidade}" value="1" class="w-16 px-2 py-1 border rounded text-center">
+                        <button onclick="adicionarSaborAoCarrinho('${produtoId}', '${sabor.id}')" class="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                            +
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-backdrop';
+            modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 1rem;';
+            modal.innerHTML = `
+                <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 my-4" style="max-height: 85vh; display: flex; flex-direction: column;">
+                    <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50 flex-shrink-0">
+                        <h3 class="text-xl font-bold text-gray-900">${produto.nome}</h3>
+                        <button onclick="this.closest('.modal-backdrop').remove()" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="px-6 py-4 overflow-y-auto" style="flex: 1;">
+                        ${html}
+                    </div>
+                    <div class="px-6 py-4 border-t bg-gray-50 flex-shrink-0">
+                        <button onclick="this.closest('.modal-backdrop').remove()" class="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 font-medium">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            `;
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
+            document.body.appendChild(modal);
+        }
+
+        function adicionarAoCarrinho(produtoId) {
+            const produto = produtos.find(p => p.id === produtoId);
+            const qtd = parseInt(document.getElementById(`qtd-${produtoId}`).value) || 1;
+
+            if (qtd > produto.estoque_atual) {
+                alert(`Quantidade solicitada (${qtd}) excede o estoque disponível (${produto.estoque_atual})`);
+                return;
+            }
+
+            carrinho.push({
+                produto_id: produtoId,
+                sabor_id: null,
+                nome: produto.nome,
+                marca: produto.marca,
+                sabor: null,
+                quantidade: qtd,
+                preco_unitario: produto.preco_venda,
+                estoque_disponivel: produto.estoque_atual
+            });
+
+            atualizarCarrinho();
+            showToast(`${produto.nome} adicionado ao carrinho!`, 'success');
+        }
+
+        function adicionarSaborAoCarrinho(produtoId, saborId) {
+            const produto = produtos.find(p => p.id === produtoId);
+            const sabor = sabores.find(s => s.id === saborId);
+            const qtd = parseInt(document.getElementById(`qtd-sabor-${saborId}`).value) || 1;
+
+            if (qtd > sabor.quantidade) {
+                alert(`Quantidade solicitada (${qtd}) excede o estoque disponível (${sabor.quantidade})`);
+                return;
+            }
+
+            carrinho.push({
+                produto_id: produtoId,
+                sabor_id: saborId,
+                nome: produto.nome,
+                marca: produto.marca,
+                sabor: sabor.sabor,
+                quantidade: qtd,
+                preco_unitario: sabor.preco_venda,
+                estoque_disponivel: sabor.quantidade
+            });
+
+            atualizarCarrinho();
+            document.querySelector('.modal-backdrop').remove();
+            showToast(`${produto.nome} - ${sabor.sabor} adicionado!`, 'success');
+        }
+
+        function atualizarCarrinho() {
+            const qtdTotal = carrinho.reduce((sum, item) => sum + item.quantidade, 0);
+            const valorTotal = carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
+
+            const badgeElement = document.getElementById('qtd-itens-badge');
+            const totalElement = document.getElementById('carrinho-total');
+            const floatElement = document.getElementById('carrinho-float');
+            
+            if (badgeElement) badgeElement.textContent = qtdTotal;
+            if (totalElement) totalElement.textContent = formatCurrency(valorTotal);
+            
+            if (floatElement) {
+                if (qtdTotal > 0) {
+                    floatElement.classList.remove('hidden');
+                } else {
+                    floatElement.classList.add('hidden');
+                }
+            }
+
+            renderizarItensCarrinho();
+        }
+
+        function renderizarItensCarrinho() {
+            const container = document.getElementById('carrinho-itens');
+            
+            if (!container) {
+                console.warn('Container carrinho-itens não encontrado');
+                return;
+            }
+            
+            if (carrinho.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 py-8">Seu carrinho está vazio</p>';
+                return;
+            }
+
+            container.innerHTML = carrinho.map((item, index) => `
+                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
+                    <div class="flex-1">
+                        <p class="font-medium">${item.nome}</p>
+                        ${item.sabor ? `<p class="text-sm text-gray-600">${item.sabor}</p>` : ''}
+                        <p class="text-sm text-blue-600">${item.quantidade}x ${formatCurrency(item.preco_unitario)}</p>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <p class="font-bold">${formatCurrency(item.quantidade * item.preco_unitario)}</p>
+                        <button onclick="removerDoCarrinho(${index})" class="text-red-600 hover:text-red-800">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function removerDoCarrinho(index) {
+            carrinho.splice(index, 1);
+            atualizarCarrinho();
+        }
+
+        function abrirCarrinho() {
+            console.log('Função abrirCarrinho chamada');
+            console.log('Modal carregado?', modalCarregado);
+            
+            // Aguardar um pouco se ainda não carregou
+            if (!modalCarregado) {
+                console.log('Aguardando carregamento do modal...');
+                setTimeout(() => abrirCarrinho(), 100);
+                return;
+            }
+            
+            let modal = document.getElementById('modal-carrinho');
+            console.log('Modal encontrado:', modal);
+            
+            // Se não encontrou, criar dinamicamente
+            if (!modal) {
+                console.warn('Modal não encontrado, criando dinamicamente...');
+                criarModalCarrinho();
+                modal = document.getElementById('modal-carrinho');
+            }
+            
+            if (!modal) {
+                console.error('Falhou ao criar modal!');
+                alert('Erro: Não foi possível abrir o carrinho. Recarregue a página.');
+                return;
+            }
+            
+            // Renderizar itens antes de abrir
+            renderizarItensCarrinho();
+            atualizarTotaisCarrinho();
+            
+            modal.classList.remove('hidden');
+            console.log('Modal aberto com sucesso');
+        }
+
+        function atualizarTotaisCarrinho() {
+            const valorTotal = carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
+            const totalElement = document.getElementById('carrinho-total');
+            if (totalElement) {
+                totalElement.textContent = formatCurrency(valorTotal);
+            }
+        }
+
+        function criarModalCarrinho() {
+            const modalHTML = `
+                <div id="modal-carrinho" class="modal-backdrop hidden">
+                    <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50">
+                            <h3 class="text-2xl font-bold text-gray-900">🛒 Seu Carrinho</h3>
+                            <button onclick="fecharCarrinho()" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div id="carrinho-itens" class="px-6 py-4">
+                            <p class="text-center text-gray-500 py-8">Seu carrinho está vazio</p>
+                        </div>
+                        <div class="px-6 py-4 border-t bg-gray-50">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-xl font-bold">Total:</span>
+                                <span id="carrinho-total" class="text-2xl font-bold text-blue-600">R$ 0,00</span>
+                            </div>
+                            <button onclick="abrirFormularioPedido()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold text-lg transition">
+                                ✅ Finalizar Pedido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            console.log('Modal criado dinamicamente');
+        }
+
+        function fecharCarrinho() {
+            const modal = document.getElementById('modal-carrinho');
+            if (!modal) {
+                console.error('Modal do carrinho não encontrado!');
+                return;
+            }
+            modal.classList.add('hidden');
+        }
+
+        function abrirFormularioPedido() {
+            if (carrinho.length === 0) {
+                alert('Adicione itens ao carrinho primeiro!');
+                return;
+            }
+
+            // Verificar se modal existe, senão criar
+            let modal = document.getElementById('modal-finalizar');
+            if (!modal) {
+                console.warn('Modal finalizar não encontrado, criando dinamicamente...');
+                criarModalFinalizar();
+                modal = document.getElementById('modal-finalizar');
+            }
+
+            if (!modal) {
+                alert('Erro ao abrir formulário. Recarregue a página.');
+                return;
+            }
+
+            const valorTotal = carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
+            
+            const resumo = carrinho.map(item => `
+                <div class="flex justify-between text-sm">
+                    <span>${item.nome}${item.sabor ? ` - ${item.sabor}` : ''} (${item.quantidade}x)</span>
+                    <span class="font-medium">${formatCurrency(item.quantidade * item.preco_unitario)}</span>
+                </div>
+            `).join('');
+
+            const resumoElement = document.getElementById('resumo-itens');
+            const totalElement = document.getElementById('resumo-total');
+            
+            if (resumoElement) resumoElement.innerHTML = resumo;
+            if (totalElement) totalElement.textContent = formatCurrency(valorTotal);
+
+            fecharCarrinho();
+            modal.classList.remove('hidden');
+        }
+
+        function criarModalFinalizar() {
+            const modalHTML = `
+                <div id="modal-finalizar" class="modal-backdrop hidden">
+                    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+                        <div class="flex justify-between items-center px-6 py-4 border-b bg-green-50">
+                            <h3 class="text-2xl font-bold text-gray-900">📋 Finalizar Solicitação</h3>
+                            <button onclick="fecharFormularioPedido()" class="text-gray-400 hover:text-gray-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <form id="form-pedido-publico" onsubmit="enviarPedido(event)" class="px-6 py-6">
+                            <div class="mb-6">
+                                <h4 class="font-semibold text-gray-900 mb-3">📦 Resumo do Pedido</h4>
+                                <div id="resumo-itens" class="space-y-2 bg-gray-50 p-4 rounded-lg mb-3"></div>
+                                <div class="flex justify-between text-lg font-bold border-t pt-3">
+                                    <span>Total:</span>
+                                    <span id="resumo-total" class="text-green-600">R$ 0,00</span>
+                                </div>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
+                                    <input type="text" id="nome-solicitante" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Email (opcional)</label>
+                                    <input type="email" id="email-contato" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Telefone/WhatsApp (opcional)</label>
+                                    <input type="tel" id="telefone-contato" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Observações (opcional)</label>
+                                    <textarea id="observacoes-pedido" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="flex space-x-3 mt-6 pt-4 border-t">
+                                <button type="button" onclick="fecharFormularioPedido()" class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
+                                    Voltar
+                                </button>
+                                <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
+                                    Enviar Solicitação
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            console.log('Modal finalizar criado dinamicamente');
+        }
+
+        function criarModalSucesso() {
+            const modalHTML = `
+                <div id="modal-sucesso" class="modal-backdrop hidden">
+                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-8 text-center">
+                        <div class="text-6xl mb-4">✅</div>
+                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Pedido Enviado com Sucesso!</h3>
+                        <p class="text-gray-600 mb-6">
+                            Seu pedido foi recebido e será analisado em breve.
+                        </p>
+                        <div class="bg-blue-50 p-4 rounded-lg mb-6">
+                            <p class="text-sm font-medium text-gray-700 mb-2">Número do Pedido:</p>
+                            <p id="numero-pedido-sucesso" class="text-2xl font-bold text-blue-600 mb-3"></p>
+                            <p class="text-xs text-gray-500">Guarde este número para acompanhamento</p>
+                        </div>
+                        <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-bold">
+                            Fazer Novo Pedido
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            console.log('Modal sucesso criado dinamicamente');
+        }
+
+        function fecharFormularioPedido() {
+            const modal = document.getElementById('modal-finalizar');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        async function enviarPedido(event) {
+            event.preventDefault();
+
+            const nome = document.getElementById('nome-solicitante').value.trim();
+            const email = document.getElementById('email-contato').value.trim();
+            const telefone = document.getElementById('telefone-contato').value.trim();
+            const observacoes = document.getElementById('observacoes-pedido').value.trim();
+
+            if (!nome) {
+                alert('Por favor, informe seu nome');
+                return;
+            }
+
+            if (carrinho.length === 0) {
+                alert('Adicione itens ao carrinho');
+                return;
+            }
+
+            try {
+                showLoading(true);
+
+                const resultado = await criarPrePedido({
+                    nome: nome,
+                    email: email || null,
+                    telefone: telefone || null,
+                    observacoes: observacoes || null,
+                    itens: carrinho
+                });
+
+                showLoading(false);
+                fecharFormularioPedido();
+
+                // Verificar se modal de sucesso existe
+                let modalSucesso = document.getElementById('modal-sucesso');
+                if (!modalSucesso) {
+                    criarModalSucesso();
+                    modalSucesso = document.getElementById('modal-sucesso');
+                }
+
+                const numeroPedidoElement = document.getElementById('numero-pedido-sucesso');
+                if (numeroPedidoElement) {
+                    numeroPedidoElement.textContent = resultado.prePedido.numero;
+                }
+                
+                if (modalSucesso) {
+                    modalSucesso.classList.remove('hidden');
+                }
+
+                // Limpar carrinho
+                carrinho = [];
+                atualizarCarrinho();
+
+            } catch (error) {
+                showLoading(false);
+                alert('Erro ao enviar pedido: ' + error.message);
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 left-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${
+                type === 'success' ? 'bg-green-600' : 
+                type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+            }`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        }
+
+        // Função de DEBUG - remover depois
+        function debugModal() {
+            const modal = document.getElementById('modal-carrinho');
+            const info = `
+═══════════════════════════════════════
+🔧 DEBUG DO MODAL
+═══════════════════════════════════════
+
+✓ Modal Carregado: ${modalCarregado}
+✓ Modal Existe: ${modal !== null}
+✓ Modal é: ${modal}
+
+IDs disponíveis:
+${Array.from(document.querySelectorAll('[id]')).map(el => `  - ${el.id}`).join('\n')}
+
+Por classe (.modal-backdrop):
+${document.querySelector('.modal-backdrop')}
+
+HTML contém 'modal-carrinho': ${document.body.innerHTML.includes('modal-carrinho')}
+
+Total de elementos no body: ${document.body.children.length}
+═══════════════════════════════════════
+            `;
+            alert(info);
+            console.log(info);
+        }
+    </script>
+</body>
+</html>

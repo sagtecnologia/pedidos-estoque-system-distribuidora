@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pré-Pedidos Públicos - Sistema</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Pré-Pedidos Públicos</h2>
+                <p class="text-gray-600 mt-2">Analise e aprove pedidos recebidos pelo catálogo público</p>
+            </div>
+
+            <!-- Cards de Estatísticas -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Pendentes</p>
+                            <p id="card-pendentes" class="text-2xl font-bold text-yellow-600">0</p>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Em Análise</p>
+                            <p id="card-analise" class="text-2xl font-bold text-blue-600">0</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Aprovados Hoje</p>
+                            <p id="card-aprovados" class="text-2xl font-bold text-green-600">0</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Expirados</p>
+                            <p id="card-expirados" class="text-2xl font-bold text-red-600">0</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">Filtros</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select id="filter-status" onchange="carregarPrePedidos()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <option value="PENDENTE,EM_ANALISE">Pendentes e Em Análise</option>
+                            <option value="PENDENTE">Apenas Pendentes</option>
+                            <option value="EM_ANALISE">Apenas Em Análise</option>
+                            <option value="APROVADO">Aprovados</option>
+                            <option value="REJEITADO">Rejeitados</option>
+                            <option value="EXPIRADO">Expirados</option>
+                            <option value="">Todos</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input type="date" id="filter-data-inicio" onchange="carregarPrePedidos()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+                        <input type="date" id="filter-data-fim" onchange="carregarPrePedidos()" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lista de Pré-Pedidos -->
+            <div id="pre-pedidos-container" class="space-y-4">
+                <div class="text-center py-12">
+                    <div class="spinner mx-auto mb-4"></div>
+                    <p class="text-gray-600">Carregando pré-pedidos...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Análise -->
+    <div id="modal-analise" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50">
+                <h3 class="text-xl font-bold text-gray-900">Análise de Pré-Pedido</h3>
+                <button onclick="fecharModalAnalise()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="analise-content" class="p-6"></div>
+        </div>
+    </div>
+
+    <!-- Modal Rejeitar -->
+    <div id="modal-rejeitar" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Rejeitar Pré-Pedido</h3>
+                <button onclick="fecharModalRejeitar()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <form id="form-rejeitar" class="px-6 py-4" onsubmit="confirmarRejeicao(event)">
+                <input type="hidden" id="rejeitar-id">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Motivo da Rejeição*</label>
+                    <textarea id="motivo-rejeicao" required rows="4" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Explique o motivo da rejeição..."></textarea>
+                </div>
+                <div class="flex justify-end space-x-3">
+                    <button type="button" onclick="fecharModalRejeitar()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Rejeitar Pedido</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg">
+            <div class="spinner mx-auto"></div>
+            <p class="mt-4 text-gray-700">Processando...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/pre-pedidos.js"></script>
+    <script src="../js/services/clientes.js"></script>
+    <script src="../js/services/pedidos.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        let currentUser = null;
+        let prePedidos = [];
+
+        (async () => {
+            await checkAuth();
+            currentUser = await getCurrentUser();
+            
+            // Verificar permissões
+            if (!['VENDEDOR', 'APROVADOR', 'ADMIN'].includes(currentUser.role)) {
+                showToast('Acesso negado', 'error');
+                redirect('/pages/dashboard.html');
+                return;
+            }
+
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+
+            await carregarPrePedidos();
+            
+            // Atualizar a cada 30 segundos
+            setInterval(carregarPrePedidos, 30000);
+        })();
+
+        async function carregarPrePedidos() {
+            try {
+                // Expirar pedidos vencidos
+                await expirarPrePedidosAntigos();
+
+                const filtros = {};
+                const status = document.getElementById('filter-status').value;
+                const dataInicio = document.getElementById('filter-data-inicio').value;
+                const dataFim = document.getElementById('filter-data-fim').value;
+
+                if (status) {
+                    filtros.status = status.includes(',') ? status.split(',') : status;
+                }
+                if (dataInicio) filtros.dataInicio = dataInicio;
+                if (dataFim) filtros.dataFim = dataFim + 'T23:59:59';
+
+                prePedidos = await listarPrePedidos(filtros);
+                
+                atualizarCards();
+                renderizarPrePedidos();
+            } catch (error) {
+                handleError(error, 'Erro ao carregar pré-pedidos');
+            }
+        }
+
+        function atualizarCards() {
+            const pendentes = prePedidos.filter(p => p.status === 'PENDENTE').length;
+            const emAnalise = prePedidos.filter(p => p.status === 'EM_ANALISE').length;
+            
+            const hoje = new Date().toISOString().split('T')[0];
+            const aprovados = prePedidos.filter(p => 
+                p.status === 'APROVADO' && p.data_analise?.startsWith(hoje)
+            ).length;
+            
+            const expirados = prePedidos.filter(p => p.status === 'EXPIRADO').length;
+
+            document.getElementById('card-pendentes').textContent = pendentes;
+            document.getElementById('card-analise').textContent = emAnalise;
+            document.getElementById('card-aprovados').textContent = aprovados;
+            document.getElementById('card-expirados').textContent = expirados;
+        }
+
+        function renderizarPrePedidos() {
+            const container = document.getElementById('pre-pedidos-container');
+
+            if (prePedidos.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-lg shadow p-12 text-center">
+                        <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                        </svg>
+                        <p class="text-gray-600 text-lg">Nenhum pré-pedido encontrado</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = prePedidos.map(pp => {
+                const statusColor = {
+                    'PENDENTE': 'bg-yellow-100 text-yellow-800',
+                    'EM_ANALISE': 'bg-blue-100 text-blue-800',
+                    'APROVADO': 'bg-green-100 text-green-800',
+                    'REJEITADO': 'bg-red-100 text-red-800',
+                    'EXPIRADO': 'bg-gray-100 text-gray-800'
+                }[pp.status] || 'bg-gray-100 text-gray-800';
+
+                const tempoRestante = calcularTempoRestante(pp.data_expiracao);
+                const expiracaoBadge = tempoRestante.expirado
+                    ? '<span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">Expirado</span>'
+                    : `<span class="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-medium">Expira em ${tempoRestante.texto}</span>`;
+
+                const itensResumo = pp.pre_pedido_itens.slice(0, 3).map(item =>
+                    `• ${item.produto.nome}${item.sabor ? ' - ' + item.sabor.sabor : ''}: ${item.quantidade} un.`
+                ).join('<br>');
+                const maisItens = pp.pre_pedido_itens.length > 3 
+                    ? `<br>... e mais ${pp.pre_pedido_itens.length - 3} iten(s)`
+                    : '';
+
+                return `
+                    <div class="bg-white rounded-lg shadow hover:shadow-md transition p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900">${pp.numero}</h3>
+                                <p class="text-gray-700 font-medium">${pp.nome_solicitante}</p>
+                                ${pp.email_contato ? `<p class="text-sm text-gray-500">${pp.email_contato}</p>` : ''}
+                                ${pp.telefone_contato ? `<p class="text-sm text-gray-500">${pp.telefone_contato}</p>` : ''}
+                            </div>
+                            <div class="text-right space-y-2">
+                                <span class="px-3 py-1 ${statusColor} rounded-full text-sm font-medium">${pp.status}</span>
+                                ${['PENDENTE', 'EM_ANALISE'].includes(pp.status) ? expiracaoBadge : ''}
+                            </div>
+                        </div>
+
+                        <div class="border-t border-b py-4 my-4">
+                            <p class="text-sm font-medium text-gray-700 mb-2">Itens solicitados (${pp.pre_pedido_itens.length}):</p>
+                            <p class="text-sm text-gray-600">${itensResumo}${maisItens}</p>
+                        </div>
+
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <p class="text-sm text-gray-500">Solicitado em ${formatDateTime(pp.created_at)}</p>
+                                <p class="text-2xl font-bold text-blue-600 mt-1">${formatCurrency(pp.total)}</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                ${pp.status === 'PENDENTE' || pp.status === 'EM_ANALISE' ? `
+                                    <button onclick="analisarPrePedido('${pp.id}')" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                                        Analisar
+                                    </button>
+                                    <button onclick="abrirModalRejeitar('${pp.id}')" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                                        Rejeitar
+                                    </button>
+                                ` : pp.status === 'APROVADO' && pp.pedido_gerado_id ? `
+                                    <a href="/pages/pedido-detalhe.html?id=${pp.pedido_gerado_id}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                        Ver Pedido
+                                    </a>
+                                ` : `
+                                    <button onclick="analisarPrePedido('${pp.id}')" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition">
+                                        Ver Detalhes
+                                    </button>
+                                `}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        /**
+         * Buscar cliente automaticamente por email, telefone ou nome
+         */
+        async function buscarClienteAutomatico(prePedido) {
+            try {
+                const clientes = await getClientes();
+                
+                // 1. Buscar por email (mais confiável)
+                if (prePedido.email_contato) {
+                    const porEmail = clientes.find(c => 
+                        c.email && c.email.toLowerCase() === prePedido.email_contato.toLowerCase()
+                    );
+                    if (porEmail) {
+                        return { ...porEmail, motivo: 'Correspondência por email' };
+                    }
+                }
+                
+                // 2. Buscar por telefone/WhatsApp
+                if (prePedido.telefone_contato) {
+                    const telefone = prePedido.telefone_contato.replace(/\D/g, '');
+                    const porTelefone = clientes.find(c => {
+                        const contatoCliente = (c.contato || '').replace(/\D/g, '');
+                        const whatsappCliente = (c.whatsapp || '').replace(/\D/g, '');
+                        return contatoCliente === telefone || whatsappCliente === telefone;
+                    });
+                    if (porTelefone) {
+                        return { ...porTelefone, motivo: 'Correspondência por telefone' };
+                    }
+                }
+                
+                // 3. Buscar por similaridade de nome (caso tenha telefone/email mas não exato)
+                if (prePedido.email_contato || prePedido.telefone_contato) {
+                    const nomePedido = prePedido.nome_solicitante.toLowerCase().trim();
+                    const porNome = clientes.find(c => 
+                        c.nome.toLowerCase().trim() === nomePedido
+                    );
+                    if (porNome) {
+                        return { ...porNome, motivo: 'Correspondência por nome exato' };
+                    }
+                }
+                
+                return null;
+            } catch (error) {
+                console.error('Erro ao buscar cliente automático:', error);
+                return null;
+            }
+        }
+
+        async function analisarPrePedido(id) {
+            try {
+                showLoading(true);
+
+                // Marcar como em análise se ainda estiver pendente
+                const pp = prePedidos.find(p => p.id === id);
+                if (pp.status === 'PENDENTE') {
+                    await marcarEmAnalise(id);
+                }
+
+                const prePedido = await obterPrePedido(id);
+                const validacao = await validarEstoquePrePedido(id);
+                const clientes = await getClientes();
+                
+                // Buscar cliente automaticamente
+                const clienteSugerido = await buscarClienteAutomatico(prePedido);
+
+                const itensHtml = prePedido.pre_pedido_itens.map(item => {
+                    const val = validacao.validacoes.find(v => v.item_id === item.id);
+                    const statusIcon = val.status === 'OK' ? '✅' : val.status === 'ALERTA' ? '⚠️' : '❌';
+                    const statusColor = val.status === 'OK' ? 'text-green-600' : val.status === 'ALERTA' ? 'text-yellow-600' : 'text-red-600';
+
+                    return `
+                        <tr class="border-b">
+                            <td class="py-3 px-4">
+                                <p class="font-medium">${item.produto.nome}</p>
+                                ${item.sabor ? `<p class="text-sm text-gray-600">${item.sabor.sabor}</p>` : ''}
+                            </td>
+                            <td class="py-3 px-4 text-center">${item.quantidade}</td>
+                            <td class="py-3 px-4 text-right">${formatCurrency(item.preco_unitario)}</td>
+                            <td class="py-3 px-4 text-right font-medium">${formatCurrency(item.subtotal)}</td>
+                            <td class="py-3 px-4 text-center ${statusColor}">
+                                ${statusIcon} ${val.mensagem}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                const clientesOptions = clientes.map(c => 
+                    `<option value="${c.id}" ${clienteSugerido && clienteSugerido.id === c.id ? 'selected' : ''}>${c.nome} - ${c.contato || c.whatsapp || 'Sem contato'}</option>`
+                ).join('');
+
+                const podeGerar = validacao.valido && (prePedido.status === 'PENDENTE' || prePedido.status === 'EM_ANALISE');
+
+                const content = `
+                    <div class="space-y-6">
+                        <!-- Informações do Solicitante -->
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h4 class="font-bold text-lg mb-2">Informações do Solicitante</h4>
+                            <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div><span class="font-medium">Nome:</span> ${prePedido.nome_solicitante}</div>
+                                <div><span class="font-medium">Email:</span> ${prePedido.email_contato || '-'}</div>
+                                <div><span class="font-medium">Telefone:</span> ${prePedido.telefone_contato || '-'}</div>
+                                <div><span class="font-medium">IP:</span> ${prePedido.ip_origem || '-'}</div>
+                            </div>
+                            ${clienteSugerido ? `
+                                <div class="mt-3 bg-green-100 border border-green-400 text-green-800 px-4 py-2 rounded">
+                                    ✅ <strong>Cliente encontrado:</strong> ${clienteSugerido.nome}
+                                    ${clienteSugerido.motivo ? `<br><span class="text-xs">${clienteSugerido.motivo}</span>` : ''}
+                                </div>
+                            ` : `
+                                <div class="mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded">
+                                    ℹ️ <strong>Cliente não encontrado</strong> - Selecione manualmente abaixo
+                                </div>
+                            `}
+                            ${!prePedido.email_contato && !prePedido.telefone_contato ? `
+                                <div class="mt-2 bg-orange-100 border border-orange-400 text-orange-800 px-4 py-2 rounded text-xs">
+                                    ⚠️ Solicitante não forneceu email nem telefone - busca automática limitada
+                                </div>
+                            ` : ''}
+                            ${prePedido.observacoes ? `
+                                <div class="mt-3">
+                                    <span class="font-medium">Observações:</span>
+                                    <p class="text-gray-700 mt-1">${prePedido.observacoes}</p>
+                                </div>
+                            ` : ''}
+                        </div>
+
+                        <!-- Itens do Pedido -->
+                        <div>
+                            <h4 class="font-bold text-lg mb-3">Itens Solicitados</h4>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full">
+                                    <thead class="bg-gray-100">
+                                        <tr>
+                                            <th class="py-2 px-4 text-left">Produto</th>
+                                            <th class="py-2 px-4 text-center">Qtd</th>
+                                            <th class="py-2 px-4 text-right">Preço Unit.</th>
+                                            <th class="py-2 px-4 text-right">Subtotal</th>
+                                            <th class="py-2 px-4 text-center">Estoque</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${itensHtml}
+                                        <tr class="font-bold bg-gray-50">
+                                            <td colspan="3" class="py-3 px-4 text-right">Total:</td>
+                                            <td class="py-3 px-4 text-right text-blue-600 text-xl">${formatCurrency(prePedido.total)}</td>
+                                            <td></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        ${podeGerar ? `
+                            <!-- Seleção de Cliente -->
+                            <div>
+                                <h4 class="font-bold text-lg mb-3">Gerar Pedido de Venda</h4>
+                                <div class="bg-green-50 p-4 rounded-lg">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Selecione o Cliente *</label>
+                                    <select id="select-cliente" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4">
+                                        <option value="">Selecione um cliente...</option>
+                                        ${clientesOptions}
+                                    </select>
+                                    ${!validacao.valido ? `
+                                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                                            ⚠️ Atenção: Existem itens com estoque insuficiente. Não é possível gerar o pedido.
+                                        </div>
+                                    ` : ''}
+                                    <button onclick="gerarPedidoVendaModal('${prePedido.id}')" 
+                                            ${!validacao.valido ? 'disabled' : ''}
+                                            class="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold disabled:bg-gray-400 disabled:cursor-not-allowed">
+                                        Gerar Pedido de Venda
+                                    </button>
+                                </div>
+                            </div>
+                        ` : prePedido.status === 'APROVADO' ? `
+                            <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                                ✅ Pedido já aprovado e convertido em venda
+                                ${prePedido.pedido_gerado ? `
+                                    <a href="/pages/pedido-detalhe.html?id=${prePedido.pedido_gerado_id}" class="underline ml-2">
+                                        Ver Pedido ${prePedido.pedido_gerado.numero}
+                                    </a>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                document.getElementById('analise-content').innerHTML = content;
+                document.getElementById('modal-analise').classList.remove('hidden');
+
+                showLoading(false);
+            } catch (error) {
+                showLoading(false);
+                handleError(error, 'Erro ao analisar pré-pedido');
+            }
+        }
+
+        async function gerarPedidoVendaModal(prePedidoId) {
+            const clienteId = document.getElementById('select-cliente').value;
+            
+            if (!clienteId) {
+                alert('Selecione um cliente');
+                return;
+            }
+
+            if (!confirm('Confirma a geração do pedido de venda?')) {
+                return;
+            }
+
+            try {
+                showLoading(true);
+                
+                const resultado = await gerarPedidoVenda(prePedidoId, clienteId);
+                
+                showLoading(false);
+                showToast('Pedido de venda criado com sucesso!', 'success');
+                
+                fecharModalAnalise();
+                await carregarPrePedidos();
+                
+                // Redirecionar para o pedido criado
+                if (confirm('Deseja abrir o pedido criado?')) {
+                    window.location.href = `/pages/pedido-detalhe.html?id=${resultado.pedido.id}`;
+                }
+            } catch (error) {
+                showLoading(false);
+                handleError(error, 'Erro ao gerar pedido de venda');
+            }
+        }
+
+        function fecharModalAnalise() {
+            document.getElementById('modal-analise').classList.add('hidden');
+        }
+
+        function abrirModalRejeitar(id) {
+            document.getElementById('rejeitar-id').value = id;
+            document.getElementById('modal-rejeitar').classList.remove('hidden');
+        }
+
+        function fecharModalRejeitar() {
+            document.getElementById('modal-rejeitar').classList.add('hidden');
+            document.getElementById('form-rejeitar').reset();
+        }
+
+        async function confirmarRejeicao(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('rejeitar-id').value;
+            const motivo = document.getElementById('motivo-rejeicao').value;
+
+            try {
+                showLoading(true);
+                await rejeitarPrePedido(id, motivo);
+                showLoading(false);
+                
+                showToast('Pré-pedido rejeitado', 'success');
+                fecharModalRejeitar();
+                await carregarPrePedidos();
+            } catch (error) {
+                showLoading(false);
+                handleError(error, 'Erro ao rejeitar pré-pedido');
+            }
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+    </script>
+</body>
+</html>

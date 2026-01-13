@@ -767,10 +767,34 @@
             
             try {
                 showLoading(true);
+                
+                // Verificar se foi gerado por um pré-pedido
+                const { data: prePedido } = await supabase
+                    .from('pre_pedidos')
+                    .select('id, numero')
+                    .eq('pedido_gerado_id', pedidoId)
+                    .single();
+                
                 const success = await deletePedido(pedidoId);
                 if (success) {
-                    // Redirecionar para lista de pedidos
-                    window.location.href = 'pedidos.html';
+                    // Se foi gerado por pré-pedido, voltar para pré-pedidos
+                    if (prePedido) {
+                        showToast('Pedido excluído. Pré-pedido voltou para status EM_ANÁLISE', 'success');
+                        
+                        // Atualizar status do pré-pedido
+                        await supabase
+                            .from('pre_pedidos')
+                            .update({
+                                status: 'EM_ANALISE',
+                                pedido_gerado_id: null
+                            })
+                            .eq('id', prePedido.id);
+                        
+                        window.location.href = 'pre-pedidos.html';
+                    } else {
+                        // Caso contrário, voltar para lista de pedidos
+                        window.location.href = 'pedidos.html';
+                    }
                 }
             } finally {
                 showLoading(false);

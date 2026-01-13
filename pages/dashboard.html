@@ -103,10 +103,13 @@
                     </div>
                 </div>
 
-                <!-- Pedidos Pendentes de Aprovação -->
+                <!-- Pré-Pedidos Públicos Pendentes -->
                 <div class="bg-white rounded-lg shadow">
                     <div class="px-6 py-4 border-b border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900">🔔 Pendentes de Aprovação</h3>
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-gray-900">🔔 Pré-Pedidos Públicos Pendentes</h3>
+                            <a href="/pages/pre-pedidos.html" class="text-sm text-purple-600 hover:text-purple-700">Ver todos →</a>
+                        </div>
                     </div>
                     <div class="p-6">
                         <div id="pedidos-pendentes" class="space-y-3">
@@ -161,6 +164,7 @@
     <script src="../js/auth.js"></script>
     <script src="../js/services/produtos.js"></script>
     <script src="../js/services/pedidos.js"></script>
+    <script src="../js/services/pre-pedidos.js"></script>
     <script src="../components/navbar.js"></script>
     <script src="../components/sidebar.js"></script>
     
@@ -236,28 +240,28 @@
                     `).join('');
                 }
 
-                // Pedidos pendentes de aprovação
-                const pendentes = todosPedidos.filter(p => p.status === 'ENVIADO');
+                // Pré-pedidos públicos pendentes
+                const prePedidosPendentes = await listarPrePedidos({ status: 'PENDENTE' });
                 const containerPendentes = document.getElementById('pedidos-pendentes');
                 
-                if (pendentes.length === 0) {
-                    containerPendentes.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum pedido pendente</p>';
+                if (!prePedidosPendentes || prePedidosPendentes.length === 0) {
+                    containerPendentes.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum pré-pedido pendente</p>';
                 } else {
-                    containerPendentes.innerHTML = pendentes.slice(0, 5).map(p => {
-                        const tipo = p.tipo_pedido === 'VENDA' ? 'VENDA' : 'COMPRA';
-                        const badgeColor = tipo === 'VENDA' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
-                        const detailUrl = tipo === 'VENDA' ? `/pages/venda-detalhe.html?id=${p.id}` : `/pages/pedido-detalhe.html?id=${p.id}`;
-                        const nomeExibir = tipo === 'VENDA' ? (p.cliente?.nome || 'Sem cliente') : (p.fornecedor?.nome || 'Sem fornecedor');
+                    containerPendentes.innerHTML = prePedidosPendentes.slice(0, 5).map(p => {
+                        const statusColor = p.status === 'PENDENTE' ? 'bg-yellow-100 text-yellow-800' : 'bg-purple-100 text-purple-800';
+                        const horasRestantes = Math.floor((new Date(p.data_expiracao) - new Date()) / (1000 * 60 * 60));
+                        const expiracaoText = horasRestantes > 0 ? `⏱️ ${horasRestantes}h restantes` : '⚠️ Expirado';
                         
                         return `
-                            <a href="${detailUrl}" class="block">
-                                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg hover:bg-yellow-100 transition border-l-4 border-yellow-400 cursor-pointer">
+                            <a href="/pages/pre-pedidos.html?id=${p.id}" class="block">
+                                <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition border-l-4 border-purple-400 cursor-pointer">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-2">
                                             <p class="font-medium text-gray-900">${p.numero}</p>
-                                            <span class="text-xs px-2 py-1 rounded ${badgeColor}">${tipo}</span>
+                                            <span class="text-xs px-2 py-1 rounded ${statusColor}">${p.status}</span>
                                         </div>
-                                        <p class="text-sm text-gray-600">${nomeExibir}</p>
+                                        <p class="text-sm text-gray-600">${p.nome_solicitante}</p>
+                                        <p class="text-xs text-gray-500">${expiracaoText}</p>
                                     </div>
                                     <div class="text-right">
                                         <p class="text-sm font-semibold text-gray-900">${formatCurrency(p.total)}</p>
