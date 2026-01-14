@@ -43,7 +43,6 @@
                                     <tr>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Preço Un.</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Subtotal</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
@@ -604,7 +603,7 @@
             const tbody = document.getElementById('itens-tbody');
             
             if (itens.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">Nenhum item adicionado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Nenhum item adicionado</td></tr>';
                 document.getElementById('pedido-quantidade-total').textContent = '0 UN';
                 return;
             }
@@ -613,61 +612,9 @@
             const quantidadeTotal = itens.reduce((sum, item) => sum + parseFloat(item.quantidade || 0), 0);
             document.getElementById('pedido-quantidade-total').textContent = `${Math.round(quantidadeTotal)} UN`;
 
-            // Buscar estoque atual para cada item
-            const itensComEstoque = await Promise.all(itens.map(async (item) => {
-                let estoqueAtual = 0;
-                
-                try {
-                    if (item.sabor_id) {
-                        // Produto com sabor - buscar estoque do sabor
-                        const { data: sabor } = await supabase
-                            .from('produto_sabores')
-                            .select('quantidade')
-                            .eq('id', item.sabor_id)
-                            .single();
-                        estoqueAtual = sabor?.quantidade || 0;
-                    } else {
-                        // Produto sem sabor - buscar estoque do produto
-                        const { data: produto } = await supabase
-                            .from('produtos')
-                            .select('estoque_atual')
-                            .eq('id', item.produto_id)
-                            .single();
-                        estoqueAtual = produto?.estoque_atual || 0;
-                    }
-                } catch (error) {
-                    console.error('Erro ao buscar estoque:', error);
-                }
-                
-                return { ...item, estoqueAtual };
-            }));
-
-            tbody.innerHTML = itensComEstoque.map(item => {
+            tbody.innerHTML = itens.map(item => {
                 const produtoNome = item.produto?.nome || 'N/A';
                 const sabor = item.sabor?.sabor ? ` - ${item.sabor.sabor}` : '';
-                const quantidade = parseFloat(item.quantidade);
-                const estoqueAtual = item.estoqueAtual;
-                
-                // Determinar status do estoque
-                let estoqueClass = 'text-green-600';
-                let estoqueIcon = '✅';
-                let estoqueMensagem = '';
-                
-                if (estoqueAtual === 0) {
-                    estoqueClass = 'text-red-600 font-semibold';
-                    estoqueIcon = '❌';
-                    estoqueMensagem = 'Sem estoque!';
-                } else if (estoqueAtual < quantidade) {
-                    estoqueClass = 'text-orange-600 font-semibold';
-                    estoqueIcon = '⚠️';
-                    const faltam = quantidade - estoqueAtual;
-                    estoqueMensagem = `Faltam ${faltam}`;
-                } else {
-                    estoqueClass = 'text-green-600';
-                    estoqueIcon = '✅';
-                    estoqueMensagem = 'OK';
-                }
-                
                 return `
                     <tr class="border-t">
                         <td class="px-4 py-3 text-sm">
@@ -676,13 +623,6 @@
                             <div class="text-xs text-gray-500">${item.produto?.codigo || ''}</div>
                         </td>
                         <td class="px-4 py-3 text-sm">${item.quantidade} ${item.produto?.unidade || ''}</td>
-                        <td class="px-4 py-3 text-sm ${estoqueClass}">
-                            <div class="flex items-center gap-1">
-                                <span>${estoqueIcon}</span>
-                                <span>${estoqueAtual}</span>
-                            </div>
-                            <div class="text-xs">${estoqueMensagem}</div>
-                        </td>
                         <td class="px-4 py-3 text-sm">${formatCurrency(item.preco_unitario)}</td>
                         <td class="px-4 py-3 text-sm font-semibold">${formatCurrency(item.subtotal)}</td>
                         <td class="px-4 py-3 text-sm">

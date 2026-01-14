@@ -311,7 +311,7 @@
                                         Rejeitar
                                     </button>
                                 ` : pp.status === 'APROVADO' && pp.pedido_gerado_id ? `
-                                    <a href="/pages/pedido-detalhe.html?id=${pp.pedido_gerado_id}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                                    <a href="/pages/venda-detalhe.html?id=${pp.pedido_gerado_id}" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
                                         Ver Pedido
                                     </a>
                                 ` : `
@@ -505,7 +505,7 @@
                             <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
                                 ✅ Pedido já aprovado e convertido em venda
                                 ${prePedido.pedido_gerado ? `
-                                    <a href="/pages/pedido-detalhe.html?id=${prePedido.pedido_gerado_id}" class="underline ml-2">
+                                    <a href="/pages/venda-detalhe.html?id=${prePedido.pedido_gerado_id}" class="underline ml-2">
                                         Ver Pedido ${prePedido.pedido_gerado.numero}
                                     </a>
                                 ` : ''}
@@ -639,7 +639,7 @@
                 
                 // Redirecionar para o pedido criado
                 if (confirm('Deseja abrir o pedido criado?')) {
-                    window.location.href = `/pages/pedido-detalhe.html?id=${resultado.pedido.id}`;
+                    window.location.href = `/pages/venda-detalhe.html?id=${resultado.pedido.id}`;
                 }
             } catch (error) {
                 showLoading(false);
