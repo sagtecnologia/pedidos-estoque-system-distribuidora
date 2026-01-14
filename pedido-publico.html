@@ -409,19 +409,37 @@
                 return;
             }
 
-            carrinho.push({
-                produto_id: produtoId,
-                sabor_id: null,
-                nome: produto.nome,
-                marca: produto.marca,
-                sabor: null,
-                quantidade: qtd,
-                preco_unitario: produto.preco_venda,
-                estoque_disponivel: produto.estoque_atual
-            });
+            // Verificar se produto sem sabor já existe no carrinho
+            const itemExistente = carrinho.find(item => 
+                item.produto_id === produtoId && item.sabor_id === null
+            );
+
+            if (itemExistente) {
+                // Se já existe, verificar se a soma não excede o estoque
+                const novaQuantidade = itemExistente.quantidade + qtd;
+                if (novaQuantidade > produto.estoque_atual) {
+                    alert(`Quantidade total (${novaQuantidade}) excede o estoque disponível (${produto.estoque_atual})`);
+                    return;
+                }
+                // Somar à quantidade existente
+                itemExistente.quantidade = novaQuantidade;
+                showToast(`Quantidade de ${produto.nome} atualizada no carrinho!`, 'success');
+            } else {
+                // Adicionar novo item
+                carrinho.push({
+                    produto_id: produtoId,
+                    sabor_id: null,
+                    nome: produto.nome,
+                    marca: produto.marca,
+                    sabor: null,
+                    quantidade: qtd,
+                    preco_unitario: produto.preco_venda,
+                    estoque_disponivel: produto.estoque_atual
+                });
+                showToast(`${produto.nome} adicionado ao carrinho!`, 'success');
+            }
 
             atualizarCarrinho();
-            showToast(`${produto.nome} adicionado ao carrinho!`, 'success');
         }
 
         function adicionarSaboresSelecionados(produtoId) {
@@ -429,6 +447,7 @@
             const saboresProduto = sabores.filter(s => s.produto_id === produtoId);
             
             let adicionados = 0;
+            let atualizados = 0;
             let erros = [];
 
             saboresProduto.forEach(sabor => {
@@ -438,20 +457,38 @@
                 const qtd = parseInt(inputElement.value) || 0;
                 
                 if (qtd > 0) {
-                    if (qtd > sabor.quantidade) {
-                        erros.push(`${sabor.sabor}: quantidade (${qtd}) excede estoque (${sabor.quantidade})`);
+                    // Verificar se sabor já existe no carrinho
+                    const itemExistente = carrinho.find(item => 
+                        item.produto_id === produtoId && item.sabor_id === sabor.id
+                    );
+
+                    if (itemExistente) {
+                        // Se já existe, verificar se a soma não excede o estoque
+                        const novaQuantidade = itemExistente.quantidade + qtd;
+                        if (novaQuantidade > sabor.quantidade) {
+                            erros.push(`${sabor.sabor}: quantidade total (${novaQuantidade}) excede estoque (${sabor.quantidade})`);
+                        } else {
+                            // Somar à quantidade existente
+                            itemExistente.quantidade = novaQuantidade;
+                            atualizados++;
+                        }
                     } else {
-                        carrinho.push({
-                            produto_id: produtoId,
-                            sabor_id: sabor.id,
-                            nome: produto.nome,
-                            marca: produto.marca,
-                            sabor: sabor.sabor,
-                            quantidade: qtd,
-                            preco_unitario: sabor.preco_venda,
-                            estoque_disponivel: sabor.quantidade
-                        });
-                        adicionados++;
+                        // Novo item
+                        if (qtd > sabor.quantidade) {
+                            erros.push(`${sabor.sabor}: quantidade (${qtd}) excede estoque (${sabor.quantidade})`);
+                        } else {
+                            carrinho.push({
+                                produto_id: produtoId,
+                                sabor_id: sabor.id,
+                                nome: produto.nome,
+                                marca: produto.marca,
+                                sabor: sabor.sabor,
+                                quantidade: qtd,
+                                preco_unitario: sabor.preco_venda,
+                                estoque_disponivel: sabor.quantidade
+                            });
+                            adicionados++;
+                        }
                     }
                 }
             });
@@ -461,7 +498,7 @@
                 return;
             }
 
-            if (adicionados === 0) {
+            if (adicionados === 0 && atualizados === 0) {
                 alert('Informe a quantidade para pelo menos um sabor');
                 return;
             }
@@ -473,7 +510,11 @@
             }
             
             atualizarCarrinho();
-            showToast(`${adicionados} ${adicionados === 1 ? 'sabor adicionado' : 'sabores adicionados'} ao carrinho!`, 'success');
+            const total = adicionados + atualizados;
+            const mensagem = [];
+            if (adicionados > 0) mensagem.push(`${adicionados} ${adicionados === 1 ? 'sabor adicionado' : 'sabores adicionados'}`);
+            if (atualizados > 0) mensagem.push(`${atualizados} ${atualizados === 1 ? 'sabor atualizado' : 'sabores atualizados'}`);
+            showToast(mensagem.join(' e ') + ' no carrinho!', 'success');
         }
 
         function adicionarSaborAoCarrinho(produtoId, saborId) {
@@ -491,20 +532,38 @@
                 return;
             }
 
-            carrinho.push({
-                produto_id: produtoId,
-                sabor_id: saborId,
-                nome: produto.nome,
-                marca: produto.marca,
-                sabor: sabor.sabor,
-                quantidade: qtd,
-                preco_unitario: sabor.preco_venda,
-                estoque_disponivel: sabor.quantidade
-            });
+            // Verificar se sabor já existe no carrinho
+            const itemExistente = carrinho.find(item => 
+                item.produto_id === produtoId && item.sabor_id === saborId
+            );
+
+            if (itemExistente) {
+                // Se já existe, verificar se a soma não excede o estoque
+                const novaQuantidade = itemExistente.quantidade + qtd;
+                if (novaQuantidade > sabor.quantidade) {
+                    alert(`Quantidade total (${novaQuantidade}) excede o estoque disponível (${sabor.quantidade})`);
+                    return;
+                }
+                // Somar à quantidade existente
+                itemExistente.quantidade = novaQuantidade;
+                showToast(`Quantidade de ${produto.nome} - ${sabor.sabor} atualizada!`, 'success');
+            } else {
+                // Adicionar novo item
+                carrinho.push({
+                    produto_id: produtoId,
+                    sabor_id: saborId,
+                    nome: produto.nome,
+                    marca: produto.marca,
+                    sabor: sabor.sabor,
+                    quantidade: qtd,
+                    preco_unitario: sabor.preco_venda,
+                    estoque_disponivel: sabor.quantidade
+                });
+                showToast(`${produto.nome} - ${sabor.sabor} adicionado!`, 'success');
+            }
 
             atualizarCarrinho();
             document.querySelector('.modal-backdrop').remove();
-            showToast(`${produto.nome} - ${sabor.sabor} adicionado!`, 'success');
         }
 
         function atualizarCarrinho() {
