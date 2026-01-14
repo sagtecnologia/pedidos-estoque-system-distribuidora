@@ -391,22 +391,52 @@
                 // Buscar cliente automaticamente
                 const clienteSugerido = await buscarClienteAutomatico(prePedido);
 
+                // Definir se pode gerar o pedido (usado dentro do map)
+                const podeGerar = validacao.valido && (prePedido.status === 'PENDENTE' || prePedido.status === 'EM_ANALISE');
+
                 const itensHtml = prePedido.pre_pedido_itens.map(item => {
                     const val = validacao.validacoes.find(v => v.item_id === item.id);
                     const statusIcon = val.status === 'OK' ? '✅' : val.status === 'ALERTA' ? '⚠️' : '❌';
                     const statusColor = val.status === 'OK' ? 'text-green-600' : val.status === 'ALERTA' ? 'text-yellow-600' : 'text-red-600';
+                    const podeEditar = podeGerar && val.status !== 'OK';
 
                     return `
-                        <tr class="border-b">
+                        <tr class="border-b" id="item-row-${item.id}">
                             <td class="py-3 px-4">
                                 <p class="font-medium">${item.produto.nome}</p>
                                 ${item.sabor ? `<p class="text-sm text-gray-600">${item.sabor.sabor}</p>` : ''}
                             </td>
-                            <td class="py-3 px-4 text-center">${item.quantidade}</td>
+                            <td class="py-3 px-4 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    ${podeEditar ? `
+                                        <button onclick="diminuirQuantidade('${item.id}', '${prePedido.id}')" 
+                                                class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-xs"
+                                                title="Diminuir quantidade">
+                                            −
+                                        </button>
+                                    ` : ''}
+                                    <input type="number" 
+                                           id="quantidade-${item.id}" 
+                                           value="${item.quantidade}" 
+                                           min="1" 
+                                           max="${val.estoque_atual}"
+                                           ${podeEditar ? '' : 'readonly'}
+                                           onchange="atualizarQuantidadeItem('${item.id}', '${prePedido.id}')"
+                                           class="w-16 px-2 py-1 text-center border rounded ${podeEditar ? 'border-blue-500' : 'border-gray-300 bg-gray-50'}" />
+                                    ${podeEditar ? `
+                                        <button onclick="aumentarQuantidade('${item.id}', '${prePedido.id}')" 
+                                                class="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs"
+                                                title="Aumentar quantidade">
+                                            +
+                                        </button>
+                                    ` : ''}
+                                </div>
+                                ${podeEditar ? `<p class="text-xs text-gray-500 mt-1">Max: ${val.estoque_atual}</p>` : ''}
+                            </td>
                             <td class="py-3 px-4 text-right">${formatCurrency(item.preco_unitario)}</td>
-                            <td class="py-3 px-4 text-right font-medium">${formatCurrency(item.subtotal)}</td>
-                            <td class="py-3 px-4 text-center ${statusColor}">
-                                ${statusIcon} ${val.mensagem}
+                            <td class="py-3 px-4 text-right font-medium" id="subtotal-${item.id}">${formatCurrency(item.subtotal)}</td>
+                            <td class="py-3 px-4 text-center ${statusColor}" id="status-${item.id}">
+                                ${statusIcon} <span id="msg-${item.id}">${val.mensagem}</span>
                             </td>
                         </tr>
                     `;
@@ -415,8 +445,6 @@
                 const clientesOptions = clientes.map(c => 
                     `<option value="${c.id}" ${clienteSugerido && clienteSugerido.id === c.id ? 'selected' : ''}>${c.nome} - ${c.contato || c.whatsapp || 'Sem contato'}</option>`
                 ).join('');
-
-                const podeGerar = validacao.valido && (prePedido.status === 'PENDENTE' || prePedido.status === 'EM_ANALISE');
 
                 const content = `
                     <div class="space-y-6">
@@ -470,7 +498,7 @@
                                         ${itensHtml}
                                         <tr class="font-bold bg-gray-50">
                                             <td colspan="3" class="py-3 px-4 text-right">Total:</td>
-                                            <td class="py-3 px-4 text-right text-blue-600 text-xl">${formatCurrency(prePedido.total)}</td>
+                                            <td class="py-3 px-4 text-right text-blue-600 text-xl" id="total-pedido">${formatCurrency(prePedido.total)}</td>
                                             <td></td>
                                         </tr>
                                     </tbody>
@@ -482,21 +510,29 @@
                             <!-- Seleção de Cliente -->
                             <div>
                                 <h4 class="font-bold text-lg mb-3">Gerar Pedido de Venda</h4>
-                                <div class="bg-green-50 p-4 rounded-lg">
+                                <div class="bg-green-50 p-4 rounded-lg" id="area-gerar-pedido">
                                     <label class="block text-sm font-medium text-gray-700 mb-2">Selecione o Cliente *</label>
                                     <select id="select-cliente" class="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4">
                                         <option value="">Selecione um cliente...</option>
                                         ${clientesOptions}
                                     </select>
                                     ${!validacao.valido ? `
-                                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                                            ⚠️ Atenção: Existem itens com estoque insuficiente. Não é possível gerar o pedido.
+                                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4" id="alerta-estoque">
+                                            <p class="font-bold mb-2">⚠️ Atenção: Estoque Insuficiente</p>
+                                            <p class="text-sm mb-2">Alguns itens não possuem estoque suficiente. Você pode:</p>
+                                            <ul class="text-sm list-disc list-inside space-y-1 ml-2">
+                                                <li>Ajustar as quantidades dos itens acima usando os botões +/-</li>
+                                                <li>Remover itens clicando em diminuir até zero</li>
+                                                <li>Rejeitar o pedido se não for possível atender</li>
+                                            </ul>
+                                            <p class="text-xs mt-2 italic">O pedido só poderá ser gerado quando todos os itens tiverem estoque disponível.</p>
                                         </div>
                                     ` : ''}
                                     <button onclick="gerarPedidoVendaModal('${prePedido.id}')" 
+                                            id="btn-gerar-pedido"
                                             ${!validacao.valido ? 'disabled' : ''}
-                                            class="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold disabled:bg-gray-400 disabled:cursor-not-allowed">
-                                        Gerar Pedido de Venda
+                                            class="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold disabled:bg-gray-400 disabled:cursor-not-allowed transition">
+                                        ${!validacao.valido ? 'Ajuste as quantidades para gerar' : 'Gerar Pedido de Venda'}
                                     </button>
                                 </div>
                             </div>
@@ -592,6 +628,281 @@
 
         function showLoading(show) {
             document.getElementById('loading').classList.toggle('hidden', !show);
+        }
+
+        // =====================================================
+        // FUNÇÕES DE EDIÇÃO DE QUANTIDADES
+        // =====================================================
+
+        // Armazenar dados do pré-pedido e validação atual
+        let dadosAnaliseAtual = {
+            prePedido: null,
+            validacao: null,
+            itensAtualizados: {}
+        };
+
+        async function diminuirQuantidade(itemId, prePedidoId) {
+            const input = document.getElementById(`quantidade-${itemId}`);
+            const novaQuantidade = Math.max(0, parseInt(input.value) - 1);
+            input.value = novaQuantidade;
+            await atualizarQuantidadeItem(itemId, prePedidoId);
+        }
+
+        async function aumentarQuantidade(itemId, prePedidoId) {
+            const input = document.getElementById(`quantidade-${itemId}`);
+            const maxEstoque = parseInt(input.max);
+            const novaQuantidade = Math.min(maxEstoque, parseInt(input.value) + 1);
+            input.value = novaQuantidade;
+            await atualizarQuantidadeItem(itemId, prePedidoId);
+        }
+
+        async function atualizarQuantidadeItem(itemId, prePedidoId) {
+            try {
+                const input = document.getElementById(`quantidade-${itemId}`);
+                const novaQuantidade = parseInt(input.value);
+                const maxEstoque = parseInt(input.max);
+
+                // Validar quantidade
+                if (isNaN(novaQuantidade) || novaQuantidade < 0) {
+                    showToast('Quantidade inválida', 'error');
+                    return;
+                }
+
+                if (novaQuantidade > maxEstoque) {
+                    showToast(`Quantidade máxima disponível: ${maxEstoque}`, 'error');
+                    input.value = maxEstoque;
+                    return;
+                }
+
+                // Se quantidade for zero, perguntar se deseja remover
+                if (novaQuantidade === 0) {
+                    if (!confirm('Remover este item do pedido?')) {
+                        input.value = 1;
+                        return;
+                    }
+                }
+
+                // Armazenar alteração temporária
+                if (!dadosAnaliseAtual.itensAtualizados) {
+                    dadosAnaliseAtual.itensAtualizados = {};
+                }
+                dadosAnaliseAtual.itensAtualizados[itemId] = novaQuantidade;
+
+                // Buscar dados do item
+                const prePedido = await obterPrePedido(prePedidoId);
+                const item = prePedido.pre_pedido_itens.find(i => i.id === itemId);
+                
+                if (!item) {
+                    showToast('Item não encontrado', 'error');
+                    return;
+                }
+
+                // Recalcular subtotal
+                const novoSubtotal = novaQuantidade * item.preco_unitario;
+                document.getElementById(`subtotal-${itemId}`).textContent = formatCurrency(novoSubtotal);
+
+                // Validar estoque para o item
+                let estoqueAtual = 0;
+                if (item.sabor_id) {
+                    const { data: sabor } = await supabase
+                        .from('produto_sabores')
+                        .select('quantidade')
+                        .eq('id', item.sabor_id)
+                        .single();
+                    estoqueAtual = sabor?.quantidade || 0;
+                } else {
+                    estoqueAtual = item.produto.estoque_atual;
+                }
+
+                // Atualizar status visual do item
+                const statusCell = document.getElementById(`status-${itemId}`);
+                const msgSpan = document.getElementById(`msg-${itemId}`);
+                
+                if (novaQuantidade === 0) {
+                    statusCell.className = 'py-3 px-4 text-center text-gray-500';
+                    statusCell.innerHTML = '🗑️ <span id="msg-' + itemId + '">Item será removido</span>';
+                    // Marcar linha como removida
+                    document.getElementById(`item-row-${itemId}`).classList.add('opacity-50', 'bg-gray-100');
+                } else if (novaQuantidade <= estoqueAtual) {
+                    statusCell.className = 'py-3 px-4 text-center text-green-600';
+                    statusCell.innerHTML = '✅ <span id="msg-' + itemId + '">Estoque OK: ' + estoqueAtual + ' disponíveis</span>';
+                    // Remover marcação de removido
+                    document.getElementById(`item-row-${itemId}`).classList.remove('opacity-50', 'bg-gray-100');
+                } else {
+                    statusCell.className = 'py-3 px-4 text-center text-red-600';
+                    statusCell.innerHTML = '❌ <span id="msg-' + itemId + '">Estoque insuficiente. Disponível: ' + estoqueAtual + '</span>';
+                    // Remover marcação de removido
+                    document.getElementById(`item-row-${itemId}`).classList.remove('opacity-50', 'bg-gray-100');
+                }
+
+                // Recalcular total geral
+                await recalcularTotalGeral(prePedidoId);
+
+                showToast('Quantidade atualizada', 'success');
+            } catch (error) {
+                console.error('Erro ao atualizar quantidade:', error);
+                showToast('Erro ao atualizar quantidade', 'error');
+            }
+        }
+
+        async function recalcularTotalGeral(prePedidoId) {
+            try {
+                const prePedido = await obterPrePedido(prePedidoId);
+                let totalGeral = 0;
+                let todosItensOk = true;
+
+                for (const item of prePedido.pre_pedido_itens) {
+                    const quantidade = dadosAnaliseAtual.itensAtualizados[item.id] !== undefined 
+                        ? dadosAnaliseAtual.itensAtualizados[item.id] 
+                        : item.quantidade;
+                    
+                    // Ignorar itens com quantidade zero
+                    if (quantidade === 0) continue;
+
+                    const subtotal = quantidade * item.preco_unitario;
+                    totalGeral += subtotal;
+
+                    // Verificar estoque
+                    let estoqueAtual = 0;
+                    if (item.sabor_id) {
+                        const { data: sabor } = await supabase
+                            .from('produto_sabores')
+                            .select('quantidade')
+                            .eq('id', item.sabor_id)
+                            .single();
+                        estoqueAtual = sabor?.quantidade || 0;
+                    } else {
+                        estoqueAtual = item.produto.estoque_atual;
+                    }
+
+                    if (quantidade > estoqueAtual) {
+                        todosItensOk = false;
+                    }
+                }
+
+                // Atualizar total na interface
+                document.getElementById('total-pedido').textContent = formatCurrency(totalGeral);
+
+                // Verificar se todos os itens foram removidos
+                const quantidades = Object.values(dadosAnaliseAtual.itensAtualizados);
+                const todosRemovidos = quantidades.length > 0 && quantidades.every(q => q === 0);
+
+                // Atualizar botão de gerar pedido
+                const btnGerar = document.getElementById('btn-gerar-pedido');
+                const alertaEstoque = document.getElementById('alerta-estoque');
+                
+                if (todosRemovidos) {
+                    btnGerar.disabled = true;
+                    btnGerar.textContent = 'Não há itens no pedido';
+                    if (alertaEstoque) {
+                        alertaEstoque.className = 'bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded mb-4';
+                        alertaEstoque.innerHTML = '⚠️ Todos os itens foram removidos. Você pode rejeitar este pedido.';
+                    }
+                } else if (todosItensOk) {
+                    btnGerar.disabled = false;
+                    btnGerar.textContent = 'Gerar Pedido de Venda';
+                    btnGerar.className = 'w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold transition';
+                    if (alertaEstoque) {
+                        alertaEstoque.remove();
+                    }
+                } else {
+                    btnGerar.disabled = true;
+                    btnGerar.textContent = 'Ajuste as quantidades para gerar';
+                    btnGerar.className = 'w-full px-6 py-3 bg-gray-400 text-white rounded-lg font-bold cursor-not-allowed transition';
+                }
+            } catch (error) {
+                console.error('Erro ao recalcular total:', error);
+            }
+        }
+
+        // Modificar a função gerarPedidoVendaModal para incluir as quantidades atualizadas
+        const gerarPedidoVendaModalOriginal = gerarPedidoVendaModal;
+        async function gerarPedidoVendaModal(prePedidoId) {
+            const clienteId = document.getElementById('select-cliente').value;
+            
+            if (!clienteId) {
+                alert('Selecione um cliente');
+                return;
+            }
+
+            // Verificar se há alterações nas quantidades
+            const temAlteracoes = Object.keys(dadosAnaliseAtual.itensAtualizados).length > 0;
+            
+            if (temAlteracoes) {
+                const mensagem = 'Você alterou as quantidades de alguns itens. Deseja salvar essas alterações e gerar o pedido?';
+                if (!confirm(mensagem)) {
+                    return;
+                }
+
+                // Atualizar quantidades no banco antes de gerar o pedido
+                try {
+                    showLoading(true);
+                    
+                    for (const [itemId, quantidade] of Object.entries(dadosAnaliseAtual.itensAtualizados)) {
+                        if (quantidade === 0) {
+                            // Remover item
+                            await supabase
+                                .from('pre_pedido_itens')
+                                .delete()
+                                .eq('id', itemId);
+                        } else {
+                            // Atualizar quantidade
+                            await supabase
+                                .from('pre_pedido_itens')
+                                .update({ quantidade: quantidade })
+                                .eq('id', itemId);
+                        }
+                    }
+
+                    // Recalcular total do pré-pedido
+                    const prePedido = await obterPrePedido(prePedidoId);
+                    const novoTotal = prePedido.pre_pedido_itens.reduce((sum, item) => {
+                        const qtd = dadosAnaliseAtual.itensAtualizados[item.id] !== undefined 
+                            ? dadosAnaliseAtual.itensAtualizados[item.id] 
+                            : item.quantidade;
+                        return sum + (qtd * item.preco_unitario);
+                    }, 0);
+
+                    await supabase
+                        .from('pre_pedidos')
+                        .update({ total: novoTotal })
+                        .eq('id', prePedidoId);
+
+                    showLoading(false);
+                    showToast('Quantidades atualizadas com sucesso!', 'success');
+                } catch (error) {
+                    showLoading(false);
+                    handleError(error, 'Erro ao atualizar quantidades');
+                    return;
+                }
+            }
+
+            if (!confirm('Confirma a geração do pedido de venda?')) {
+                return;
+            }
+
+            try {
+                showLoading(true);
+                
+                const resultado = await gerarPedidoVenda(prePedidoId, clienteId);
+                
+                showLoading(false);
+                showToast('Pedido de venda criado com sucesso!', 'success');
+                
+                // Limpar dados temporários
+                dadosAnaliseAtual.itensAtualizados = {};
+                
+                fecharModalAnalise();
+                await carregarPrePedidos();
+                
+                // Redirecionar para o pedido criado
+                if (confirm('Deseja abrir o pedido criado?')) {
+                    window.location.href = `/pages/pedido-detalhe.html?id=${resultado.pedido.id}`;
+                }
+            } catch (error) {
+                showLoading(false);
+                handleError(error, 'Erro ao gerar pedido de venda');
+            }
         }
     </script>
 </body>
