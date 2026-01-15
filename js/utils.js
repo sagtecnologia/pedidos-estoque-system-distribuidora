@@ -219,7 +219,13 @@ function getStatusBadge(status) {
         'ENVIADO': '<span class="px-2 py-1 text-xs rounded-full bg-blue-200 text-blue-800">Enviado</span>',
         'APROVADO': '<span class="px-2 py-1 text-xs rounded-full bg-green-200 text-green-800">Aprovado</span>',
         'REJEITADO': '<span class="px-2 py-1 text-xs rounded-full bg-red-200 text-red-800">Rejeitado</span>',
-        'FINALIZADO': '<span class="px-2 py-1 text-xs rounded-full bg-purple-200 text-purple-800">Finalizado</span>'
+        'FINALIZADO': '<span class="px-2 py-1 text-xs rounded-full bg-purple-200 text-purple-800">Finalizado</span>',
+        'CANCELADO': '<span class="px-2 py-1 text-xs rounded-full bg-red-300 text-red-900">Cancelado</span>',
+        'SEPARADO': '<span class="px-2 py-1 text-xs rounded-full bg-indigo-200 text-indigo-800">Separado</span>',
+        'DESPACHADO': '<span class="px-2 py-1 text-xs rounded-full bg-teal-200 text-teal-800">Despachado</span>',
+        
+        // Status de envio (logística)
+        'AGUARDANDO_SEPARACAO': '<span class="px-2 py-1 text-xs rounded-full bg-yellow-200 text-yellow-800">Aguardando Separação</span>'
     };
     return badges[status] || status;
 }

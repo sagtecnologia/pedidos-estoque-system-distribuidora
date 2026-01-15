@@ -92,6 +92,14 @@ function createSidebar() {
                         <span id="badge-pendentes" class="hidden ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-orange-500 text-white"></span>
                     </a>
 
+                    <a href="/pages/conferencia-vendas.html" id="menu-conferencia" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                        </svg>
+                        <span class="flex-1">Conferência de Vendas</span>
+                        <span id="badge-conferencia" class="hidden ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-500 text-white"></span>
+                    </a>
+
                     <a href="/pages/aprovacao.html" id="menu-aprovacao" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition">
                         <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>

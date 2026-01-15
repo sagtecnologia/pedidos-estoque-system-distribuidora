@@ -121,7 +121,10 @@ function gerarHTMLPedidoCompra(pedido, itens, empresaConfig) {
         'ENVIADO': 'Aguardando Aprovação',
         'APROVADO': 'Aprovado',
         'REJEITADO': 'Rejeitado',
-        'FINALIZADO': 'Finalizado'
+        'FINALIZADO': 'Finalizado',
+        'CANCELADO': 'Cancelado',
+        'SEPARADO': 'Separado',
+        'DESPACHADO': 'Despachado'
     };
 
     const total = itens.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
@@ -544,7 +547,10 @@ function gerarHTMLPedidoVenda(pedido, itens, empresaConfig) {
         'ENVIADO': 'Aguardando Aprovação',
         'APROVADO': 'Aprovado',
         'REJEITADO': 'Rejeitado',
-        'FINALIZADO': 'Finalizado'
+        'FINALIZADO': 'Finalizado',
+        'CANCELADO': 'Cancelado',
+        'SEPARADO': 'Separado',
+        'DESPACHADO': 'Despachado'
     };
 
     const total = itens.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);

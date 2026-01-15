@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conferência de Vendas - Sistema de Pedidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js">
+</script>
+</head>
+<body class="bg-gray-100">
+    <div id="navbar-container"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">
+                        <i class="fas fa-boxes mr-3 text-blue-600"></i>Conferência de Vendas
+                    </h2>
+                    <p class="text-gray-600 mt-1">Gerenciamento de separação e despacho</p>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8 px-6">
+                        <button onclick="trocarAba('aguardando-separacao')" 
+                                id="tab-aguardando-separacao"
+                                class="tab-button border-b-2 border-blue-500 text-blue-600 py-4 px-1 font-medium">
+                            <i class="fas fa-clipboard-check mr-2"></i>
+                            Aguardando Separação
+                            <span id="badge-aguardando" class="ml-2 bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full">0</span>
+                        </button>
+                        <button onclick="trocarAba('aguardando-despacho')" 
+                                id="tab-aguardando-despacho"
+                                class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 font-medium">
+                            <i class="fas fa-truck mr-2"></i>
+                            Aguardando Despacho
+                            <span id="badge-despacho" class="ml-2 bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full">0</span>
+                        </button>
+                        <button onclick="trocarAba('historico')" 
+                                id="tab-historico"
+                                class="tab-button border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 py-4 px-1 font-medium">
+                            <i class="fas fa-history mr-2"></i>
+                            Histórico
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Conteúdo das Abas -->
+                
+                <!-- Aba: Aguardando Separação -->
+                <div id="aba-aguardando-separacao" class="aba-content p-6">
+                    <!-- Loading -->
+                    <div id="loading-separacao" class="hidden text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+                        <p class="text-gray-600 mt-2">Carregando pedidos...</p>
+                    </div>
+
+                    <!-- Lista de Pedidos -->
+                    <div id="lista-aguardando-separacao" class="space-y-4"></div>
+                    
+                    <!-- Empty State -->
+                    <div id="empty-separacao" class="hidden text-center py-12">
+                        <i class="fas fa-check-circle text-6xl text-green-400 mb-4"></i>
+                        <p class="text-gray-600 text-lg">Nenhum pedido aguardando separação</p>
+                    </div>
+                </div>
+
+                <!-- Aba: Aguardando Despacho -->
+                <div id="aba-aguardando-despacho" class="aba-content hidden p-6">
+                    <!-- Loading -->
+                    <div id="loading-despacho" class="hidden text-center py-8">
+                        <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+                        <p class="text-gray-600 mt-2">Carregando pedidos...</p>
+                    </div>
+
+                    <!-- Lista de Pedidos -->
+                    <div id="lista-aguardando-despacho" class="space-y-4"></div>
+                    
+                    <!-- Empty State -->
+                    <div id="empty-despacho" class="hidden text-center py-12">
+                        <i class="fas fa-check-circle text-6xl text-green-400 mb-4"></i>
+                        <p class="text-gray-600 text-lg">Nenhum pedido aguardando despacho</p>
+                    </div>
+                </div>
+
+                <!-- Aba: Histórico -->
+                <div id="aba-historico" class="aba-content hidden p-6">
+                    <!-- Filtros -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
+                                    <input type="date" id="filtro-data-inicio" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
+                                    <input type="date" id="filtro-data-fim" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <div class="flex items-end">
+                                    <button onclick="carregarHistorico()" 
+                                            class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                        <i class="fas fa-search mr-2"></i> Buscar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading-historico" class="hidden text-center py-8">
+                <i class="fas fa-spinner fa-spin text-4xl text-blue-600"></i>
+                <p class="text-gray-600 mt-2">Carregando histórico...</p>
+            </div>
+
+            <!-- Lista de Pedidos -->
+            <div id="lista-historico" class="space-y-4"></div>
+            
+            <!-- Empty State -->
+            <div id="empty-historico" class="hidden text-center py-12">
+                <i class="fas fa-inbox text-6xl text-gray-300 mb-4"></i>
+                <p class="text-gray-600 text-lg">Nenhum pedido encontrado no período</p>
+            </div>
+        </div>
+            </div>
+        </main>
+
+    <!-- Modal: Conferir Pedido -->
+    <div id="modal-conferir" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <!-- Header -->
+            <div class="bg-blue-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-semibold">
+                    <i class="fas fa-clipboard-check mr-2"></i>
+                    Conferir Pedido <span id="modal-numero"></span>
+                </h3>
+                <button onclick="fecharModalConferir()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Conteúdo -->
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <!-- Informações do Cliente -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h4 class="font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-user mr-2 text-blue-600"></i>
+                        Informações do Cliente
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-sm text-gray-600">Cliente:</span>
+                            <p class="font-medium" id="modal-cliente"></p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-600">WhatsApp:</span>
+                            <p class="font-medium" id="modal-whatsapp"></p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-600">Vendedor:</span>
+                            <p class="font-medium" id="modal-vendedor"></p>
+                        </div>
+                        <div>
+                            <span class="text-sm text-gray-600">Total:</span>
+                            <p class="font-medium text-green-600" id="modal-total"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Itens para Conferir -->
+                <div class="mb-6">
+                    <h4 class="font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-list mr-2 text-blue-600"></i>
+                        Itens do Pedido
+                    </h4>
+                    <div id="modal-itens" class="space-y-3"></div>
+                </div>
+
+                <!-- Progresso -->
+                <div class="bg-blue-50 rounded-lg p-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-medium text-gray-700">Progresso da Conferência</span>
+                        <span class="text-sm font-medium text-blue-600" id="progresso-texto">0/0</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div id="progresso-barra" class="bg-blue-600 h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-between">
+                <button onclick="fecharModalConferir()" 
+                        class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100">
+                    <i class="fas fa-times mr-2"></i> Cancelar
+                </button>
+                <button id="btn-finalizar-separacao" onclick="finalizarSeparacao()" 
+                        class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled>
+                    <i class="fas fa-check mr-2"></i> Finalizar Separação
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Despachar Pedido -->
+    <div id="modal-despachar" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+            <!-- Header -->
+            <div class="bg-green-600 text-white px-6 py-4 flex justify-between items-center">
+                <h3 class="text-xl font-semibold">
+                    <i class="fas fa-truck mr-2"></i>
+                    Despachar Pedido <span id="modal-despachar-numero"></span>
+                </h3>
+                <button onclick="fecharModalDespachar()" class="text-white hover:text-gray-200">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <!-- Conteúdo -->
+            <div class="p-6">
+                <!-- Informações do Cliente -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                    <h4 class="font-semibold text-gray-800 mb-3">
+                        <i class="fas fa-map-marker-alt mr-2 text-green-600"></i>
+                        Endereço de Entrega
+                    </h4>
+                    <div id="modal-despachar-endereco" class="space-y-2"></div>
+                </div>
+
+                <!-- Observações -->
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        Observações do Despacho (opcional)
+                    </label>
+                    <textarea id="observacoes-despacho" rows="3"
+                              placeholder="Ex: Entregue no período da manhã, código de rastreio, etc."
+                              class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"></textarea>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-between">
+                <button onclick="fecharModalDespachar()" 
+                        class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100">
+                    <i class="fas fa-times mr-2"></i> Cancelar
+                </button>
+                <button onclick="confirmarDespacho()" 
+                        class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    <i class="fas fa-truck mr-2"></i> Confirmar Despacho
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/modal.js"></script>
+    
+    <script>
+        let currentUser = null;
+        let pedidoAtualConferencia = null;
+        let pedidoAtualDespacho = null;
+
+        (async () => {
+            // Verificar autenticação
+            await checkAuth();
+            currentUser = await getCurrentUser();
+            document.getElementById('navbar-container').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+
+            // Carregar dados iniciais
+            await carregarVendasAguardandoSeparacao();
+        })();
+
+        // Funções de navegação entre abas
+        window.trocarAba = function(aba) {
+            // Remover active de todas as abas
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            // Esconder todos os conteúdos
+            document.querySelectorAll('.aba-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            // Ativar aba selecionada
+            document.getElementById(`tab-${aba}`).classList.remove('border-transparent', 'text-gray-500');
+            document.getElementById(`tab-${aba}`).classList.add('border-blue-500', 'text-blue-600');
+            document.getElementById(`aba-${aba}`).classList.remove('hidden');
+            
+            // Carregar dados da aba
+            if (aba === 'aguardando-separacao') {
+                carregarVendasAguardandoSeparacao();
+            } else if (aba === 'aguardando-despacho') {
+                carregarVendasAguardandoDespacho();
+            } else if (aba === 'historico') {
+                // Definir datas padrão (últimos 30 dias)
+                const hoje = new Date().toISOString().split('T')[0];
+                const trintaDiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                document.getElementById('filtro-data-inicio').value = trintaDiasAtras;
+                document.getElementById('filtro-data-fim').value = hoje;
+                carregarHistorico();
+            }
+        };
+
+        // Carregar vendas aguardando separação
+        window.carregarVendasAguardandoSeparacao = async function() {
+            const loading = document.getElementById('loading-separacao');
+            const lista = document.getElementById('lista-aguardando-separacao');
+            const empty = document.getElementById('empty-separacao');
+            
+            loading.classList.remove('hidden');
+            lista.innerHTML = '';
+            empty.classList.add('hidden');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('vw_vendas_aguardando_separacao')
+                    .select('*')
+                    .order('data_finalizacao', { ascending: false });
+                
+                if (error) throw error;
+                
+                document.getElementById('badge-aguardando').textContent = data.length;
+                
+                if (data.length === 0) {
+                    empty.classList.remove('hidden');
+                } else {
+                    data.forEach(venda => {
+                        lista.appendChild(criarCardVendaSeparacao(venda));
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar vendas:', error);
+                alert('Erro ao carregar vendas aguardando separação');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        };
+
+        // Criar card de venda para separação
+        function criarCardVendaSeparacao(venda) {
+            const div = document.createElement('div');
+            div.className = 'border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow';
+            
+            const progresso = venda.total_itens > 0 ? Math.round((venda.itens_conferidos / venda.total_itens) * 100) : 0;
+            const corProgresso = progresso === 100 ? 'bg-green-500' : progresso > 0 ? 'bg-yellow-500' : 'bg-gray-300';
+            
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <h3 class="font-semibold text-lg text-gray-800">${venda.numero}</h3>
+                        <p class="text-sm text-gray-600">${venda.cliente_nome}</p>
+                        ${venda.cliente_whatsapp ? `
+                            <a href="https://wa.me/${venda.cliente_whatsapp.replace(/\D/g, '')}" 
+                               target="_blank"
+                               class="text-sm text-green-600 hover:text-green-700">
+                                <i class="fab fa-whatsapp mr-1"></i>${venda.cliente_whatsapp}
+                            </a>
+                        ` : ''}
+                    </div>
+                    <div class="text-right">
+                        <span class="text-2xl font-bold text-green-600">
+                            R$ ${parseFloat(venda.total).toFixed(2)}
+                        </span>
+                        <p class="text-sm text-gray-600">${venda.total_itens} itens</p>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600">Progresso: ${venda.itens_conferidos}/${venda.total_itens}</span>
+                        <span class="font-medium">${progresso}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="${corProgresso} h-2 rounded-full transition-all" style="width: ${progresso}%"></div>
+                    </div>
+                </div>
+                
+                <div class="flex justify-between items-center text-sm text-gray-600 mb-3">
+                    <span>Vendedor: ${venda.vendedor}</span>
+                    <span>Finalizado: ${new Date(venda.data_finalizacao).toLocaleString('pt-BR')}</span>
+                </div>
+                
+                <button onclick="abrirModalConferir('${venda.id}')" 
+                        class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-clipboard-check mr-2"></i>
+                    ${progresso === 100 ? 'Finalizar Separação' : 'Iniciar Conferência'}
+                </button>
+            `;
+            
+            return div;
+        }
+
+        // Abrir modal de conferência
+        window.abrirModalConferir = async function(pedidoId) {
+            pedidoAtualConferencia = pedidoId;
+            
+            try {
+                // Buscar dados do pedido
+                const { data: pedido, error: erroPedido } = await supabase
+                    .from('pedidos')
+                    .select(`
+                        *,
+                        clientes (nome, whatsapp),
+                        users:solicitante_id (full_name)
+                    `)
+                    .eq('id', pedidoId)
+                    .single();
+                
+                if (erroPedido) throw erroPedido;
+                
+                // Buscar itens do pedido
+                const { data: itens, error: erroItens } = await supabase
+                    .from('pedido_itens')
+                    .select(`
+                        *,
+                        produtos (codigo, nome),
+                        produto_sabores (sabor)
+                    `)
+                    .eq('pedido_id', pedidoId)
+                    .order('created_at', { ascending: true });
+                
+                if (erroItens) throw erroItens;
+                
+                // Preencher modal
+                document.getElementById('modal-numero').textContent = pedido.numero;
+                document.getElementById('modal-cliente').textContent = pedido.clientes.nome;
+                document.getElementById('modal-whatsapp').textContent = pedido.clientes.whatsapp || 'Não informado';
+                document.getElementById('modal-vendedor').textContent = pedido.users.full_name;
+                document.getElementById('modal-total').textContent = `R$ ${parseFloat(pedido.total).toFixed(2)}`;
+                
+                // Renderizar itens
+                const containerItens = document.getElementById('modal-itens');
+                containerItens.innerHTML = '';
+                
+                itens.forEach(item => {
+                    const divItem = document.createElement('div');
+                    divItem.className = `border rounded-lg p-3 flex items-center justify-between ${item.conferido ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`;
+                    divItem.innerHTML = `
+                        <div class="flex items-center flex-1">
+                            <input type="checkbox" 
+                                   id="item-${item.id}" 
+                                   ${item.conferido ? 'checked' : ''}
+                                   onchange="toggleItemConferido('${item.id}')"
+                                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 mr-3">
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800">
+                                    ${item.produtos.codigo} - ${item.produtos.nome}
+                                    ${item.produto_sabores ? `<span class="text-sm text-gray-600">(${item.produto_sabores.sabor})</span>` : ''}
+                                </p>
+                                <p class="text-sm text-gray-600">
+                                    Quantidade: ${parseFloat(item.quantidade)} | Subtotal: R$ ${parseFloat(item.subtotal).toFixed(2)}
+                                </p>
+                            </div>
+                        </div>
+                        ${item.conferido ? `
+                            <div class="ml-3">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    <i class="fas fa-check mr-1"></i> Conferido
+                                </span>
+                            </div>
+                        ` : ''}
+                    `;
+                    containerItens.appendChild(divItem);
+                });
+                
+                // Atualizar progresso
+                atualizarProgressoConferencia(itens);
+                
+                // Mostrar modal
+                document.getElementById('modal-conferir').classList.remove('hidden');
+                document.getElementById('modal-conferir').classList.add('flex');
+                
+            } catch (error) {
+                console.error('Erro ao abrir modal:', error);
+                alert('Erro ao carregar dados do pedido');
+            }
+        };
+
+        // Toggle item conferido
+        window.toggleItemConferido = async function(itemId) {
+            console.log('toggleItemConferido chamado:', itemId);
+            const checkbox = document.getElementById(`item-${itemId}`);
+            const conferido = checkbox.checked;
+            console.log('Estado do checkbox:', conferido);
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                console.log('Atualizando item:', itemId, 'para conferido:', conferido);
+                console.log('User ID:', user.id);
+                
+                const { data: updateData, error } = await supabase
+                    .from('pedido_itens')
+                    .update({
+                        conferido: conferido,
+                        conferido_por: conferido ? user.id : null,
+                        data_conferencia: conferido ? new Date().toISOString() : null
+                    })
+                    .eq('id', itemId)
+                    .select();
+                
+                console.log('Resultado do update:', updateData);
+                console.log('Erro do update:', error);
+                
+                if (error) {
+                    console.error('ERRO NO UPDATE:', error);
+                    throw error;
+                }
+                
+                // Recarregar itens para atualizar progresso
+                const { data: itens } = await supabase
+                    .from('pedido_itens')
+                    .select('*')
+                    .eq('pedido_id', pedidoAtualConferencia);
+                
+                console.log('Itens recarregados:', itens);
+                console.log('Primeiro item completo:', itens[0]);
+                console.log('Campo conferido existe?', 'conferido' in itens[0]);
+                console.log('Valor do campo conferido do primeiro item:', itens[0].conferido);
+                console.log('Todos os valores conferido:', itens.map(i => ({id: i.id, conferido: i.conferido})));
+                atualizarProgressoConferencia(itens);
+                
+                // Atualizar visual do card
+                const divItem = checkbox.closest('div.border');
+                if (conferido) {
+                    divItem.classList.add('bg-green-50', 'border-green-200');
+                    divItem.classList.remove('bg-white', 'border-gray-200');
+                } else {
+                    divItem.classList.remove('bg-green-50', 'border-green-200');
+                    divItem.classList.add('bg-white', 'border-gray-200');
+                }
+                
+            } catch (error) {
+                console.error('Erro ao atualizar item:', error);
+                checkbox.checked = !conferido;
+                alert('Erro ao atualizar item');
+            }
+        };
+
+        // Atualizar progresso da conferência
+        function atualizarProgressoConferencia(itens) {
+            const total = itens.length;
+            const conferidos = itens.filter(i => i.conferido).length;
+            const progresso = total > 0 ? Math.round((conferidos / total) * 100) : 0;
+            
+            console.log('Atualizando progresso:', { total, conferidos, progresso });
+            
+            document.getElementById('progresso-texto').textContent = `${conferidos}/${total}`;
+            document.getElementById('progresso-barra').style.width = `${progresso}%`;
+            
+            const btnFinalizar = document.getElementById('btn-finalizar-separacao');
+            if (progresso === 100) {
+                btnFinalizar.disabled = false;
+                btnFinalizar.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                btnFinalizar.disabled = true;
+                btnFinalizar.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Finalizar separação
+        window.finalizarSeparacao = async function() {
+            if (!confirm('Confirmar finalização da separação? O pedido será marcado como SEPARADO.')) {
+                return;
+            }
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                const { error } = await supabase.rpc('marcar_pedido_separado', {
+                    p_pedido_id: pedidoAtualConferencia,
+                    p_usuario_id: user.id
+                });
+                
+                if (error) throw error;
+                
+                alert('Pedido separado com sucesso!');
+                fecharModalConferir();
+                carregarVendasAguardandoSeparacao();
+                
+            } catch (error) {
+                console.error('Erro ao finalizar separação:', error);
+                alert('Erro: ' + error.message);
+            }
+        };
+
+        // Fechar modal conferir
+        window.fecharModalConferir = function() {
+            document.getElementById('modal-conferir').classList.add('hidden');
+            document.getElementById('modal-conferir').classList.remove('flex');
+            pedidoAtualConferencia = null;
+        };
+
+        // Carregar vendas aguardando despacho
+        window.carregarVendasAguardandoDespacho = async function() {
+            const loading = document.getElementById('loading-despacho');
+            const lista = document.getElementById('lista-aguardando-despacho');
+            const empty = document.getElementById('empty-despacho');
+            
+            loading.classList.remove('hidden');
+            lista.innerHTML = '';
+            empty.classList.add('hidden');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('vw_vendas_aguardando_despacho')
+                    .select('*')
+                    .order('data_separacao', { ascending: false });
+                
+                if (error) throw error;
+                
+                document.getElementById('badge-despacho').textContent = data.length;
+                
+                if (data.length === 0) {
+                    empty.classList.remove('hidden');
+                } else {
+                    data.forEach(venda => {
+                        lista.appendChild(criarCardVendaDespacho(venda));
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar vendas:', error);
+                alert('Erro ao carregar vendas aguardando despacho');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        };
+
+        // Criar card de venda para despacho
+        function criarCardVendaDespacho(venda) {
+            const div = document.createElement('div');
+            div.className = 'bg-white border border-green-200 rounded-lg p-6 hover:shadow-md transition-shadow';
+            
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-lg text-gray-900 mb-1">${venda.numero}</h3>
+                        <p class="text-sm text-gray-600 mb-1">${venda.cliente_nome}</p>
+                        ${venda.cliente_whatsapp ? `
+                            <a href="https://wa.me/${venda.cliente_whatsapp.replace(/\D/g, '')}" 
+                               target="_blank"
+                               class="text-sm text-green-600 hover:text-green-700">
+                                <i class="fab fa-whatsapp mr-1"></i>${venda.cliente_whatsapp}
+                            </a>
+                        ` : ''}
+                    </div>
+                    <div class="text-right">
+                        <span class="text-2xl font-bold text-green-600">
+                            R$ ${parseFloat(venda.total).toFixed(2)}
+                        </span>
+                        <p class="text-sm text-gray-600 mt-1">${venda.total_itens} itens</p>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-50 rounded-lg p-3 mb-4">
+                    <p class="text-sm font-medium text-gray-700 mb-1">
+                        <i class="fas fa-map-marker-alt mr-1 text-red-500"></i> Endereço:
+                    </p>
+                    <p class="text-sm text-gray-600">
+                        ${venda.endereco || 'Não informado'}<br>
+                        ${venda.cidade ? `${venda.cidade} - ${venda.estado}` : ''}
+                    </p>
+                </div>
+                
+                <div class="flex justify-between items-center text-sm text-gray-600 mb-4 pb-4 border-b border-gray-200">
+                    <span><i class="fas fa-user mr-1"></i>${venda.separado_por_nome}</span>
+                    <span><i class="far fa-clock mr-1"></i>${new Date(venda.data_separacao).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'})}</span>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button onclick="voltarParaSeparacao('${venda.id}')" 
+                            class="flex-1 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">
+                        <i class="fas fa-undo mr-2"></i>
+                        Voltar para Separação
+                    </button>
+                    <button onclick="abrirModalDespachar('${venda.id}')" 
+                            class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                        <i class="fas fa-truck mr-2"></i>
+                        Despachar
+                    </button>
+                </div>
+            `;
+            
+            return div;
+        }
+
+        // Abrir modal de despacho
+        window.abrirModalDespachar = async function(pedidoId) {
+            pedidoAtualDespacho = pedidoId;
+            
+            try {
+                const { data: pedido, error } = await supabase
+                    .from('pedidos')
+                    .select(`
+                        *,
+                        clientes (nome, whatsapp, endereco, cidade, estado, cep)
+                    `)
+                    .eq('id', pedidoId)
+                    .single();
+                
+                if (error) throw error;
+                
+                document.getElementById('modal-despachar-numero').textContent = pedido.numero;
+                
+                const containerEndereco = document.getElementById('modal-despachar-endereco');
+                containerEndereco.innerHTML = `
+                    <p class="font-medium text-gray-800">${pedido.clientes.nome}</p>
+                    <p class="text-gray-600">${pedido.clientes.endereco || 'Endereço não informado'}</p>
+                    <p class="text-gray-600">${pedido.clientes.cidade || ''} - ${pedido.clientes.estado || ''}</p>
+                    <p class="text-gray-600">CEP: ${pedido.clientes.cep || 'Não informado'}</p>
+                    ${pedido.clientes.whatsapp ? `
+                        <a href="https://wa.me/${pedido.clientes.whatsapp.replace(/\D/g, '')}" 
+                           target="_blank"
+                           class="inline-flex items-center text-green-600 hover:text-green-700 mt-2">
+                            <i class="fab fa-whatsapp mr-2"></i>${pedido.clientes.whatsapp}
+                        </a>
+                    ` : ''}
+                `;
+                
+                document.getElementById('observacoes-despacho').value = '';
+                
+                document.getElementById('modal-despachar').classList.remove('hidden');
+                document.getElementById('modal-despachar').classList.add('flex');
+                
+            } catch (error) {
+                console.error('Erro ao abrir modal:', error);
+                alert('Erro ao carregar dados do pedido');
+            }
+        };
+
+        // Confirmar despacho
+        window.confirmarDespacho = async function() {
+            if (!confirm('Confirmar despacho do pedido? O pedido será marcado como DESPACHADO.')) {
+                return;
+            }
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const observacoes = document.getElementById('observacoes-despacho').value.trim();
+                
+                const { error } = await supabase.rpc('marcar_pedido_despachado', {
+                    p_pedido_id: pedidoAtualDespacho,
+                    p_usuario_id: user.id
+                });
+                
+                if (error) throw error;
+                
+                // Adicionar observações se houver
+                if (observacoes) {
+                    await supabase
+                        .from('pedidos')
+                        .update({
+                            observacoes: observacoes
+                        })
+                        .eq('id', pedidoAtualDespacho);
+                }
+                
+                alert('Pedido despachado com sucesso!');
+                fecharModalDespachar();
+                carregarVendasAguardandoDespacho();
+                
+            } catch (error) {
+                console.error('Erro ao despachar pedido:', error);
+                alert('Erro: ' + error.message);
+            }
+        };
+
+        // Fechar modal despachar
+        window.fecharModalDespachar = function() {
+            document.getElementById('modal-despachar').classList.add('hidden');
+            document.getElementById('modal-despachar').classList.remove('flex');
+            pedidoAtualDespacho = null;
+        };
+
+        // Carregar histórico
+        window.carregarHistorico = async function() {
+            const loading = document.getElementById('loading-historico');
+            const lista = document.getElementById('lista-historico');
+            const empty = document.getElementById('empty-historico');
+            const dataInicio = document.getElementById('filtro-data-inicio').value;
+            const dataFim = document.getElementById('filtro-data-fim').value;
+            
+            loading.classList.remove('hidden');
+            lista.innerHTML = '';
+            empty.classList.add('hidden');
+            
+            try {
+                let query = supabase
+                    .from('pedidos')
+                    .select(`
+                        *,
+                        clientes (nome),
+                        users:solicitante_id (full_name),
+                        users_separado:separado_por (full_name),
+                        users_despacho:despachado_por (full_name)
+                    `)
+                    .eq('tipo_pedido', 'VENDA')
+                    .eq('status', 'FINALIZADO')
+                    .eq('status_envio', 'DESPACHADO')
+                    .order('data_despacho', { ascending: false });
+                
+                if (dataInicio) {
+                    query = query.gte('data_despacho', dataInicio);
+                }
+                if (dataFim) {
+                    query = query.lte('data_despacho', dataFim + 'T23:59:59');
+                }
+                
+                const { data, error } = await query;
+                
+                if (error) throw error;
+                
+                if (data.length === 0) {
+                    empty.classList.remove('hidden');
+                } else {
+                    data.forEach(pedido => {
+                        lista.appendChild(criarCardHistorico(pedido));
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar histórico:', error);
+                alert('Erro ao carregar histórico');
+            } finally {
+                loading.classList.add('hidden');
+            }
+        };
+
+        // Criar card de histórico
+        function criarCardHistorico(pedido) {
+            const div = document.createElement('div');
+            div.className = 'bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow';
+            
+            div.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-lg text-gray-900 mb-1">${pedido.numero}</h3>
+                        <p class="text-sm text-gray-600">${pedido.clientes.nome}</p>
+                    </div>
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                        <i class="fas fa-check-circle mr-1"></i> DESPACHADO
+                    </span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 text-sm mb-4 pb-4 border-b border-gray-200">
+                    <div>
+                        <p class="text-gray-600 text-xs mb-1">Total</p>
+                        <p class="font-semibold text-green-600 text-lg">R$ ${parseFloat(pedido.total).toFixed(2)}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 text-xs mb-1">Vendedor</p>
+                        <p class="font-medium text-gray-900">${pedido.users.full_name}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 text-xs mb-1">Separado por</p>
+                        <p class="font-medium text-gray-900">${pedido.users_separado?.full_name || '-'}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-600 text-xs mb-1">Despachado por</p>
+                        <p class="font-medium text-gray-900">${pedido.users_despacho?.full_name || '-'}</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-3 gap-4 text-xs text-gray-600 mb-4">
+                    <div>
+                        <p class="text-gray-500 mb-1">Finalizado</p>
+                        <p class="font-medium">${new Date(pedido.data_finalizacao).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'})}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 mb-1">Separado</p>
+                        <p class="font-medium">${new Date(pedido.data_separacao).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'})}</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 mb-1">Despachado</p>
+                        <p class="font-medium">${new Date(pedido.data_despacho).toLocaleString('pt-BR', {dateStyle: 'short', timeStyle: 'short'})}</p>
+                    </div>
+                </div>
+                
+                <button onclick="voltarParaDespacho('${pedido.id}')" 
+                        class="w-full bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 transition-colors text-sm">
+                    <i class="fas fa-undo mr-2"></i>
+                    Voltar para Aguardando Despacho
+                </button>
+            `;
+            
+            return div;
+        }
+
+        // Voltar para separação (de SEPARADO para AGUARDANDO)
+        window.voltarParaSeparacao = async function(pedidoId) {
+            if (!confirm('Tem certeza que deseja voltar este pedido para AGUARDANDO SEPARAÇÃO? Todos os itens serão desmarcados.')) {
+                return;
+            }
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                const { error } = await supabase.rpc('voltar_para_separacao', {
+                    p_pedido_id: pedidoId,
+                    p_usuario_id: user.id
+                });
+                
+                if (error) throw error;
+                
+                alert('Pedido voltou para Aguardando Separação!');
+                carregarVendasAguardandoSeparacao();
+                carregarVendasAguardandoDespacho();
+                
+            } catch (error) {
+                console.error('Erro ao voltar pedido:', error);
+                alert('Erro: ' + error.message);
+            }
+        };
+
+        // Voltar para despacho (de DESPACHADO para SEPARADO)
+        window.voltarParaDespacho = async function(pedidoId) {
+            if (!confirm('Tem certeza que deseja voltar este pedido para AGUARDANDO DESPACHO?')) {
+                return;
+            }
+            
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                const { error } = await supabase.rpc('voltar_para_despacho', {
+                    p_pedido_id: pedidoId,
+                    p_usuario_id: user.id
+                });
+                
+                if (error) throw error;
+                
+                alert('Pedido voltou para Aguardando Despacho!');
+                carregarVendasAguardandoDespacho();
+                carregarHistorico();
+                
+            } catch (error) {
+                console.error('Erro ao voltar pedido:', error);
+                alert('Erro: ' + error.message);
+            }
+        };
+    </script>
+</body>
+</html>

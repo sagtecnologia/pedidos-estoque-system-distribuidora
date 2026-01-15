@@ -145,7 +145,9 @@ CREATE TABLE IF NOT EXISTS pedidos (
     fornecedor_id UUID REFERENCES fornecedores(id),
     cliente_id UUID REFERENCES clientes(id),
     status VARCHAR(20) NOT NULL DEFAULT 'RASCUNHO' 
-        CHECK (status IN ('RASCUNHO', 'ENVIADO', 'APROVADO', 'REJEITADO', 'FINALIZADO', 'CANCELADO', 'SEPARADO', 'DESPACHADO')),
+        CHECK (status IN ('RASCUNHO', 'ENVIADO', 'APROVADO', 'REJEITADO', 'FINALIZADO', 'CANCELADO')),
+    status_envio VARCHAR(30)
+        CHECK (status_envio IN ('AGUARDANDO_SEPARACAO', 'SEPARADO', 'DESPACHADO')),
     total DECIMAL(10,2) DEFAULT 0,
     observacoes TEXT,
     aprovador_id UUID REFERENCES users(id),
