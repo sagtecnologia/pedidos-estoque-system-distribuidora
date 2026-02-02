@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pedidos - Sistema de Compras</title>
+    <title>Pedidos de Compra - Sistema Distribuidora</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
@@ -14,16 +14,27 @@
 
     <main class="lg:ml-64 pt-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="flex justify-between items-center mb-8">
+            <div class="flex flex-wrap justify-between items-center gap-4 mb-8">
                 <div>
                     <h2 class="text-3xl font-bold text-gray-900">
-                        <i class="fas fa-file-invoice mr-3 text-blue-600"></i>Pedidos de Compra
+                        <i class="fas fa-truck mr-3 text-blue-600"></i>Pedidos de Compra
                     </h2>
-                    <p class="text-gray-600 mt-1">Gerenciamento de pedidos</p>
+                    <p class="text-gray-600 mt-1">Gerenciamento de compras e importação de NFe</p>
                 </div>
-                <button onclick="novoPedido()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-                    + Novo Pedido
-                </button>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="abrirModalImportarXML()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+                        <i class="fas fa-file-code"></i>
+                        <span>Importar XML</span>
+                    </button>
+                    <button onclick="abrirModalImportarChave()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
+                        <i class="fas fa-key"></i>
+                        <span>Importar Chave</span>
+                    </button>
+                    <button onclick="novoPedido()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i>
+                        <span>Novo Pedido</span>
+                    </button>
+                </div>
             </div>
 
             <!-- Filtros -->
@@ -34,10 +45,10 @@
                         <select id="filter-status" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadPedidos()">
                             <option value="">Todos os status</option>
                             <option value="RASCUNHO">Rascunho</option>
-                            <option value="ENVIADO">Enviado</option>
+                            <option value="PENDENTE">Pendente</option>
                             <option value="APROVADO">Aprovado</option>
-                            <option value="REJEITADO">Rejeitado</option>
-                            <option value="FINALIZADO">Finalizado</option>
+                            <option value="RECEBIDO">Recebido</option>
+                            <option value="CANCELADO">Cancelado</option>
                         </select>
                     </div>
                     <div>
@@ -47,8 +58,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Número</label>
-                        <input type="text" id="search" placeholder="Buscar número..." class="w-full px-4 py-2 border border-gray-300 rounded-lg" onkeyup="loadPedidos()">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Número/NF</label>
+                        <input type="text" id="search" placeholder="Buscar..." class="w-full px-4 py-2 border border-gray-300 rounded-lg" onkeyup="loadPedidos()">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
@@ -59,8 +70,30 @@
                         <input type="date" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadPedidos()">
                     </div>
                     <div class="flex items-end">
-                        <button onclick="limparFiltros()" class="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Limpar</button>
+                        <button onclick="limparFiltros()" class="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+                            <i class="fas fa-eraser mr-1"></i> Limpar
+                        </button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Cards Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4 border-l-4 border-yellow-500">
+                    <p class="text-sm text-gray-600">Pendentes</p>
+                    <p id="stat-pendentes" class="text-2xl font-bold text-yellow-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+                    <p class="text-sm text-gray-600">Aprovados</p>
+                    <p id="stat-aprovados" class="text-2xl font-bold text-blue-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+                    <p class="text-sm text-gray-600">Recebidos</p>
+                    <p id="stat-recebidos" class="text-2xl font-bold text-green-600">0</p>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+                    <p class="text-sm text-gray-600">Total Compras</p>
+                    <p id="stat-total" class="text-xl font-bold text-purple-600">R$ 0,00</p>
                 </div>
             </div>
 
@@ -69,50 +102,209 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Solicitante</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">NF/Chave</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Itens</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="pedidos-tbody" class="bg-white divide-y divide-gray-200"></tbody>
-                    <tfoot id="pedidos-tfoot" class="bg-gray-50 border-t-2 border-gray-300">
-                        <tr>
-                            <td colspan="3" class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">TOTAL:</td>
-                            <td class="px-6 py-4 text-sm font-bold text-gray-900" id="total-quantidade">0</td>
-                            <td class="px-6 py-4 text-sm font-bold text-gray-900" id="total-valor">R$ 0,00</td>
-                            <td colspan="3"></td>
-                        </tr>
-                    </tfoot>
                 </table>
             </div>
         </div>
     </main>
 
-    <!-- Modal Detalhes Pedido -->
-    <div id="modal-pedido" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4">
-            <div class="flex justify-between items-center px-6 py-4 border-b">
-                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Detalhes do Pedido</h3>
-                <button onclick="closeModal('modal-pedido')" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+    <!-- Modal Importar XML -->
+    <div id="modal-importar-xml" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-green-50">
+                <h3 class="text-lg font-semibold text-green-900">
+                    <i class="fas fa-file-code mr-2"></i>Importar XML de NFe
+                </h3>
+                <button onclick="closeModal('modal-importar-xml')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
-            <div id="pedido-content" class="px-6 py-4"></div>
+            <div class="px-6 py-4">
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Selecione o arquivo XML da NFe</label>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-green-500 transition cursor-pointer" onclick="document.getElementById('xml-file-input').click()">
+                        <input type="file" id="xml-file-input" accept=".xml" class="hidden" onchange="processarXML(this)">
+                        <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-3"></i>
+                        <p class="text-gray-600">Clique para selecionar ou arraste o arquivo XML</p>
+                        <p class="text-sm text-gray-500 mt-1">Apenas arquivos .xml de NFe</p>
+                    </div>
+                </div>
+                
+                <!-- Preview dos dados do XML -->
+                <div id="xml-preview" class="hidden">
+                    <h4 class="font-semibold text-gray-900 mb-3 flex items-center">
+                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                        Dados da NFe
+                    </h4>
+                    
+                    <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-500">Número NF:</span>
+                                <span id="xml-numero-nf" class="font-semibold ml-2"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Série:</span>
+                                <span id="xml-serie" class="font-semibold ml-2"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Data Emissão:</span>
+                                <span id="xml-data-emissao" class="font-semibold ml-2"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Chave de Acesso:</span>
+                                <span id="xml-chave" class="font-semibold ml-2 text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-blue-50 rounded-lg p-4 mb-4">
+                        <h5 class="font-semibold text-blue-900 mb-2">Emitente (Fornecedor)</h5>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-500">Razão Social:</span>
+                                <span id="xml-fornecedor-nome" class="font-semibold ml-2"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">CNPJ:</span>
+                                <span id="xml-fornecedor-cnpj" class="font-semibold ml-2"></span>
+                            </div>
+                        </div>
+                        <div id="xml-fornecedor-aviso" class="mt-2 text-sm"></div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <h5 class="font-semibold text-gray-900 mb-2">Produtos (<span id="xml-qtd-itens">0</span> itens)</h5>
+                        <div class="max-h-48 overflow-y-auto border rounded-lg">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-gray-100 sticky top-0">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Código</th>
+                                        <th class="px-3 py-2 text-left">Produto</th>
+                                        <th class="px-3 py-2 text-right">Qtd</th>
+                                        <th class="px-3 py-2 text-right">Valor Un.</th>
+                                        <th class="px-3 py-2 text-right">Total</th>
+                                        <th class="px-3 py-2 text-center">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="xml-produtos-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-50 rounded-lg p-4 mb-4">
+                        <div class="grid grid-cols-3 gap-4 text-sm">
+                            <div>
+                                <span class="text-gray-500">Total Produtos:</span>
+                                <span id="xml-total-produtos" class="font-bold text-green-700 ml-2"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Total Frete:</span>
+                                <span id="xml-total-frete" class="font-semibold ml-2"></span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500">Total NF:</span>
+                                <span id="xml-total-nf" class="font-bold text-green-700 ml-2"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center mb-4">
+                        <input type="checkbox" id="xml-cadastrar-produtos" class="mr-2 h-4 w-4 text-green-600 rounded">
+                        <label for="xml-cadastrar-produtos" class="text-sm text-gray-700">
+                            Cadastrar produtos não encontrados automaticamente
+                        </label>
+                    </div>
+                    
+                    <div class="flex items-center mb-4">
+                        <input type="checkbox" id="xml-atualizar-precos" class="mr-2 h-4 w-4 text-green-600 rounded" checked>
+                        <label for="xml-atualizar-precos" class="text-sm text-gray-700">
+                            Atualizar preços de custo dos produtos existentes
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50">
+                <button type="button" onclick="closeModal('modal-importar-xml')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-importar-xml" onclick="confirmarImportacaoXML()" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50" disabled>
+                    <i class="fas fa-download mr-2"></i>Importar Pedido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Importar por Chave -->
+    <div id="modal-importar-chave" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-xl w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-purple-50">
+                <h3 class="text-lg font-semibold text-purple-900">
+                    <i class="fas fa-key mr-2"></i>Importar por Chave de Acesso
+                </h3>
+                <button onclick="closeModal('modal-importar-chave')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="px-6 py-4">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Chave de Acesso da NFe (44 dígitos)</label>
+                    <input type="text" id="input-chave-nfe" maxlength="44" placeholder="00000000000000000000000000000000000000000000" 
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg font-mono text-sm tracking-wider"
+                           oninput="validarChave(this)">
+                    <p class="text-xs text-gray-500 mt-1">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Digite apenas os números da chave de acesso
+                    </p>
+                </div>
+                
+                <div id="chave-info" class="hidden bg-gray-50 rounded-lg p-4">
+                    <p class="text-sm text-gray-600">
+                        <span class="font-semibold">UF:</span> <span id="chave-uf"></span> |
+                        <span class="font-semibold">Ano/Mês:</span> <span id="chave-data"></span> |
+                        <span class="font-semibold">CNPJ:</span> <span id="chave-cnpj"></span> |
+                        <span class="font-semibold">Número:</span> <span id="chave-numero"></span>
+                    </p>
+                </div>
+                
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
+                    <p class="text-sm text-yellow-800">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <strong>Nota:</strong> A consulta por chave de acesso requer integração com a SEFAZ ou com serviço de consulta NFe (Focus NFe). 
+                        Certifique-se de que as credenciais estão configuradas.
+                    </p>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50">
+                <button type="button" onclick="closeModal('modal-importar-chave')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-consultar-chave" onclick="consultarPorChave()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50" disabled>
+                    <i class="fas fa-search mr-2"></i>Consultar NFe
+                </button>
+            </div>
         </div>
     </div>
 
     <!-- Modal Novo Pedido -->
     <div id="modal-novo-pedido" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4">
-            <div class="flex justify-between items-center px-6 py-4 border-b">
-                <h3 class="text-lg font-semibold text-gray-900">Novo Pedido de Compra</h3>
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50">
+                <h3 class="text-lg font-semibold text-blue-900">
+                    <i class="fas fa-plus-circle mr-2"></i>Novo Pedido de Compra
+                </h3>
                 <button onclick="closeModal('modal-novo-pedido')" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             <form id="form-novo-pedido" class="px-6 py-4">
@@ -123,12 +315,14 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Observações</label>
-                        <textarea id="pedido-observacoes" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        <textarea id="pedido-observacoes" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Observações sobre o pedido..."></textarea>
                     </div>
                 </div>
                 <div class="flex justify-end space-x-3 mt-6">
                     <button type="button" onclick="closeModal('modal-novo-pedido')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Criar Pedido</button>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-check mr-2"></i>Criar Pedido
+                    </button>
                 </div>
             </form>
         </div>
@@ -152,6 +346,8 @@
     
     <script>
         let currentUser = null;
+        let dadosXMLImportado = null;
+        let produtosCadastrados = [];
 
         (async () => {
             await checkAuth();
@@ -161,41 +357,50 @@
             await initNavbar();
             await initSidebar();
             
-            // Definir data padrão (dia atual)
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('filter-data-inicio').value = hoje;
-            document.getElementById('filter-data-fim').value = hoje;
+            // Definir data padrão (últimos 30 dias)
+            const hoje = new Date();
+            const trintaDiasAtras = new Date();
+            trintaDiasAtras.setDate(hoje.getDate() - 30);
             
+            document.getElementById('filter-data-inicio').value = trintaDiasAtras.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            
+            await carregarProdutosCadastrados();
             await loadFornecedoresSelect();
             await loadPedidos();
         })();
 
+        async function carregarProdutosCadastrados() {
+            try {
+                const { data, error } = await supabase
+                    .from('produtos')
+                    .select('id, codigo, codigo_barras, nome, preco_custo, unidade, categoria_id')
+                    .eq('active', true);
+                
+                if (error) throw error;
+                produtosCadastrados = data || [];
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+            }
+        }
+
         async function loadFornecedoresSelect() {
             try {
-                showLoading(true);
                 const fornecedores = await listFornecedores({});
                 
-                // Select do modal
                 const select = document.getElementById('pedido-fornecedor');
-                select.innerHTML = '<option value="">Selecione (opcional)...</option>';
+                select.innerHTML = '<option value="">Selecione o fornecedor...</option>';
                 fornecedores.forEach(f => {
-                    const option = document.createElement('option');
-                    option.value = f.id;
-                    option.textContent = f.nome;
-                    select.appendChild(option);
+                    select.innerHTML += `<option value="${f.id}">${f.nome || f.razao_social}</option>`;
                 });
                 
-                // Select do filtro
                 const filterSelect = document.getElementById('filter-fornecedor');
                 filterSelect.innerHTML = '<option value="">Todos os fornecedores</option>';
                 fornecedores.forEach(f => {
-                    const option = document.createElement('option');
-                    option.value = f.id;
-                    option.textContent = f.nome;
-                    filterSelect.appendChild(option);
+                    filterSelect.innerHTML += `<option value="${f.id}">${f.nome || f.razao_social}</option>`;
                 });
-            } finally {
-                showLoading(false);
+            } catch (error) {
+                console.error('Erro ao carregar fornecedores:', error);
             }
         }
 
@@ -210,6 +415,44 @@
             
             try {
                 let query = supabase
+                    .from('pedidos_compra')
+                    .select(`
+                        *,
+                        fornecedor:fornecedores(razao_social, nome_fantasia),
+                        itens:pedido_compra_itens(quantidade)
+                    `);
+                
+                if (status) query = query.eq('status', status);
+                if (fornecedorId) query = query.eq('fornecedor_id', fornecedorId);
+                if (search) query = query.or(`numero.ilike.%${search}%,numero_nf.ilike.%${search}%,chave_nfe.ilike.%${search}%`);
+                if (dataInicio) query = query.gte('data_pedido', dataInicio);
+                if (dataFim) query = query.lte('data_pedido', dataFim + 'T23:59:59');
+                
+                const { data, error } = await query.order('created_at', { ascending: false });
+                
+                if (error) throw error;
+                
+                renderPedidos(data || []);
+                calcularEstatisticas(data || []);
+            } catch (error) {
+                console.error('Erro ao carregar pedidos:', error);
+                // Tentar tabela antiga se a nova não existir
+                await loadPedidosLegacy();
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Fallback para tabela antiga
+        async function loadPedidosLegacy() {
+            try {
+                const status = document.getElementById('filter-status').value;
+                const search = document.getElementById('search').value;
+                const fornecedorId = document.getElementById('filter-fornecedor').value;
+                const dataInicio = document.getElementById('filter-data-inicio').value;
+                const dataFim = document.getElementById('filter-data-fim').value;
+
+                let query = supabase
                     .from('pedidos')
                     .select(`
                         *,
@@ -219,39 +462,19 @@
                     `)
                     .eq('tipo_pedido', 'COMPRA');
                 
-                if (status) {
-                    query = query.eq('status', status);
-                }
-                
-                if (fornecedorId) {
-                    query = query.eq('fornecedor_id', fornecedorId);
-                }
-                
-                if (search) {
-                    query = query.ilike('numero', `%${search}%`);
-                }
-                
-                if (dataInicio) {
-                    // Criar data no horário local (adiciona T00:00:00 para forçar interpretação local)
-                    const dataInicioObj = new Date(dataInicio + 'T00:00:00');
-                    query = query.gte('created_at', dataInicioObj.toISOString());
-                }
-                
-                if (dataFim) {
-                    // Criar data no horário local (fim do dia)
-                    const dataFimObj = new Date(dataFim + 'T23:59:59');
-                    query = query.lte('created_at', dataFimObj.toISOString());
-                }
+                if (status) query = query.eq('status', status);
+                if (fornecedorId) query = query.eq('fornecedor_id', fornecedorId);
+                if (search) query = query.ilike('numero', `%${search}%`);
+                if (dataInicio) query = query.gte('created_at', dataInicio + 'T00:00:00');
+                if (dataFim) query = query.lte('created_at', dataFim + 'T23:59:59');
                 
                 const { data, error } = await query.order('created_at', { ascending: false });
                 
                 if (error) throw error;
                 
-                renderPedidos(data || []);
+                renderPedidosLegacy(data || []);
             } catch (error) {
                 handleError(error, 'Erro ao carregar pedidos');
-            } finally {
-                showLoading(false);
             }
         }
         
@@ -259,56 +482,519 @@
             const tbody = document.getElementById('pedidos-tbody');
             
             if (pedidos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum pedido encontrado</td></tr>';
-                document.getElementById('total-quantidade').textContent = '0';
-                document.getElementById('total-valor').textContent = 'R$ 0,00';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">Nenhum pedido encontrado</td></tr>';
                 return;
             }
 
-            let somaQuantidade = 0;
-            let somaValor = 0;
-
             tbody.innerHTML = pedidos.map(p => {
-                // Calcular quantidade total de itens
-                const quantidadeTotal = (p.pedido_itens || []).reduce((sum, item) => sum + (item.quantidade || 0), 0);
-                
-                // Acumular totais
-                somaQuantidade += quantidadeTotal;
-                somaValor += (p.total || 0);
+                const qtdItens = (p.itens || []).reduce((sum, i) => sum + (i.quantidade || 0), 0);
+                const fornecedor = p.fornecedor?.nome_fantasia || p.fornecedor?.razao_social || '-';
+                const nfInfo = p.numero_nf ? `NF ${p.numero_nf}` : (p.chave_nfe ? `...${p.chave_nfe.slice(-8)}` : '-');
                 
                 return `
                 <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.numero}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">${p.solicitante?.full_name || 'N/A'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">${p.fornecedor?.nome || '-'}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">${Math.round(quantidadeTotal)}</td>
-                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(p.total)}</td>
-                    <td class="px-6 py-4 text-sm">${getStatusBadge(p.status)}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600">${formatDate(p.created_at)}</td>
-                    <td class="px-6 py-4 text-sm space-x-2">
-                        <button onclick="verPedido('${p.id}')" class="text-blue-600 hover:text-blue-800">Ver</button>
+                    <td class="px-4 py-3 text-sm font-medium text-blue-600">${p.numero || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${nfInfo}</td>
+                    <td class="px-4 py-3 text-sm text-gray-900">${fornecedor}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${Math.round(qtdItens)}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">${formatCurrency(p.total)}</td>
+                    <td class="px-4 py-3 text-sm">${getStatusBadgeCompra(p.status)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${formatDate(p.data_pedido || p.created_at)}</td>
+                    <td class="px-4 py-3 text-sm space-x-2">
+                        <button onclick="verPedido('${p.id}')" class="text-blue-600 hover:text-blue-800" title="Ver detalhes">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${p.status === 'APROVADO' ? `
+                            <button onclick="receberPedido('${p.id}')" class="text-green-600 hover:text-green-800" title="Dar entrada no estoque">
+                                <i class="fas fa-box-open"></i>
+                            </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `;
+            }).join('');
+        }
+
+        function renderPedidosLegacy(pedidos) {
+            const tbody = document.getElementById('pedidos-tbody');
+            
+            if (pedidos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">Nenhum pedido encontrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = pedidos.map(p => {
+                const qtdItens = (p.pedido_itens || []).reduce((sum, i) => sum + (i.quantidade || 0), 0);
+                
+                return `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-3 text-sm font-medium text-blue-600">${p.numero}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">-</td>
+                    <td class="px-4 py-3 text-sm text-gray-900">${p.fornecedor?.nome || '-'}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${Math.round(qtdItens)}</td>
+                    <td class="px-4 py-3 text-sm font-medium text-gray-900">${formatCurrency(p.total)}</td>
+                    <td class="px-4 py-3 text-sm">${getStatusBadge(p.status)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${formatDate(p.created_at)}</td>
+                    <td class="px-4 py-3 text-sm">
+                        <button onclick="verPedidoLegacy('${p.id}')" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-eye"></i>
+                        </button>
                     </td>
                 </tr>
             `;
             }).join('');
 
-            // Atualizar totais no rodapé
-            document.getElementById('total-quantidade').textContent = Math.round(somaQuantidade);
-            document.getElementById('total-valor').textContent = formatCurrency(somaValor);
+            // Calcular estatísticas
+            const pendentes = pedidos.filter(p => ['RASCUNHO', 'ENVIADO'].includes(p.status)).length;
+            const aprovados = pedidos.filter(p => p.status === 'APROVADO').length;
+            const finalizados = pedidos.filter(p => p.status === 'FINALIZADO').length;
+            const total = pedidos.reduce((sum, p) => sum + (p.total || 0), 0);
+
+            document.getElementById('stat-pendentes').textContent = pendentes;
+            document.getElementById('stat-aprovados').textContent = aprovados;
+            document.getElementById('stat-recebidos').textContent = finalizados;
+            document.getElementById('stat-total').textContent = formatCurrency(total);
         }
-        
-        // Limpar filtros
+
+        function calcularEstatisticas(pedidos) {
+            const pendentes = pedidos.filter(p => p.status === 'PENDENTE').length;
+            const aprovados = pedidos.filter(p => p.status === 'APROVADO').length;
+            const recebidos = pedidos.filter(p => p.status === 'RECEBIDO').length;
+            const total = pedidos.reduce((sum, p) => sum + (p.total || 0), 0);
+
+            document.getElementById('stat-pendentes').textContent = pendentes;
+            document.getElementById('stat-aprovados').textContent = aprovados;
+            document.getElementById('stat-recebidos').textContent = recebidos;
+            document.getElementById('stat-total').textContent = formatCurrency(total);
+        }
+
+        function getStatusBadgeCompra(status) {
+            const badges = {
+                'RASCUNHO': 'bg-gray-100 text-gray-800',
+                'PENDENTE': 'bg-yellow-100 text-yellow-800',
+                'APROVADO': 'bg-blue-100 text-blue-800',
+                'RECEBIDO': 'bg-green-100 text-green-800',
+                'CANCELADO': 'bg-red-100 text-red-800'
+            };
+            return `<span class="px-2 py-1 text-xs font-semibold rounded-full ${badges[status] || 'bg-gray-100'}">${status}</span>`;
+        }
+
         function limparFiltros() {
-            const hoje = new Date().toISOString().split('T')[0];
+            const hoje = new Date();
+            const trintaDiasAtras = new Date();
+            trintaDiasAtras.setDate(hoje.getDate() - 30);
+            
             document.getElementById('filter-status').value = '';
             document.getElementById('filter-fornecedor').value = '';
             document.getElementById('search').value = '';
-            document.getElementById('filter-data-inicio').value = hoje;
-            document.getElementById('filter-data-fim').value = hoje;
+            document.getElementById('filter-data-inicio').value = trintaDiasAtras.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
             loadPedidos();
         }
 
-        async function novoPedido() {
+        // ========================================
+        // IMPORTAÇÃO DE XML
+        // ========================================
+        function abrirModalImportarXML() {
+            dadosXMLImportado = null;
+            document.getElementById('xml-file-input').value = '';
+            document.getElementById('xml-preview').classList.add('hidden');
+            document.getElementById('btn-importar-xml').disabled = true;
+            openModal('modal-importar-xml');
+        }
+
+        function processarXML(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(e.target.result, 'text/xml');
+                    
+                    // Verificar se é um XML válido de NFe
+                    const nfeProc = xmlDoc.querySelector('nfeProc') || xmlDoc.querySelector('NFe');
+                    if (!nfeProc) {
+                        showToast('Arquivo XML não é uma NFe válida', 'error');
+                        return;
+                    }
+
+                    const infNFe = xmlDoc.querySelector('infNFe');
+                    const ide = xmlDoc.querySelector('ide');
+                    const emit = xmlDoc.querySelector('emit');
+                    const total = xmlDoc.querySelector('total ICMSTot');
+                    const det = xmlDoc.querySelectorAll('det');
+
+                    // Extrair dados da NFe
+                    dadosXMLImportado = {
+                        chave: infNFe?.getAttribute('Id')?.replace('NFe', '') || '',
+                        numero_nf: ide?.querySelector('nNF')?.textContent || '',
+                        serie: ide?.querySelector('serie')?.textContent || '',
+                        data_emissao: ide?.querySelector('dhEmi')?.textContent?.split('T')[0] || '',
+                        fornecedor: {
+                            cnpj: emit?.querySelector('CNPJ')?.textContent || '',
+                            razao_social: emit?.querySelector('xNome')?.textContent || '',
+                            nome_fantasia: emit?.querySelector('xFant')?.textContent || '',
+                            ie: emit?.querySelector('IE')?.textContent || '',
+                            endereco: {
+                                logradouro: emit?.querySelector('enderEmit xLgr')?.textContent || '',
+                                numero: emit?.querySelector('enderEmit nro')?.textContent || '',
+                                bairro: emit?.querySelector('enderEmit xBairro')?.textContent || '',
+                                cidade: emit?.querySelector('enderEmit xMun')?.textContent || '',
+                                uf: emit?.querySelector('enderEmit UF')?.textContent || '',
+                                cep: emit?.querySelector('enderEmit CEP')?.textContent || ''
+                            }
+                        },
+                        total_produtos: parseFloat(total?.querySelector('vProd')?.textContent || 0),
+                        total_frete: parseFloat(total?.querySelector('vFrete')?.textContent || 0),
+                        total_desconto: parseFloat(total?.querySelector('vDesc')?.textContent || 0),
+                        total_nf: parseFloat(total?.querySelector('vNF')?.textContent || 0),
+                        itens: []
+                    };
+
+                    // Extrair itens
+                    det.forEach(item => {
+                        const prod = item.querySelector('prod');
+                        dadosXMLImportado.itens.push({
+                            codigo: prod?.querySelector('cProd')?.textContent || '',
+                            codigo_barras: prod?.querySelector('cEAN')?.textContent || '',
+                            ncm: prod?.querySelector('NCM')?.textContent || '',
+                            nome: prod?.querySelector('xProd')?.textContent || '',
+                            unidade: prod?.querySelector('uCom')?.textContent || '',
+                            quantidade: parseFloat(prod?.querySelector('qCom')?.textContent || 0),
+                            valor_unitario: parseFloat(prod?.querySelector('vUnCom')?.textContent || 0),
+                            valor_total: parseFloat(prod?.querySelector('vProd')?.textContent || 0),
+                            cfop: prod?.querySelector('CFOP')?.textContent || ''
+                        });
+                    });
+
+                    exibirPreviewXML();
+                    
+                } catch (error) {
+                    console.error('Erro ao processar XML:', error);
+                    showToast('Erro ao processar arquivo XML', 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        async function exibirPreviewXML() {
+            if (!dadosXMLImportado) return;
+
+            // Dados da NFe
+            document.getElementById('xml-numero-nf').textContent = dadosXMLImportado.numero_nf;
+            document.getElementById('xml-serie').textContent = dadosXMLImportado.serie;
+            document.getElementById('xml-data-emissao').textContent = formatDate(dadosXMLImportado.data_emissao);
+            document.getElementById('xml-chave').textContent = dadosXMLImportado.chave;
+
+            // Fornecedor
+            document.getElementById('xml-fornecedor-nome').textContent = dadosXMLImportado.fornecedor.razao_social;
+            document.getElementById('xml-fornecedor-cnpj').textContent = formatCNPJ(dadosXMLImportado.fornecedor.cnpj);
+
+            // Verificar se fornecedor já está cadastrado
+            const { data: fornecedorExistente } = await supabase
+                .from('fornecedores')
+                .select('id, razao_social')
+                .eq('cnpj', dadosXMLImportado.fornecedor.cnpj)
+                .maybeSingle();
+
+            const avisoDiv = document.getElementById('xml-fornecedor-aviso');
+            if (fornecedorExistente) {
+                avisoDiv.innerHTML = `<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Fornecedor já cadastrado</span>`;
+                dadosXMLImportado.fornecedor_id = fornecedorExistente.id;
+            } else {
+                avisoDiv.innerHTML = `<span class="text-orange-600"><i class="fas fa-exclamation-circle mr-1"></i>Fornecedor será cadastrado automaticamente</span>`;
+                dadosXMLImportado.fornecedor_id = null;
+            }
+
+            // Totais
+            document.getElementById('xml-total-produtos').textContent = formatCurrency(dadosXMLImportado.total_produtos);
+            document.getElementById('xml-total-frete').textContent = formatCurrency(dadosXMLImportado.total_frete);
+            document.getElementById('xml-total-nf').textContent = formatCurrency(dadosXMLImportado.total_nf);
+
+            // Itens
+            document.getElementById('xml-qtd-itens').textContent = dadosXMLImportado.itens.length;
+            
+            const tbody = document.getElementById('xml-produtos-tbody');
+            tbody.innerHTML = dadosXMLImportado.itens.map(item => {
+                // Verificar se produto existe pelo código de barras ou código
+                const produtoEncontrado = produtosCadastrados.find(p => 
+                    (item.codigo_barras && p.codigo_barras === item.codigo_barras) ||
+                    (item.codigo && p.codigo === item.codigo)
+                );
+                
+                item.produto_id = produtoEncontrado?.id || null;
+                
+                const statusClass = produtoEncontrado ? 'text-green-600' : 'text-orange-600';
+                const statusIcon = produtoEncontrado ? 'fa-check-circle' : 'fa-exclamation-circle';
+                const statusText = produtoEncontrado ? 'Encontrado' : 'Novo';
+                
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-3 py-2 text-gray-600">${item.codigo}</td>
+                        <td class="px-3 py-2 text-gray-900">${item.nome.substring(0, 40)}${item.nome.length > 40 ? '...' : ''}</td>
+                        <td class="px-3 py-2 text-right">${item.quantidade} ${item.unidade}</td>
+                        <td class="px-3 py-2 text-right">${formatCurrency(item.valor_unitario)}</td>
+                        <td class="px-3 py-2 text-right font-medium">${formatCurrency(item.valor_total)}</td>
+                        <td class="px-3 py-2 text-center">
+                            <span class="${statusClass}"><i class="fas ${statusIcon} mr-1"></i>${statusText}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('xml-preview').classList.remove('hidden');
+            document.getElementById('btn-importar-xml').disabled = false;
+        }
+
+        async function confirmarImportacaoXML() {
+            if (!dadosXMLImportado) return;
+
+            const cadastrarProdutos = document.getElementById('xml-cadastrar-produtos').checked;
+            const atualizarPrecos = document.getElementById('xml-atualizar-precos').checked;
+
+            showLoading(true);
+            
+            try {
+                // 1. Cadastrar fornecedor se não existir
+                let fornecedorId = dadosXMLImportado.fornecedor_id;
+                if (!fornecedorId) {
+                    const { data: novoFornecedor, error: errFornecedor } = await supabase
+                        .from('fornecedores')
+                        .insert([{
+                            cnpj: dadosXMLImportado.fornecedor.cnpj,
+                            razao_social: dadosXMLImportado.fornecedor.razao_social,
+                            nome_fantasia: dadosXMLImportado.fornecedor.nome_fantasia || dadosXMLImportado.fornecedor.razao_social,
+                            ie: dadosXMLImportado.fornecedor.ie,
+                            endereco: dadosXMLImportado.fornecedor.endereco.logradouro,
+                            numero: dadosXMLImportado.fornecedor.endereco.numero,
+                            bairro: dadosXMLImportado.fornecedor.endereco.bairro,
+                            cidade: dadosXMLImportado.fornecedor.endereco.cidade,
+                            uf: dadosXMLImportado.fornecedor.endereco.uf,
+                            cep: dadosXMLImportado.fornecedor.endereco.cep
+                        }])
+                        .select()
+                        .single();
+                    
+                    if (errFornecedor) throw errFornecedor;
+                    fornecedorId = novoFornecedor.id;
+                }
+
+                // 2. Processar produtos
+                const itensParaPedido = [];
+                
+                for (const item of dadosXMLImportado.itens) {
+                    let produtoId = item.produto_id;
+                    
+                    if (!produtoId && cadastrarProdutos) {
+                        // Cadastrar novo produto
+                        const { data: novoProduto, error: errProduto } = await supabase
+                            .from('produtos')
+                            .insert([{
+                                codigo: item.codigo,
+                                codigo_barras: item.codigo_barras || null,
+                                nome: item.nome,
+                                unidade: item.unidade || 'UN',
+                                ncm: item.ncm,
+                                preco_custo: item.valor_unitario,
+                                preco_venda: item.valor_unitario * 1.3, // Margem padrão 30%
+                                estoque_atual: 0,
+                                estoque_minimo: 5
+                            }])
+                            .select()
+                            .single();
+                        
+                        if (!errProduto) {
+                            produtoId = novoProduto.id;
+                        }
+                    } else if (produtoId && atualizarPrecos) {
+                        // Atualizar preço de custo
+                        await supabase
+                            .from('produtos')
+                            .update({ preco_custo: item.valor_unitario })
+                            .eq('id', produtoId);
+                    }
+                    
+                    if (produtoId) {
+                        itensParaPedido.push({
+                            produto_id: produtoId,
+                            quantidade: item.quantidade,
+                            preco_unitario: item.valor_unitario,
+                            preco_total: item.valor_total
+                        });
+                    }
+                }
+
+                // 3. Criar pedido de compra
+                const numero = `PC${Date.now().toString().slice(-8)}`;
+                
+                const { data: pedido, error: errPedido } = await supabase
+                    .from('pedidos_compra')
+                    .insert([{
+                        numero: numero,
+                        fornecedor_id: fornecedorId,
+                        numero_nf: dadosXMLImportado.numero_nf,
+                        serie_nf: dadosXMLImportado.serie,
+                        chave_nfe: dadosXMLImportado.chave,
+                        data_pedido: dadosXMLImportado.data_emissao || new Date().toISOString().split('T')[0],
+                        data_emissao_nf: dadosXMLImportado.data_emissao,
+                        subtotal: dadosXMLImportado.total_produtos,
+                        desconto: dadosXMLImportado.total_desconto,
+                        frete: dadosXMLImportado.total_frete,
+                        total: dadosXMLImportado.total_nf,
+                        status: 'APROVADO',
+                        observacoes: `Importado via XML NFe ${dadosXMLImportado.numero_nf}`
+                    }])
+                    .select()
+                    .single();
+
+                if (errPedido) {
+                    // Tentar com tabela legada
+                    await criarPedidoLegacy(fornecedorId, itensParaPedido);
+                } else {
+                    // 4. Adicionar itens ao pedido
+                    if (itensParaPedido.length > 0) {
+                        const itensComPedido = itensParaPedido.map(item => ({
+                            ...item,
+                            pedido_compra_id: pedido.id
+                        }));
+
+                        await supabase
+                            .from('pedido_compra_itens')
+                            .insert(itensComPedido);
+                    }
+                }
+
+                showToast(`Pedido importado com sucesso! ${itensParaPedido.length} produtos processados.`, 'success');
+                closeModal('modal-importar-xml');
+                await loadPedidos();
+                
+            } catch (error) {
+                console.error('Erro ao importar XML:', error);
+                showToast('Erro ao importar XML: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function criarPedidoLegacy(fornecedorId, itens) {
+            const user = await getCurrentUser();
+            const numero = `PC${Date.now().toString().slice(-8)}`;
+            
+            const { data: pedido, error } = await supabase
+                .from('pedidos')
+                .insert([{
+                    numero: numero,
+                    tipo_pedido: 'COMPRA',
+                    fornecedor_id: fornecedorId,
+                    solicitante_id: user.id,
+                    total: dadosXMLImportado.total_nf,
+                    status: 'APROVADO',
+                    observacoes: `Importado via XML NFe ${dadosXMLImportado.numero_nf}`
+                }])
+                .select()
+                .single();
+            
+            if (error) throw error;
+            
+            // Adicionar itens
+            const itensComPedido = itens.map(item => ({
+                pedido_id: pedido.id,
+                produto_id: item.produto_id,
+                quantidade: item.quantidade,
+                preco_unitario: item.preco_unitario
+            }));
+            
+            await supabase.from('pedido_itens').insert(itensComPedido);
+        }
+
+        // ========================================
+        // IMPORTAÇÃO POR CHAVE
+        // ========================================
+        function abrirModalImportarChave() {
+            document.getElementById('input-chave-nfe').value = '';
+            document.getElementById('chave-info').classList.add('hidden');
+            document.getElementById('btn-consultar-chave').disabled = true;
+            openModal('modal-importar-chave');
+        }
+
+        function validarChave(input) {
+            // Remove caracteres não numéricos
+            input.value = input.value.replace(/\D/g, '');
+            
+            const chave = input.value;
+            const btnConsultar = document.getElementById('btn-consultar-chave');
+            const infoDiv = document.getElementById('chave-info');
+            
+            if (chave.length === 44) {
+                btnConsultar.disabled = false;
+                
+                // Decodificar informações da chave
+                const uf = chave.substring(0, 2);
+                const anoMes = `20${chave.substring(2, 4)}/${chave.substring(4, 6)}`;
+                const cnpj = chave.substring(6, 20);
+                const numero = chave.substring(25, 34);
+                
+                document.getElementById('chave-uf').textContent = getUFNome(uf);
+                document.getElementById('chave-data').textContent = anoMes;
+                document.getElementById('chave-cnpj').textContent = formatCNPJ(cnpj);
+                document.getElementById('chave-numero').textContent = parseInt(numero);
+                
+                infoDiv.classList.remove('hidden');
+            } else {
+                btnConsultar.disabled = true;
+                infoDiv.classList.add('hidden');
+            }
+        }
+
+        function getUFNome(codigo) {
+            const ufs = {
+                '11': 'RO', '12': 'AC', '13': 'AM', '14': 'RR', '15': 'PA',
+                '16': 'AP', '17': 'TO', '21': 'MA', '22': 'PI', '23': 'CE',
+                '24': 'RN', '25': 'PB', '26': 'PE', '27': 'AL', '28': 'SE',
+                '29': 'BA', '31': 'MG', '32': 'ES', '33': 'RJ', '35': 'SP',
+                '41': 'PR', '42': 'SC', '43': 'RS', '50': 'MS', '51': 'MT',
+                '52': 'GO', '53': 'DF'
+            };
+            return ufs[codigo] || codigo;
+        }
+
+        async function consultarPorChave() {
+            const chave = document.getElementById('input-chave-nfe').value;
+            
+            if (chave.length !== 44) {
+                showToast('Chave de acesso inválida', 'error');
+                return;
+            }
+
+            showLoading(true);
+            
+            try {
+                // Tentar consultar via Focus NFe ou outro serviço
+                // Por enquanto, apenas mostrar mensagem informativa
+                
+                showToast('Funcionalidade de consulta SEFAZ em desenvolvimento. Por favor, use a importação por XML.', 'info');
+                
+                // Quando implementado:
+                // const response = await consultarNFeSefaz(chave);
+                // dadosXMLImportado = processarRespostaSefaz(response);
+                // closeModal('modal-importar-chave');
+                // abrirModalImportarXML();
+                // exibirPreviewXML();
+                
+            } catch (error) {
+                console.error('Erro ao consultar chave:', error);
+                showToast('Erro ao consultar NFe: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ========================================
+        // OUTRAS FUNÇÕES
+        // ========================================
+        function novoPedido() {
             openModal('modal-novo-pedido');
         }
 
@@ -317,23 +1003,116 @@
             
             try {
                 showLoading(true);
-                const pedido = {
-                    fornecedor_id: document.getElementById('pedido-fornecedor').value || null,
-                    observacoes: document.getElementById('pedido-observacoes').value || null
-                };
+                const fornecedorId = document.getElementById('pedido-fornecedor').value;
+                const observacoes = document.getElementById('pedido-observacoes').value;
 
-                const novoPedido = await createPedido(pedido);
-                if (novoPedido) {
-                    closeModal('modal-novo-pedido');
-                    redirect(`/pages/pedido-detalhe.html?id=${novoPedido.id}`);
+                if (!fornecedorId) {
+                    showToast('Selecione um fornecedor', 'warning');
+                    return;
                 }
+
+                // Tentar criar na tabela nova
+                const numero = `PC${Date.now().toString().slice(-8)}`;
+                
+                const { data: pedido, error } = await supabase
+                    .from('pedidos_compra')
+                    .insert([{
+                        numero: numero,
+                        fornecedor_id: fornecedorId,
+                        data_pedido: new Date().toISOString().split('T')[0],
+                        status: 'RASCUNHO',
+                        observacoes: observacoes
+                    }])
+                    .select()
+                    .single();
+
+                if (error) {
+                    // Fallback para tabela antiga
+                    const pedidoLegacy = await createPedido({
+                        fornecedor_id: fornecedorId,
+                        observacoes: observacoes,
+                        tipo_pedido: 'COMPRA'
+                    });
+                    
+                    if (pedidoLegacy) {
+                        closeModal('modal-novo-pedido');
+                        redirect(`/pages/pedido-detalhe.html?id=${pedidoLegacy.id}`);
+                    }
+                } else {
+                    closeModal('modal-novo-pedido');
+                    showToast('Pedido criado com sucesso!', 'success');
+                    await loadPedidos();
+                    // TODO: Redirecionar para página de detalhes do novo modelo
+                }
+            } catch (error) {
+                handleError(error, 'Erro ao criar pedido');
             } finally {
                 showLoading(false);
             }
         });
 
-        async function verPedido(id) {
+        function verPedido(id) {
+            // TODO: Criar página de detalhes para novo modelo
+            showToast('Abrindo detalhes do pedido...', 'info');
+        }
+
+        function verPedidoLegacy(id) {
             redirect(`/pages/pedido-detalhe.html?id=${id}`);
+        }
+
+        async function receberPedido(id) {
+            if (!await confirmAction('Deseja dar entrada no estoque para este pedido?')) {
+                return;
+            }
+            
+            showLoading(true);
+            try {
+                // Atualizar status do pedido
+                await supabase
+                    .from('pedidos_compra')
+                    .update({ 
+                        status: 'RECEBIDO',
+                        data_recebimento: new Date().toISOString()
+                    })
+                    .eq('id', id);
+
+                // Buscar itens do pedido
+                const { data: itens } = await supabase
+                    .from('pedido_compra_itens')
+                    .select('produto_id, quantidade')
+                    .eq('pedido_compra_id', id);
+
+                // Atualizar estoque de cada produto
+                for (const item of (itens || [])) {
+                    const { data: produto } = await supabase
+                        .from('produtos')
+                        .select('estoque_atual')
+                        .eq('id', item.produto_id)
+                        .single();
+
+                    if (produto) {
+                        await supabase
+                            .from('produtos')
+                            .update({ 
+                                estoque_atual: (produto.estoque_atual || 0) + item.quantidade 
+                            })
+                            .eq('id', item.produto_id);
+                    }
+                }
+
+                showToast('Entrada no estoque realizada com sucesso!', 'success');
+                await loadPedidos();
+            } catch (error) {
+                handleError(error, 'Erro ao receber pedido');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function formatCNPJ(cnpj) {
+            if (!cnpj) return '';
+            cnpj = cnpj.replace(/\D/g, '');
+            return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
         }
     </script>
 </body>

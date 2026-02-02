@@ -74,8 +74,7 @@ async function getItensPedido(pedidoId) {
             .from('pedido_itens')
             .select(`
                 *,
-                produto:produtos(codigo, nome, unidade, preco),
-                sabor:produto_sabores(id, sabor, quantidade)
+                produto:produtos(codigo, nome, unidade, preco_venda, preco_custo, codigo_barras)
             `)
             .eq('pedido_id', pedidoId)
             .order('created_at');
@@ -133,23 +132,15 @@ async function createPedido(pedido) {
 }
 
 // Adicionar item ao pedido
-// Adicionar item ao pedido
+// Adicionar item ao pedido (novo modelo sem sabores)
 async function addItemPedido(pedidoId, item) {
     try {
-        // ✅ NÃO mostrar loading aqui - já é mostrado pela função chamadora
-        // showLoading(true);
-
         const itemData = {
             pedido_id: pedidoId,
             produto_id: item.produto_id,
             quantidade: item.quantidade,
             preco_unitario: item.preco_unitario
         };
-
-        // Incluir sabor_id se fornecido
-        if (item.sabor_id) {
-            itemData.sabor_id = item.sabor_id;
-        }
 
         const { data, error } = await supabase
             .from('pedido_itens')
@@ -159,16 +150,11 @@ async function addItemPedido(pedidoId, item) {
 
         if (error) throw error;
 
-        // ✅ NÃO mostrar toast aqui - será mostrado pela função chamadora
-        // showToast('Item adicionado com sucesso!', 'success');
         return data;
         
     } catch (error) {
         console.error('Erro ao adicionar item:', error);
-        throw error; // ✅ Propagar erro para função chamadora tratar
-    } finally {
-        // ✅ NÃO remover loading aqui
-        // showLoading(false);
+        throw error;
     }
 }
 
