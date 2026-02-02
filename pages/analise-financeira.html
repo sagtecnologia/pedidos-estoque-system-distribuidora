@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise Financeira - Sistema Distribuidora</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">
+                    <i class="fas fa-chart-pie text-blue-600 mr-3"></i>Análise Financeira
+                </h2>
+                <p class="text-gray-600 mt-2">Análise detalhada de receitas, custos e margens</p>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <h3 class="text-lg font-semibold mb-4">
+                    <i class="fas fa-filter text-gray-500 mr-2"></i>Filtros
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                        <select id="filter-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                            <option value="">Todas as categorias</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                        <select id="filter-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                            <option value="">Todas as marcas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input type="date" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+                        <input type="date" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="aplicarFiltros()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-search mr-2"></i>Filtrar
+                    </button>
+                    <button onclick="limparFiltros()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">
+                        <i class="fas fa-redo mr-2"></i>Limpar
+                    </button>
+                    <button onclick="exportarExcel()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-file-excel mr-2"></i>Excel
+                    </button>
+                    <button onclick="exportarPDF()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition">
+                        <i class="fas fa-file-pdf mr-2"></i>PDF
+                    </button>
+                </div>
+            </div>
+
+            <!-- Cards Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-5 border-l-4 border-green-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Receita Total</p>
+                            <p id="card-receita" class="text-xl font-bold text-green-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-green-100 p-2 rounded-full">
+                            <i class="fas fa-dollar-sign text-green-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-5 border-l-4 border-red-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Custo Total</p>
+                            <p id="card-custo" class="text-xl font-bold text-red-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-red-100 p-2 rounded-full">
+                            <i class="fas fa-minus-circle text-red-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-5 border-l-4 border-blue-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Lucro Bruto</p>
+                            <p id="card-lucro" class="text-xl font-bold text-blue-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-blue-100 p-2 rounded-full">
+                            <i class="fas fa-chart-line text-blue-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-5 border-l-4 border-purple-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Margem Média</p>
+                            <p id="card-margem" class="text-xl font-bold text-purple-600">0%</p>
+                        </div>
+                        <div class="bg-purple-100 p-2 rounded-full">
+                            <i class="fas fa-percent text-purple-600"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow p-5 border-l-4 border-orange-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Vendas</p>
+                            <p id="card-qtd-vendas" class="text-xl font-bold text-orange-600">0</p>
+                        </div>
+                        <div class="bg-orange-100 p-2 rounded-full">
+                            <i class="fas fa-receipt text-orange-600"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="border-b border-gray-200">
+                    <nav class="flex -mb-px overflow-x-auto">
+                        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-button active py-4 px-6 font-medium text-sm border-b-2 border-blue-600 text-blue-600 whitespace-nowrap">
+                            <i class="fas fa-chart-line mr-1"></i> Dashboard
+                        </button>
+                        <button onclick="switchTab('por-categoria')" id="tab-por-categoria" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-tags mr-1"></i> Por Categoria
+                        </button>
+                        <button onclick="switchTab('por-marca')" id="tab-por-marca" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-bookmark mr-1"></i> Por Marca
+                        </button>
+                        <button onclick="switchTab('por-produto')" id="tab-por-produto" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-box mr-1"></i> Por Produto
+                        </button>
+                        <button onclick="switchTab('fluxo-caixa')" id="tab-fluxo-caixa" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-money-bill-wave mr-1"></i> Fluxo de Caixa
+                        </button>
+                        <button onclick="switchTab('dre')" id="tab-dre" class="tab-button py-4 px-6 font-medium text-sm border-b-2 border-transparent text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                            <i class="fas fa-file-invoice-dollar mr-1"></i> DRE Simplificado
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Tab: Dashboard -->
+                <div id="content-dashboard" class="tab-content p-6">
+                    <h3 class="text-lg font-semibold mb-6">Dashboard Visual de Vendas</h3>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">
+                                <i class="fas fa-chart-area text-blue-500 mr-2"></i>Evolução de Vendas
+                            </h4>
+                            <canvas id="chart-evolucao"></canvas>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">
+                                <i class="fas fa-tags text-green-500 mr-2"></i>Vendas por Categoria
+                            </h4>
+                            <canvas id="chart-categorias"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">
+                                <i class="fas fa-trophy text-yellow-500 mr-2"></i>Top 10 Produtos
+                            </h4>
+                            <canvas id="chart-produtos"></canvas>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">
+                                <i class="fas fa-balance-scale text-purple-500 mr-2"></i>Lucro vs Receita por Marca
+                            </h4>
+                            <canvas id="chart-lucro-receita"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">
+                                <i class="fas fa-calendar-alt text-red-500 mr-2"></i>Receita, Custo e Lucro Diário
+                            </h4>
+                            <canvas id="chart-diario"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: Por Categoria -->
+                <div id="content-por-categoria" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Lucro por Categoria</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Vendida</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-por-categoria" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Por Marca -->
+                <div id="content-por-marca" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Lucro por Marca</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Marca</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Vendida</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-por-marca" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Por Produto -->
+                <div id="content-por-produto" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-4">Lucro por Produto</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd Vendida</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Receita</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custo</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lucro</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Margem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-por-produto" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: Fluxo de Caixa -->
+                <div id="content-fluxo-caixa" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-6">Fluxo de Caixa</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-5">
+                            <p class="text-sm text-green-700 font-medium">Entradas (Vendas + Recebimentos)</p>
+                            <p id="card-fc-entradas" class="text-2xl font-bold text-green-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-5">
+                            <p class="text-sm text-red-700 font-medium">Saídas (Compras + Pagamentos)</p>
+                            <p id="card-fc-saidas" class="text-2xl font-bold text-red-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-5">
+                            <p class="text-sm text-blue-700 font-medium">Saldo do Período</p>
+                            <p id="card-fc-saldo" class="text-2xl font-bold text-blue-600">R$ 0,00</p>
+                        </div>
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-5">
+                            <p class="text-sm text-purple-700 font-medium">Movimentações</p>
+                            <p id="card-fc-movimentacoes" class="text-2xl font-bold text-purple-600">0</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                        <h4 class="text-md font-semibold mb-4 text-gray-700">
+                            <i class="fas fa-chart-line text-blue-500 mr-2"></i>Evolução do Saldo
+                        </h4>
+                        <canvas id="chart-fluxo-caixa"></canvas>
+                    </div>
+
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <h4 class="text-md font-semibold mb-4 text-gray-700">Movimentações Detalhadas</h4>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Entrada</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saída</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-fluxo-caixa" class="bg-white divide-y divide-gray-200">
+                                    <tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">Carregando...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab: DRE Simplificado -->
+                <div id="content-dre" class="tab-content p-6 hidden">
+                    <h3 class="text-lg font-semibold mb-6">
+                        <i class="fas fa-file-invoice-dollar text-blue-500 mr-2"></i>
+                        Demonstrativo de Resultado - DRE Simplificado
+                    </h3>
+                    
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <table class="min-w-full">
+                            <thead class="bg-gray-800 text-white">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-sm font-semibold">Descrição</th>
+                                    <th class="px-6 py-4 text-right text-sm font-semibold">Valor (R$)</th>
+                                    <th class="px-6 py-4 text-right text-sm font-semibold">%</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-dre" class="divide-y divide-gray-200">
+                                <tr><td colspan="3" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg">
+            <div class="spinner mx-auto"></div>
+            <p class="mt-4 text-gray-700">Carregando...</p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        let vendas = [];
+        let produtos = [];
+        let categorias = [];
+        let contasPagar = [];
+        let contasReceber = [];
+        let chartInstances = {};
+        
+        let filtroAtual = {
+            categoria: '',
+            marca: '',
+            dataInicio: '',
+            dataFim: ''
+        };
+
+        (async () => {
+            await checkAuth();
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            
+            // Definir datas padrão (último mês)
+            const hoje = new Date();
+            const umMesAtras = new Date();
+            umMesAtras.setMonth(hoje.getMonth() - 1);
+            
+            document.getElementById('filter-data-inicio').value = umMesAtras.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            
+            await carregarDados();
+        })();
+
+        async function carregarDados() {
+            showLoading(true);
+            try {
+                // Carregar categorias
+                const { data: cats } = await supabase
+                    .from('categorias')
+                    .select('*')
+                    .eq('active', true)
+                    .order('nome');
+                categorias = cats || [];
+                
+                // Popular filtro de categorias
+                const selectCategoria = document.getElementById('filter-categoria');
+                selectCategoria.innerHTML = '<option value="">Todas as categorias</option>';
+                categorias.forEach(cat => {
+                    selectCategoria.innerHTML += `<option value="${cat.id}">${cat.nome}</option>`;
+                });
+
+                // Carregar produtos
+                const { data: prods } = await supabase
+                    .from('produtos')
+                    .select('*, categoria:categorias(nome)')
+                    .eq('active', true);
+                produtos = prods || [];
+                
+                // Popular filtro de marcas
+                const marcas = [...new Set(produtos.map(p => p.marca).filter(m => m))];
+                const selectMarca = document.getElementById('filter-marca');
+                selectMarca.innerHTML = '<option value="">Todas as marcas</option>';
+                marcas.sort().forEach(marca => {
+                    selectMarca.innerHTML += `<option value="${marca}">${marca}</option>`;
+                });
+
+                // Carregar vendas finalizadas
+                const { data: vendasData } = await supabase
+                    .from('vendas')
+                    .select(`
+                        *,
+                        itens:venda_itens(*, produto:produtos(id, nome, codigo, marca, preco_custo, categoria_id))
+                    `)
+                    .eq('status', 'FINALIZADA')
+                    .order('data_venda', { ascending: false });
+                vendas = vendasData || [];
+
+                // Carregar contas a pagar (pagas no período)
+                const { data: cpData } = await supabase
+                    .from('contas_pagar')
+                    .select('*')
+                    .eq('status', 'PAGO');
+                contasPagar = cpData || [];
+
+                // Carregar contas a receber (recebidas no período)
+                const { data: crData } = await supabase
+                    .from('contas_receber')
+                    .select('*')
+                    .eq('status', 'RECEBIDO');
+                contasReceber = crData || [];
+
+                calcularResumo();
+                renderizarTabAtiva();
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                showToast('Erro ao carregar dados', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        function aplicarFiltros() {
+            filtroAtual.categoria = document.getElementById('filter-categoria').value;
+            filtroAtual.marca = document.getElementById('filter-marca').value;
+            filtroAtual.dataInicio = document.getElementById('filter-data-inicio').value;
+            filtroAtual.dataFim = document.getElementById('filter-data-fim').value;
+            
+            calcularResumo();
+            renderizarTabAtiva();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filter-categoria').value = '';
+            document.getElementById('filter-marca').value = '';
+            
+            const hoje = new Date();
+            const umMesAtras = new Date();
+            umMesAtras.setMonth(hoje.getMonth() - 1);
+            document.getElementById('filter-data-inicio').value = umMesAtras.toISOString().split('T')[0];
+            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            
+            filtroAtual = { categoria: '', marca: '', dataInicio: '', dataFim: '' };
+            aplicarFiltros();
+        }
+
+        function filtrarVendas() {
+            let resultado = [...vendas];
+            
+            // Filtro de data
+            if (filtroAtual.dataInicio) {
+                resultado = resultado.filter(v => v.data_venda >= filtroAtual.dataInicio);
+            }
+            if (filtroAtual.dataFim) {
+                resultado = resultado.filter(v => v.data_venda <= filtroAtual.dataFim + 'T23:59:59');
+            }
+            
+            return resultado;
+        }
+
+        function calcularResumo() {
+            const vendasFiltradas = filtrarVendas();
+            
+            let receitaTotal = 0;
+            let custoTotal = 0;
+            let qtdVendas = vendasFiltradas.length;
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    // Aplicar filtros de categoria e marca
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    receitaTotal += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    custoTotal += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            const lucroTotal = receitaTotal - custoTotal;
+            const margemMedia = receitaTotal > 0 ? (lucroTotal / receitaTotal * 100) : 0;
+            
+            document.getElementById('card-receita').textContent = formatCurrency(receitaTotal);
+            document.getElementById('card-custo').textContent = formatCurrency(custoTotal);
+            document.getElementById('card-lucro').textContent = formatCurrency(lucroTotal);
+            document.getElementById('card-margem').textContent = margemMedia.toFixed(1) + '%';
+            document.getElementById('card-qtd-vendas').textContent = qtdVendas;
+        }
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            document.getElementById(`tab-${tabName}`).classList.add('active', 'border-blue-600', 'text-blue-600');
+            document.getElementById(`tab-${tabName}`).classList.remove('border-transparent', 'text-gray-500');
+            
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(`content-${tabName}`).classList.remove('hidden');
+            
+            renderizarTabAtiva();
+        }
+
+        function renderizarTabAtiva() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            
+            switch(activeTab) {
+                case 'dashboard': renderDashboard(); break;
+                case 'por-categoria': renderPorCategoria(); break;
+                case 'por-marca': renderPorMarca(); break;
+                case 'por-produto': renderPorProduto(); break;
+                case 'fluxo-caixa': renderFluxoCaixa(); break;
+                case 'dre': renderDRE(); break;
+            }
+        }
+
+        // ============================================
+        // DASHBOARD
+        // ============================================
+        function renderDashboard() {
+            Object.values(chartInstances).forEach(chart => chart?.destroy());
+            chartInstances = {};
+
+            const vendasFiltradas = filtrarVendas();
+            
+            criarGraficoEvolucao(vendasFiltradas);
+            criarGraficoCategorias(vendasFiltradas);
+            criarGraficoProdutos(vendasFiltradas);
+            criarGraficoLucroReceita(vendasFiltradas);
+            criarGraficoDiario(vendasFiltradas);
+        }
+
+        function criarGraficoEvolucao(vendasFiltradas) {
+            const vendasPorDia = {};
+            
+            vendasFiltradas.forEach(venda => {
+                const data = venda.data_venda?.split('T')[0];
+                if (!data) return;
+                
+                if (!vendasPorDia[data]) vendasPorDia[data] = 0;
+                vendasPorDia[data] += venda.total || 0;
+            });
+
+            const datasOrdenadas = Object.keys(vendasPorDia).sort();
+            
+            const ctx = document.getElementById('chart-evolucao');
+            chartInstances.evolucao = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    datasets: [{
+                        label: 'Vendas (R$)',
+                        data: datasOrdenadas.map(d => vendasPorDia[d]),
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => 'R$ ' + v.toFixed(0) }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoCategorias(vendasFiltradas) {
+            const vendasPorCategoria = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    const cat = categorias.find(c => c.id === produto.categoria_id);
+                    const catNome = cat?.nome || 'Sem Categoria';
+                    
+                    if (!vendasPorCategoria[catNome]) vendasPorCategoria[catNome] = 0;
+                    vendasPorCategoria[catNome] += (item.preco_unitario || 0) * (item.quantidade || 0);
+                });
+            });
+
+            const cats = Object.entries(vendasPorCategoria).sort((a, b) => b[1] - a[1]).slice(0, 8);
+            
+            const cores = [
+                'rgba(255, 99, 132, 0.8)', 'rgba(54, 162, 235, 0.8)',
+                'rgba(255, 206, 86, 0.8)', 'rgba(75, 192, 192, 0.8)',
+                'rgba(153, 102, 255, 0.8)', 'rgba(255, 159, 64, 0.8)',
+                'rgba(199, 199, 199, 0.8)', 'rgba(83, 102, 255, 0.8)'
+            ];
+
+            const ctx = document.getElementById('chart-categorias');
+            chartInstances.categorias = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: cats.map(c => c[0]),
+                    datasets: [{ data: cats.map(c => c[1]), backgroundColor: cores }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right' },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.label + ': ' + formatCurrency(ctx.parsed)
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoProdutos(vendasFiltradas) {
+            const qtdPorProduto = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    if (!qtdPorProduto[produto.nome]) qtdPorProduto[produto.nome] = 0;
+                    qtdPorProduto[produto.nome] += item.quantidade || 0;
+                });
+            });
+
+            const topProdutos = Object.entries(qtdPorProduto).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+            const ctx = document.getElementById('chart-produtos');
+            chartInstances.produtos = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: topProdutos.map(p => p[0]),
+                    datasets: [{
+                        label: 'Quantidade Vendida',
+                        data: topProdutos.map(p => p[1]),
+                        backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                        borderColor: 'rgba(59, 130, 246, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function criarGraficoLucroReceita(vendasFiltradas) {
+            const dadosPorMarca = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    if (!dadosPorMarca[marca]) dadosPorMarca[marca] = { receita: 0, custo: 0 };
+                    
+                    dadosPorMarca[marca].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    dadosPorMarca[marca].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+
+            const marcas = Object.keys(dadosPorMarca).sort();
+
+            const ctx = document.getElementById('chart-lucro-receita');
+            chartInstances.lucroReceita = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: marcas,
+                    datasets: [
+                        {
+                            label: 'Receita',
+                            data: marcas.map(m => dadosPorMarca[m].receita),
+                            backgroundColor: 'rgba(34, 197, 94, 0.8)'
+                        },
+                        {
+                            label: 'Custo',
+                            data: marcas.map(m => dadosPorMarca[m].custo),
+                            backgroundColor: 'rgba(239, 68, 68, 0.8)'
+                        },
+                        {
+                            label: 'Lucro',
+                            data: marcas.map(m => dadosPorMarca[m].receita - dadosPorMarca[m].custo),
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => 'R$ ' + v.toFixed(0) }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoDiario(vendasFiltradas) {
+            const dadosPorDia = {};
+            
+            vendasFiltradas.forEach(venda => {
+                const data = venda.data_venda?.split('T')[0];
+                if (!data) return;
+                
+                if (!dadosPorDia[data]) dadosPorDia[data] = { receita: 0, custo: 0 };
+                
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    dadosPorDia[data].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    dadosPorDia[data].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+
+            const datasOrdenadas = Object.keys(dadosPorDia).sort();
+
+            const ctx = document.getElementById('chart-diario');
+            chartInstances.diario = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    datasets: [
+                        {
+                            label: 'Receita',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].receita),
+                            borderColor: 'rgb(34, 197, 94)',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Custo',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].custo),
+                            borderColor: 'rgb(239, 68, 68)',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Lucro',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].receita - dadosPorDia[d].custo),
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => 'R$ ' + v.toFixed(0) }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // TABELAS
+        // ============================================
+        function renderPorCategoria() {
+            const vendasFiltradas = filtrarVendas();
+            const lucrosPorCategoria = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    const cat = categorias.find(c => c.id === produto.categoria_id);
+                    const catNome = cat?.nome || 'Sem Categoria';
+                    
+                    if (!lucrosPorCategoria[catNome]) {
+                        lucrosPorCategoria[catNome] = { quantidade: 0, receita: 0, custo: 0 };
+                    }
+                    
+                    lucrosPorCategoria[catNome].quantidade += item.quantidade || 0;
+                    lucrosPorCategoria[catNome].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucrosPorCategoria[catNome].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            const dados = Object.entries(lucrosPorCategoria).map(([categoria, d]) => ({
+                categoria,
+                ...d,
+                lucro: d.receita - d.custo,
+                margem: d.receita > 0 ? (d.receita - d.custo) / d.receita * 100 : 0
+            })).sort((a, b) => b.lucro - a.lucro);
+            
+            const lucroTotal = dados.reduce((sum, d) => sum + d.lucro, 0);
+            
+            const tbody = document.getElementById('tbody-por-categoria');
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhum dado encontrado</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${d.categoria}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.quantidade.toFixed(0)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(d.receita)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(d.custo)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(d.lucro)}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${d.margem >= 30 ? 'bg-green-100 text-green-800' : d.margem >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                            ${d.margem.toFixed(1)}%
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${lucroTotal > 0 ? (d.lucro / lucroTotal * 100).toFixed(1) : 0}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPorMarca() {
+            const vendasFiltradas = filtrarVendas();
+            const lucrosPorMarca = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    
+                    if (!lucrosPorMarca[marca]) {
+                        lucrosPorMarca[marca] = { quantidade: 0, receita: 0, custo: 0 };
+                    }
+                    
+                    lucrosPorMarca[marca].quantidade += item.quantidade || 0;
+                    lucrosPorMarca[marca].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucrosPorMarca[marca].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            const dados = Object.entries(lucrosPorMarca).map(([marca, d]) => ({
+                marca,
+                ...d,
+                lucro: d.receita - d.custo,
+                margem: d.receita > 0 ? (d.receita - d.custo) / d.receita * 100 : 0
+            })).sort((a, b) => b.lucro - a.lucro);
+            
+            const lucroTotal = dados.reduce((sum, d) => sum + d.lucro, 0);
+            
+            const tbody = document.getElementById('tbody-por-marca');
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="px-6 py-4 text-center text-gray-500">Nenhum dado encontrado</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${d.marca}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.quantidade.toFixed(0)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(d.receita)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(d.custo)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(d.lucro)}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${d.margem >= 30 ? 'bg-green-100 text-green-800' : d.margem >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                            ${d.margem.toFixed(1)}%
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${lucroTotal > 0 ? (d.lucro / lucroTotal * 100).toFixed(1) : 0}%</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderPorProduto() {
+            const vendasFiltradas = filtrarVendas();
+            const lucrosPorProduto = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    const key = produto.id;
+                    if (!lucrosPorProduto[key]) {
+                        const cat = categorias.find(c => c.id === produto.categoria_id);
+                        lucrosPorProduto[key] = {
+                            codigo: produto.codigo,
+                            nome: produto.nome,
+                            categoria: cat?.nome || '-',
+                            quantidade: 0,
+                            receita: 0,
+                            custo: 0
+                        };
+                    }
+                    
+                    lucrosPorProduto[key].quantidade += item.quantidade || 0;
+                    lucrosPorProduto[key].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucrosPorProduto[key].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            const dados = Object.values(lucrosPorProduto).map(d => ({
+                ...d,
+                lucro: d.receita - d.custo,
+                margem: d.receita > 0 ? (d.receita - d.custo) / d.receita * 100 : 0
+            })).sort((a, b) => b.lucro - a.lucro);
+            
+            const tbody = document.getElementById('tbody-por-produto');
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum dado encontrado</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = dados.map(d => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm text-gray-600 font-mono">${d.codigo}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${d.nome}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.categoria}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">${d.quantidade.toFixed(0)}</td>
+                    <td class="px-6 py-4 text-sm text-gray-900">${formatCurrency(d.receita)}</td>
+                    <td class="px-6 py-4 text-sm text-red-600">${formatCurrency(d.custo)}</td>
+                    <td class="px-6 py-4 text-sm font-bold text-green-600">${formatCurrency(d.lucro)}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${d.margem >= 30 ? 'bg-green-100 text-green-800' : d.margem >= 20 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                            ${d.margem.toFixed(1)}%
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // ============================================
+        // FLUXO DE CAIXA
+        // ============================================
+        function renderFluxoCaixa() {
+            const movimentacoes = [];
+            
+            // Vendas (entradas)
+            filtrarVendas().forEach(venda => {
+                movimentacoes.push({
+                    data: venda.data_venda,
+                    tipo: 'ENTRADA',
+                    descricao: `Venda ${venda.numero}`,
+                    entrada: venda.total || 0,
+                    saida: 0
+                });
+            });
+
+            // Recebimentos de contas a receber
+            contasReceber.forEach(cr => {
+                if (!filtroAtual.dataInicio || cr.data_recebimento >= filtroAtual.dataInicio) {
+                    if (!filtroAtual.dataFim || cr.data_recebimento <= filtroAtual.dataFim) {
+                        movimentacoes.push({
+                            data: cr.data_recebimento,
+                            tipo: 'ENTRADA',
+                            descricao: `Recebimento: ${cr.descricao}`,
+                            entrada: cr.valor_recebido || 0,
+                            saida: 0
+                        });
+                    }
+                }
+            });
+
+            // Pagamentos de contas a pagar
+            contasPagar.forEach(cp => {
+                if (!filtroAtual.dataInicio || cp.data_pagamento >= filtroAtual.dataInicio) {
+                    if (!filtroAtual.dataFim || cp.data_pagamento <= filtroAtual.dataFim) {
+                        movimentacoes.push({
+                            data: cp.data_pagamento,
+                            tipo: 'SAÍDA',
+                            descricao: `Pagamento: ${cp.descricao}`,
+                            entrada: 0,
+                            saida: cp.valor_pago || 0
+                        });
+                    }
+                }
+            });
+
+            // Ordenar por data
+            movimentacoes.sort((a, b) => new Date(a.data) - new Date(b.data));
+
+            // Calcular saldo acumulado
+            let saldoAtual = 0;
+            movimentacoes.forEach(mov => {
+                saldoAtual += mov.entrada - mov.saida;
+                mov.saldo = saldoAtual;
+            });
+
+            // Calcular resumo
+            const totalEntradas = movimentacoes.reduce((sum, m) => sum + m.entrada, 0);
+            const totalSaidas = movimentacoes.reduce((sum, m) => sum + m.saida, 0);
+            const saldoFinal = totalEntradas - totalSaidas;
+
+            // Atualizar cards
+            document.getElementById('card-fc-entradas').textContent = formatCurrency(totalEntradas);
+            document.getElementById('card-fc-saidas').textContent = formatCurrency(totalSaidas);
+            document.getElementById('card-fc-saldo').textContent = formatCurrency(saldoFinal);
+            document.getElementById('card-fc-movimentacoes').textContent = movimentacoes.length;
+
+            // Atualizar cor do saldo
+            const cardSaldo = document.getElementById('card-fc-saldo');
+            cardSaldo.className = `text-2xl font-bold ${saldoFinal >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+            // Renderizar tabela
+            const tbody = document.getElementById('tbody-fluxo-caixa');
+            if (movimentacoes.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-4 text-center text-gray-500">Nenhuma movimentação encontrada</td></tr>';
+            } else {
+                tbody.innerHTML = movimentacoes.map(m => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm text-gray-600">${formatDate(m.data)}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <span class="px-2 py-1 text-xs font-semibold rounded ${m.tipo === 'ENTRADA' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${m.tipo}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-700">${m.descricao}</td>
+                        <td class="px-4 py-3 text-sm text-right font-semibold text-green-600">
+                            ${m.entrada > 0 ? formatCurrency(m.entrada) : '-'}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-semibold text-red-600">
+                            ${m.saida > 0 ? formatCurrency(m.saida) : '-'}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-right font-bold ${m.saldo >= 0 ? 'text-blue-600' : 'text-red-600'}">
+                            ${formatCurrency(m.saldo)}
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // Renderizar gráfico
+            renderGraficoFluxoCaixa(movimentacoes);
+        }
+
+        function renderGraficoFluxoCaixa(movimentacoes) {
+            if (chartInstances.fluxoCaixa) chartInstances.fluxoCaixa.destroy();
+
+            // Agrupar por dia
+            const dadosPorDia = {};
+            movimentacoes.forEach(mov => {
+                const data = mov.data?.split('T')[0];
+                if (!data) return;
+                
+                if (!dadosPorDia[data]) dadosPorDia[data] = { entradas: 0, saidas: 0 };
+                dadosPorDia[data].entradas += mov.entrada;
+                dadosPorDia[data].saidas += mov.saida;
+            });
+
+            const datasOrdenadas = Object.keys(dadosPorDia).sort();
+
+            // Calcular saldo acumulado
+            let saldoAcumulado = 0;
+            const saldos = datasOrdenadas.map(data => {
+                saldoAcumulado += dadosPorDia[data].entradas - dadosPorDia[data].saidas;
+                return saldoAcumulado;
+            });
+
+            const ctx = document.getElementById('chart-fluxo-caixa');
+            chartInstances.fluxoCaixa = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    datasets: [
+                        {
+                            label: 'Entradas',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].entradas),
+                            borderColor: 'rgb(34, 197, 94)',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Saídas',
+                            data: datasOrdenadas.map(d => dadosPorDia[d].saidas),
+                            borderColor: 'rgb(239, 68, 68)',
+                            tension: 0.4,
+                            fill: false
+                        },
+                        {
+                            label: 'Saldo Acumulado',
+                            data: saldos,
+                            borderColor: 'rgb(59, 130, 246)',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { callback: v => 'R$ ' + v.toFixed(0) }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ============================================
+        // DRE SIMPLIFICADO
+        // ============================================
+        function renderDRE() {
+            const vendasFiltradas = filtrarVendas();
+            
+            let receitaBruta = 0;
+            let custoMercadoria = 0;
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    
+                    receitaBruta += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    custoMercadoria += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+
+            // Pagamentos no período (despesas)
+            let despesasOperacionais = 0;
+            contasPagar.forEach(cp => {
+                if (!filtroAtual.dataInicio || cp.data_pagamento >= filtroAtual.dataInicio) {
+                    if (!filtroAtual.dataFim || cp.data_pagamento <= filtroAtual.dataFim) {
+                        if (cp.categoria !== 'FORNECEDOR') {
+                            despesasOperacionais += cp.valor_pago || 0;
+                        }
+                    }
+                }
+            });
+
+            const lucroBruto = receitaBruta - custoMercadoria;
+            const lucroOperacional = lucroBruto - despesasOperacionais;
+            
+            const tbody = document.getElementById('tbody-dre');
+            tbody.innerHTML = `
+                <!-- RECEITAS -->
+                <tr class="bg-gray-50">
+                    <td colspan="3" class="px-6 py-3 text-sm font-bold text-gray-900 uppercase">Receitas</td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm text-gray-700 pl-10">Receita Bruta de Vendas</td>
+                    <td class="px-6 py-3 text-sm text-right font-medium text-green-600">${formatCurrency(receitaBruta)}</td>
+                    <td class="px-6 py-3 text-sm text-right text-gray-500">100%</td>
+                </tr>
+                <tr class="bg-green-50">
+                    <td class="px-6 py-3 text-sm font-bold text-green-800">(=) RECEITA LÍQUIDA</td>
+                    <td class="px-6 py-3 text-sm text-right font-bold text-green-800">${formatCurrency(receitaBruta)}</td>
+                    <td class="px-6 py-3 text-sm text-right font-medium text-green-700">100%</td>
+                </tr>
+                
+                <!-- CUSTOS -->
+                <tr class="bg-gray-50">
+                    <td colspan="3" class="px-6 py-3 text-sm font-bold text-gray-900 uppercase">Custos</td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm text-gray-700 pl-10">(-) Custo das Mercadorias Vendidas (CMV)</td>
+                    <td class="px-6 py-3 text-sm text-right font-medium text-red-600">${formatCurrency(custoMercadoria)}</td>
+                    <td class="px-6 py-3 text-sm text-right text-gray-500">${receitaBruta > 0 ? (custoMercadoria / receitaBruta * 100).toFixed(1) : 0}%</td>
+                </tr>
+                <tr class="bg-blue-50">
+                    <td class="px-6 py-3 text-sm font-bold text-blue-800">(=) LUCRO BRUTO</td>
+                    <td class="px-6 py-3 text-sm text-right font-bold ${lucroBruto >= 0 ? 'text-blue-800' : 'text-red-800'}">${formatCurrency(lucroBruto)}</td>
+                    <td class="px-6 py-3 text-sm text-right font-medium text-blue-700">${receitaBruta > 0 ? (lucroBruto / receitaBruta * 100).toFixed(1) : 0}%</td>
+                </tr>
+                
+                <!-- DESPESAS -->
+                <tr class="bg-gray-50">
+                    <td colspan="3" class="px-6 py-3 text-sm font-bold text-gray-900 uppercase">Despesas Operacionais</td>
+                </tr>
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-3 text-sm text-gray-700 pl-10">(-) Despesas Administrativas/Operacionais</td>
+                    <td class="px-6 py-3 text-sm text-right font-medium text-red-600">${formatCurrency(despesasOperacionais)}</td>
+                    <td class="px-6 py-3 text-sm text-right text-gray-500">${receitaBruta > 0 ? (despesasOperacionais / receitaBruta * 100).toFixed(1) : 0}%</td>
+                </tr>
+                
+                <!-- RESULTADO -->
+                <tr class="bg-purple-100">
+                    <td class="px-6 py-4 text-sm font-bold text-purple-900">(=) LUCRO OPERACIONAL</td>
+                    <td class="px-6 py-4 text-sm text-right font-bold ${lucroOperacional >= 0 ? 'text-purple-900' : 'text-red-900'}">${formatCurrency(lucroOperacional)}</td>
+                    <td class="px-6 py-4 text-sm text-right font-bold text-purple-700">${receitaBruta > 0 ? (lucroOperacional / receitaBruta * 100).toFixed(1) : 0}%</td>
+                </tr>
+            `;
+        }
+
+        // ============================================
+        // EXPORTAÇÃO
+        // ============================================
+        function exportarExcel() {
+            const activeTab = document.querySelector('.tab-button.active').id.replace('tab-', '');
+            const timestamp = new Date().toLocaleString('pt-BR').replace(/[/:]/g, '-');
+            let dados = [];
+            let nomeArquivo = `Analise_Financeira_${timestamp}.xlsx`;
+
+            switch(activeTab) {
+                case 'por-categoria':
+                    dados = obterDadosCategoria();
+                    break;
+                case 'por-marca':
+                    dados = obterDadosMarca();
+                    break;
+                case 'por-produto':
+                    dados = obterDadosProduto();
+                    break;
+                default:
+                    showToast('Selecione uma aba de tabela para exportar', 'info');
+                    return;
+            }
+
+            if (dados.length === 0) {
+                showToast('Nenhum dado para exportar', 'warning');
+                return;
+            }
+
+            const ws = XLSX.utils.json_to_sheet(dados);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Dados');
+            XLSX.writeFile(wb, nomeArquivo);
+            showToast('Excel exportado com sucesso!', 'success');
+        }
+
+        function exportarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const timestamp = new Date().toLocaleString('pt-BR');
+
+            doc.setFontSize(18);
+            doc.text('Análise Financeira', 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${timestamp}`, 14, 22);
+
+            // Resumo
+            const resumo = [
+                ['Receita Total', document.getElementById('card-receita').textContent],
+                ['Custo Total', document.getElementById('card-custo').textContent],
+                ['Lucro Bruto', document.getElementById('card-lucro').textContent],
+                ['Margem Média', document.getElementById('card-margem').textContent]
+            ];
+
+            doc.autoTable({
+                startY: 30,
+                head: [['Métrica', 'Valor']],
+                body: resumo,
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] }
+            });
+
+            doc.save(`Analise_Financeira_${new Date().toISOString().split('T')[0]}.pdf`);
+            showToast('PDF exportado com sucesso!', 'success');
+        }
+
+        function obterDadosCategoria() {
+            const vendasFiltradas = filtrarVendas();
+            const lucros = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    const cat = categorias.find(c => c.id === produto.categoria_id);
+                    const catNome = cat?.nome || 'Sem Categoria';
+                    
+                    if (!lucros[catNome]) lucros[catNome] = { quantidade: 0, receita: 0, custo: 0 };
+                    
+                    lucros[catNome].quantidade += item.quantidade || 0;
+                    lucros[catNome].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucros[catNome].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            return Object.entries(lucros).map(([cat, d]) => ({
+                'Categoria': cat,
+                'Quantidade': d.quantidade,
+                'Receita': d.receita.toFixed(2),
+                'Custo': d.custo.toFixed(2),
+                'Lucro': (d.receita - d.custo).toFixed(2),
+                'Margem %': d.receita > 0 ? ((d.receita - d.custo) / d.receita * 100).toFixed(1) : '0'
+            }));
+        }
+
+        function obterDadosMarca() {
+            const vendasFiltradas = filtrarVendas();
+            const lucros = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    const marca = produto.marca || 'SEM MARCA';
+                    
+                    if (!lucros[marca]) lucros[marca] = { quantidade: 0, receita: 0, custo: 0 };
+                    
+                    lucros[marca].quantidade += item.quantidade || 0;
+                    lucros[marca].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucros[marca].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            return Object.entries(lucros).map(([marca, d]) => ({
+                'Marca': marca,
+                'Quantidade': d.quantidade,
+                'Receita': d.receita.toFixed(2),
+                'Custo': d.custo.toFixed(2),
+                'Lucro': (d.receita - d.custo).toFixed(2),
+                'Margem %': d.receita > 0 ? ((d.receita - d.custo) / d.receita * 100).toFixed(1) : '0'
+            }));
+        }
+
+        function obterDadosProduto() {
+            const vendasFiltradas = filtrarVendas();
+            const lucros = {};
+            
+            vendasFiltradas.forEach(venda => {
+                (venda.itens || []).forEach(item => {
+                    const produto = item.produto;
+                    if (!produto) return;
+                    
+                    const key = produto.id;
+                    if (!lucros[key]) {
+                        lucros[key] = {
+                            codigo: produto.codigo,
+                            nome: produto.nome,
+                            quantidade: 0,
+                            receita: 0,
+                            custo: 0
+                        };
+                    }
+                    
+                    lucros[key].quantidade += item.quantidade || 0;
+                    lucros[key].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucros[key].custo += (produto.preco_custo || 0) * (item.quantidade || 0);
+                });
+            });
+            
+            return Object.values(lucros).map(d => ({
+                'Código': d.codigo,
+                'Produto': d.nome,
+                'Quantidade': d.quantidade,
+                'Receita': d.receita.toFixed(2),
+                'Custo': d.custo.toFixed(2),
+                'Lucro': (d.receita - d.custo).toFixed(2),
+                'Margem %': d.receita > 0 ? ((d.receita - d.custo) / d.receita * 100).toFixed(1) : '0'
+            }));
+        }
+
+        // Funções auxiliares
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleDateString('pt-BR');
+        }
+    </script>
+</body>
+</html>

@@ -146,6 +146,190 @@
                     </div>
                 </div>
 
+                <!-- Dados Fiscais da Empresa -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">📋 Dados Fiscais</h3>
+                    <p class="text-sm text-gray-600 mb-4">Informações fiscais obrigatórias para emissão de NFC-e/NF-e</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Inscrição Estadual *</label>
+                            <input type="text" id="inscricao_estadual" placeholder="000.000.000.000" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Inscrição Municipal</label>
+                            <input type="text" id="inscricao_municipal" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Regime Tributário *</label>
+                            <select id="regime_tributario" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="1">1 - Simples Nacional</option>
+                                <option value="2">2 - Simples Nacional (Excesso)</option>
+                                <option value="3">3 - Regime Normal</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CNAE Principal</label>
+                            <input type="text" id="cnae" placeholder="4723700" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Código Município (IBGE)</label>
+                            <input type="text" id="codigo_municipio" placeholder="3550308" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Código IBGE de 7 dígitos</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Número (Endereço)</label>
+                            <input type="text" id="endereco_numero" placeholder="123" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Bairro</label>
+                            <input type="text" id="bairro" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Logradouro</label>
+                            <input type="text" id="logradouro" placeholder="Rua, Avenida, etc." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Focus NFe API -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">🧾 Integração Focus NFe</h3>
+                    <p class="text-sm text-gray-600 mb-4">Configurações para emissão de NFC-e e NF-e via Focus NFe</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Ambiente *</label>
+                            <select id="nfe_ambiente" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="2">2 - Homologação (Testes)</option>
+                                <option value="1">1 - Produção</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                            <div id="nfe-status" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-600">
+                                <i class="fas fa-circle text-gray-400 mr-2"></i> Não configurado
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Token de API Focus NFe *</label>
+                            <div class="flex gap-2">
+                                <input type="password" id="nfe_token" placeholder="Seu token da API Focus NFe" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <button type="button" onclick="testarConexaoNFe()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                                    <i class="fas fa-plug mr-2"></i>Testar
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Obtenha em: <a href="https://focusnfe.com.br" target="_blank" class="text-blue-600 underline">focusnfe.com.br</a></p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Série NFC-e</label>
+                            <input type="number" id="nfce_serie" value="1" min="1" max="999" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Série NF-e</label>
+                            <input type="number" id="nfe_serie" value="1" min="1" max="999" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Próximo Número NFC-e</label>
+                            <input type="number" id="nfce_numero" value="1" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Próximo Número NF-e</label>
+                            <input type="number" id="nfe_numero" value="1" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <!-- Certificado Digital -->
+                    <div class="mt-6 pt-4 border-t">
+                        <h4 class="text-md font-semibold text-gray-800 mb-3">🔐 Certificado Digital A1</h4>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Arquivo do Certificado (.pfx)</label>
+                                <input type="file" id="certificado_input" accept=".pfx,.p12" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Senha do Certificado</label>
+                                <input type="password" id="certificado_senha" placeholder="Senha do .pfx" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            </div>
+
+                            <div class="md:col-span-2">
+                                <div id="certificado-info" class="p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-600">
+                                    <i class="fas fa-info-circle mr-2"></i> Nenhum certificado carregado
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4">
+                            <button type="button" onclick="enviarCertificado()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                                <i class="fas fa-upload mr-2"></i>Enviar Certificado para Focus NFe
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <h4 class="text-sm font-semibold text-yellow-900 mb-2">⚠️ Importante:</h4>
+                        <ul class="text-sm text-yellow-800 space-y-1">
+                            <li>• Use ambiente de <strong>Homologação</strong> para testes</li>
+                            <li>• O certificado A1 deve estar válido (verifique a data de expiração)</li>
+                            <li>• O certificado é enviado e armazenado no Focus NFe, não neste sistema</li>
+                            <li>• Consulte seu contador para os dados fiscais corretos</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Configurações PDV -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">🖥️ Configurações do PDV</h3>
+                    <p class="text-sm text-gray-600 mb-4">Opções para o Ponto de Venda</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="pdv_emitir_nfce" class="w-4 h-4 text-blue-600 rounded">
+                            <label for="pdv_emitir_nfce" class="text-sm font-medium text-gray-700">Emitir NFC-e automaticamente nas vendas</label>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="pdv_imprimir_cupom" checked class="w-4 h-4 text-blue-600 rounded">
+                            <label for="pdv_imprimir_cupom" class="text-sm font-medium text-gray-700">Imprimir cupom após venda</label>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="pdv_permitir_venda_zerado" class="w-4 h-4 text-blue-600 rounded">
+                            <label for="pdv_permitir_venda_zerado" class="text-sm font-medium text-gray-700">Permitir venda com estoque zerado</label>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="pdv_desconto_maximo" class="w-4 h-4 text-blue-600 rounded">
+                            <label for="pdv_desconto_maximo" class="text-sm font-medium text-gray-700">Limitar desconto máximo</label>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Desconto Máximo (%)</label>
+                            <input type="number" id="pdv_desconto_limite" value="10" min="0" max="100" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Mensagem no Cupom</label>
+                            <input type="text" id="pdv_mensagem_cupom" placeholder="Obrigado pela preferência!" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
                 <!-- WhatsApp API -->
                 <div class="bg-white rounded-lg shadow p-6">
                     <h3 class="text-lg font-semibold text-gray-900 mb-2">🔌 Integração WhatsApp API</h3>
@@ -330,6 +514,32 @@
                     document.getElementById('estado').value = config.estado || '';
                     document.getElementById('cep').value = config.cep || '';
                     
+                    // Dados Fiscais
+                    document.getElementById('inscricao_estadual').value = config.inscricao_estadual || '';
+                    document.getElementById('inscricao_municipal').value = config.inscricao_municipal || '';
+                    document.getElementById('regime_tributario').value = config.regime_tributario || '1';
+                    document.getElementById('cnae').value = config.cnae || '';
+                    document.getElementById('codigo_municipio').value = config.codigo_municipio || '';
+                    document.getElementById('endereco_numero').value = config.endereco_numero || '';
+                    document.getElementById('bairro').value = config.bairro || '';
+                    document.getElementById('logradouro').value = config.logradouro || '';
+                    
+                    // Focus NFe
+                    document.getElementById('nfe_ambiente').value = config.nfe_ambiente || '2';
+                    document.getElementById('nfe_token').value = config.nfe_token || '';
+                    document.getElementById('nfce_serie').value = config.nfce_serie || 1;
+                    document.getElementById('nfe_serie').value = config.nfe_serie || 1;
+                    document.getElementById('nfce_numero').value = config.nfce_numero || 1;
+                    document.getElementById('nfe_numero').value = config.nfe_numero || 1;
+                    
+                    // PDV
+                    document.getElementById('pdv_emitir_nfce').checked = config.pdv_emitir_nfce || false;
+                    document.getElementById('pdv_imprimir_cupom').checked = config.pdv_imprimir_cupom !== false;
+                    document.getElementById('pdv_permitir_venda_zerado').checked = config.pdv_permitir_venda_zerado || false;
+                    document.getElementById('pdv_desconto_maximo').checked = config.pdv_desconto_maximo || false;
+                    document.getElementById('pdv_desconto_limite').value = config.pdv_desconto_limite || 10;
+                    document.getElementById('pdv_mensagem_cupom').value = config.pdv_mensagem_cupom || '';
+                    
                     // Configurações WhatsApp API
                     document.getElementById('whatsapp_api_provider').value = config.whatsapp_api_provider || '';
                     document.getElementById('whatsapp_numero_origem').value = config.whatsapp_numero_origem || '';
@@ -344,9 +554,126 @@
                         `;
                         document.getElementById('btn-remove-logo').classList.remove('hidden');
                     }
+                    
+                    // Atualizar status NFe
+                    atualizarStatusNFe(config);
                 }
             } catch (error) {
                 console.error('Erro ao carregar configurações:', error);
+            }
+        }
+        
+        function atualizarStatusNFe(config) {
+            const statusEl = document.getElementById('nfe-status');
+            if (config.nfe_token) {
+                statusEl.innerHTML = '<i class="fas fa-circle text-green-500 mr-2"></i> Configurado';
+                statusEl.className = 'px-4 py-2 bg-green-100 rounded-lg text-green-800';
+            } else {
+                statusEl.innerHTML = '<i class="fas fa-circle text-gray-400 mr-2"></i> Não configurado';
+                statusEl.className = 'px-4 py-2 bg-gray-100 rounded-lg text-gray-600';
+            }
+        }
+        
+        async function testarConexaoNFe() {
+            const token = document.getElementById('nfe_token').value;
+            if (!token) {
+                showToast('Informe o token da API', 'error');
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                // Testar conexão com Focus NFe
+                const ambiente = document.getElementById('nfe_ambiente').value;
+                const baseUrl = ambiente === '1' 
+                    ? 'https://api.focusnfe.com.br' 
+                    : 'https://homologacao.focusnfe.com.br';
+                
+                const response = await fetch(`${baseUrl}/v2/nfce?ref=teste`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(token + ':')
+                    }
+                });
+                
+                if (response.status === 401) {
+                    showToast('Token inválido', 'error');
+                } else if (response.ok || response.status === 404) {
+                    showToast('Conexão OK! Token válido.', 'success');
+                    document.getElementById('nfe-status').innerHTML = '<i class="fas fa-circle text-green-500 mr-2"></i> Conectado';
+                    document.getElementById('nfe-status').className = 'px-4 py-2 bg-green-100 rounded-lg text-green-800';
+                } else {
+                    showToast('Erro na conexão: ' + response.status, 'error');
+                }
+            } catch (error) {
+                showToast('Erro ao conectar: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function enviarCertificado() {
+            const token = document.getElementById('nfe_token').value;
+            const arquivo = document.getElementById('certificado_input').files[0];
+            const senha = document.getElementById('certificado_senha').value;
+            
+            if (!token) {
+                showToast('Configure o token da API primeiro', 'error');
+                return;
+            }
+            if (!arquivo) {
+                showToast('Selecione o arquivo do certificado', 'error');
+                return;
+            }
+            if (!senha) {
+                showToast('Informe a senha do certificado', 'error');
+                return;
+            }
+            
+            try {
+                showLoading(true);
+                
+                const ambiente = document.getElementById('nfe_ambiente').value;
+                const baseUrl = ambiente === '1' 
+                    ? 'https://api.focusnfe.com.br' 
+                    : 'https://homologacao.focusnfe.com.br';
+                
+                // Converter arquivo para base64
+                const base64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(arquivo);
+                });
+                
+                const response = await fetch(`${baseUrl}/v2/empresas/certificado`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(token + ':'),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        arquivo_base64: base64,
+                        senha: senha
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    showToast('Certificado enviado com sucesso!', 'success');
+                    document.getElementById('certificado-info').innerHTML = `
+                        <i class="fas fa-check-circle text-green-500 mr-2"></i>
+                        Certificado válido até: ${data.validade || 'N/A'}
+                    `;
+                    document.getElementById('certificado-info').className = 'p-4 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800';
+                } else {
+                    const erro = await response.json();
+                    showToast('Erro: ' + (erro.mensagem || 'Falha ao enviar'), 'error');
+                }
+            } catch (error) {
+                showToast('Erro: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
             }
         }
 
@@ -383,6 +710,30 @@
                     estado: document.getElementById('estado').value || null,
                     cep: document.getElementById('cep').value || null,
                     logo_url: logoUrl,
+                    // Dados Fiscais
+                    inscricao_estadual: document.getElementById('inscricao_estadual').value || null,
+                    inscricao_municipal: document.getElementById('inscricao_municipal').value || null,
+                    regime_tributario: document.getElementById('regime_tributario').value || '1',
+                    cnae: document.getElementById('cnae').value || null,
+                    codigo_municipio: document.getElementById('codigo_municipio').value || null,
+                    endereco_numero: document.getElementById('endereco_numero').value || null,
+                    bairro: document.getElementById('bairro').value || null,
+                    logradouro: document.getElementById('logradouro').value || null,
+                    // Focus NFe
+                    nfe_ambiente: document.getElementById('nfe_ambiente').value || '2',
+                    nfe_token: document.getElementById('nfe_token').value || null,
+                    nfce_serie: parseInt(document.getElementById('nfce_serie').value) || 1,
+                    nfe_serie: parseInt(document.getElementById('nfe_serie').value) || 1,
+                    nfce_numero: parseInt(document.getElementById('nfce_numero').value) || 1,
+                    nfe_numero: parseInt(document.getElementById('nfe_numero').value) || 1,
+                    // PDV
+                    pdv_emitir_nfce: document.getElementById('pdv_emitir_nfce').checked,
+                    pdv_imprimir_cupom: document.getElementById('pdv_imprimir_cupom').checked,
+                    pdv_permitir_venda_zerado: document.getElementById('pdv_permitir_venda_zerado').checked,
+                    pdv_desconto_maximo: document.getElementById('pdv_desconto_maximo').checked,
+                    pdv_desconto_limite: parseFloat(document.getElementById('pdv_desconto_limite').value) || 10,
+                    pdv_mensagem_cupom: document.getElementById('pdv_mensagem_cupom').value || null,
+                    // WhatsApp
                     whatsapp_api_provider: document.getElementById('whatsapp_api_provider').value || null,
                     whatsapp_numero_origem: document.getElementById('whatsapp_numero_origem').value || null,
                     whatsapp_api_url: document.getElementById('whatsapp_api_url').value || null,

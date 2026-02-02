@@ -53,13 +53,15 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cód. Barras</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Fiscal</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                             </tr>
                         </thead>
                         <tbody id="produtos-tbody" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            <tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -79,71 +81,132 @@
             <form id="form-produto" class="px-6 py-4">
                 <input type="hidden" id="produto-id">
                 
-                <!-- Informações Básicas -->
-                <h4 class="text-md font-semibold text-gray-700 mb-3">Informações Básicas</h4>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Produto*</label>
-                        <input type="text" id="produto-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: V250">
-                        <p class="text-xs text-gray-500 mt-1">O código será gerado automaticamente</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
-                        <input type="text" id="produto-marca" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: IGNITE">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
-                        <input type="text" id="produto-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Bebidas">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Unidade*</label>
-                        <select id="produto-unidade" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                            <option value="UN">UN - Unidade</option>
-                            <option value="KG">KG - Quilograma</option>
-                            <option value="L">L - Litro</option>
-                            <option value="M">M - Metro</option>
-                            <option value="CX">CX - Caixa</option>
-                            <option value="PC">PC - Peça</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Mínimo</label>
-                        <input type="number" step="0.01" id="produto-estoque-minimo" value="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Compra (R$)*</label>
-                        <input type="number" step="0.01" id="produto-preco-compra" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Venda (R$)*</label>
-                        <input type="number" step="0.01" id="produto-preco-venda" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
-                    </div>
-                    <div class="md:col-span-2" id="margem-lucro-container" style="display: none;">
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-gray-700">Margem de Lucro:</span>
-                                <span id="margem-lucro" class="text-lg font-bold text-blue-600">0%</span>
-                            </div>
-                            <div class="flex justify-between items-center mt-2">
-                                <span class="text-sm font-medium text-gray-700">Lucro Unitário:</span>
-                                <span id="lucro-unitario" class="text-lg font-bold text-green-600">R$ 0,00</span>
+                <!-- Tabs -->
+                <div class="flex border-b mb-4">
+                    <button type="button" onclick="abrirTab('tab-basico')" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600" data-tab="tab-basico">
+                        <i class="fas fa-info-circle mr-1"></i>Básico
+                    </button>
+                    <button type="button" onclick="abrirTab('tab-fiscal')" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-tab="tab-fiscal">
+                        <i class="fas fa-file-invoice mr-1"></i>Fiscal
+                    </button>
+                </div>
+                
+                <!-- Tab Básico -->
+                <div id="tab-basico" class="tab-content">
+                    <!-- Informações Básicas -->
+                    <h4 class="text-md font-semibold text-gray-700 mb-3">Informações Básicas</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Produto*</label>
+                            <input type="text" id="produto-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Coca-Cola 350ml Lata">
+                            <p class="text-xs text-gray-500 mt-1">O código será gerado automaticamente</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Código de Barras (EAN)</label>
+                            <input type="text" id="produto-codigo-barras" maxlength="14" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="7891234567890">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
+                            <input type="text" id="produto-marca" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Coca-Cola">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                            <input type="text" id="produto-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Refrigerantes">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Unidade*</label>
+                            <select id="produto-unidade" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="UN">UN - Unidade</option>
+                                <option value="KG">KG - Quilograma</option>
+                                <option value="L">L - Litro</option>
+                                <option value="M">M - Metro</option>
+                                <option value="CX">CX - Caixa</option>
+                                <option value="PC">PC - Peça</option>
+                                <option value="FD">FD - Fardo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Mínimo</label>
+                            <input type="number" step="0.01" id="produto-estoque-minimo" value="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Compra (R$)*</label>
+                            <input type="number" step="0.01" id="produto-preco-compra" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Venda (R$)*</label>
+                            <input type="number" step="0.01" id="produto-preco-venda" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
+                        </div>
+                        <div class="md:col-span-2" id="margem-lucro-container" style="display: none;">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-sm font-medium text-gray-700">Margem de Lucro:</span>
+                                    <span id="margem-lucro" class="text-lg font-bold text-blue-600">0%</span>
+                                </div>
+                                <div class="flex justify-between items-center mt-2">
+                                    <span class="text-sm font-medium text-gray-700">Lucro Unitário:</span>
+                                    <span id="lucro-unitario" class="text-lg font-bold text-green-600">R$ 0,00</span>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Sabores -->
-                <div class="border-t pt-4">
-                    <div class="flex justify-between items-center mb-3">
-                        <h4 class="text-md font-semibold text-gray-700">Sabores</h4>
-                        <button type="button" onclick="adicionarSabor()" class="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
-                            + Adicionar Sabor
-                        </button>
+                
+                <!-- Tab Fiscal -->
+                <div id="tab-fiscal" class="tab-content hidden">
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                        <p class="text-sm text-yellow-800">
+                            <i class="fas fa-info-circle mr-2"></i>Dados obrigatórios para emissão de NFC-e/NF-e
+                        </p>
                     </div>
-                    <div id="sabores-container" class="space-y-2">
-                        <!-- Sabores serão adicionados aqui dinamicamente -->
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">NCM *</label>
+                            <input type="text" id="produto-ncm" maxlength="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="22030000">
+                            <p class="text-xs text-gray-500 mt-1">Ex: 22030000 (Cervejas)</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CFOP *</label>
+                            <select id="produto-cfop" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="5102">5102 - Venda mercadoria (dentro estado)</option>
+                                <option value="5405">5405 - Venda c/ ST (dentro estado)</option>
+                                <option value="6102">6102 - Venda mercadoria (fora estado)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Origem *</label>
+                            <select id="produto-origem" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="0">0 - Nacional</option>
+                                <option value="1">1 - Estrangeira (importação direta)</option>
+                                <option value="2">2 - Estrangeira (mercado interno)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST/CSOSN *</label>
+                            <select id="produto-cst" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <optgroup label="Simples Nacional">
+                                    <option value="102">102 - Tributado sem crédito</option>
+                                    <option value="500">500 - ICMS cobrado anteriormente por ST</option>
+                                    <option value="103">103 - Isento</option>
+                                </optgroup>
+                                <optgroup label="Lucro Real/Presumido">
+                                    <option value="00">00 - Tributada integralmente</option>
+                                    <option value="60">60 - ICMS cobrado anteriormente por ST</option>
+                                    <option value="40">40 - Isenta</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Alíquota ICMS (%)</label>
+                            <input type="number" step="0.01" min="0" max="100" id="produto-aliquota-icms" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="18.00" value="0">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CEST</label>
+                            <input type="text" id="produto-cest" maxlength="7" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0300100">
+                            <p class="text-xs text-gray-500 mt-1">Obrigatório para ST</p>
+                        </div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-2">* Adicione os sabores disponíveis para este produto. O estoque será controlado individualmente por sabor.</p>
                 </div>
 
                 <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
@@ -182,80 +245,18 @@
             await loadCategorias();
         })();
 
-        // Gerenciamento de Sabores
-        function adicionarSabor(sabor = '', quantidade = 0, saborId = null) {
-            saboresCount++;
-            const container = document.getElementById('sabores-container');
-            const div = document.createElement('div');
-            div.className = 'flex gap-2 items-center bg-gray-50 p-3 rounded-lg';
-            div.id = `sabor-${saboresCount}`;
-            div.innerHTML = `
-                <input type="hidden" name="sabor-id-${saboresCount}" value="${saborId || ''}">
-                <div class="flex-1">
-                    <input 
-                        type="text" 
-                        name="sabor-nome-${saboresCount}" 
-                        value="${sabor}" 
-                        placeholder="Nome do sabor (ex: MELANCIA)" 
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm sabor-input"
-                        required
-                    >
-                </div>
-                <div class="w-32">
-                    <input 
-                        type="number" 
-                        name="sabor-qtd-${saboresCount}" 
-                        value="${quantidade}" 
-                        placeholder="Qtd" 
-                        step="1"
-                        min="0"
-                        class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                    >
-                </div>
-                <button 
-                    type="button" 
-                    onclick="removerSabor(${saboresCount})" 
-                    class="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm"
-                >
-                    ✕
-                </button>
-            `;
-            container.appendChild(div);
-        }
-
-        function removerSabor(id) {
-            const elemento = document.getElementById(`sabor-${id}`);
-            if (elemento) {
-                elemento.remove();
-            }
-        }
-
-        function limparSabores() {
-            document.getElementById('sabores-container').innerHTML = '';
-            saboresCount = 0;
-        }
-
-        function coletarSabores() {
-            const sabores = [];
-            const container = document.getElementById('sabores-container');
-            const inputs = container.querySelectorAll('[name^="sabor-nome-"]');
-            
-            inputs.forEach(input => {
-                const num = input.name.split('-')[2];
-                const saborId = document.querySelector(`[name="sabor-id-${num}"]`).value || null;
-                const nome = input.value.trim().toUpperCase();
-                const qtd = parseFloat(document.querySelector(`[name="sabor-qtd-${num}"]`).value) || 0;
-                
-                if (nome) {
-                    sabores.push({
-                        id: saborId,
-                        sabor: nome,
-                        quantidade: qtd
-                    });
-                }
+        // === TABS ===
+        function abrirTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                btn.classList.add('text-gray-500');
             });
             
-            return sabores;
+            document.getElementById(tabId).classList.remove('hidden');
+            const btnAtivo = document.querySelector(`[data-tab="${tabId}"]`);
+            btnAtivo.classList.remove('text-gray-500');
+            btnAtivo.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
         }
 
         async function loadCategorias() {
@@ -276,11 +277,13 @@
             
             const tbody = document.getElementById('produtos-tbody');
             if (produtos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Nenhum produto encontrado</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum produto encontrado</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = produtos.map(p => `
+            tbody.innerHTML = produtos.map(p => {
+                const fiscalOk = p.ncm && p.cfop && (p.cst_icms || p.csosn);
+                return `
                 <tr class="hover:bg-gray-50">
                     <td class="px-6 py-4 text-sm text-gray-900">${p.codigo}</td>
                     <td class="px-6 py-4">
@@ -288,6 +291,7 @@
                         ${p.marca ? `<div class="text-xs text-gray-500">Marca: ${p.marca}</div>` : ''}
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600">${p.categoria || '-'}</td>
+                    <td class="px-6 py-4 text-sm font-mono text-gray-600">${p.codigo_barras || '-'}</td>
                     <td class="px-6 py-4 text-sm ${p.estoque_atual <= p.estoque_minimo ? 'text-red-600 font-semibold' : 'text-gray-900'}">
                         ${p.estoque_atual} ${p.unidade}
                         ${p.estoque_atual <= p.estoque_minimo ? '<span class="text-xs">(Baixo)</span>' : ''}
@@ -296,12 +300,18 @@
                         <div class="text-sm text-gray-600">Compra: ${formatCurrency(p.preco_compra || p.preco || 0)}</div>
                         <div class="text-sm font-medium text-gray-900">Venda: ${formatCurrency(p.preco_venda || p.preco || 0)}</div>
                     </td>
+                    <td class="px-6 py-4 text-center">
+                        ${fiscalOk 
+                            ? '<span class="text-green-600" title="Dados fiscais OK"><i class="fas fa-check-circle"></i></span>'
+                            : '<span class="text-yellow-500" title="Dados fiscais incompletos"><i class="fas fa-exclamation-circle"></i></span>'
+                        }
+                    </td>
                     <td class="px-6 py-4 text-sm space-x-2">
                         <button onclick="editProduto('${p.id}')" class="text-blue-600 hover:text-blue-800">Editar</button>
                         <button onclick="deleteProdutoHandler('${p.id}')" class="text-red-600 hover:text-red-800">Excluir</button>
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
         }
 
         document.getElementById('form-produto').addEventListener('submit', async (e) => {
@@ -323,22 +333,27 @@
                 estoque_minimo: parseFloat(document.getElementById('produto-estoque-minimo').value),
                 preco_compra: precoCompra,
                 preco_venda: precoVenda,
-                preco: precoVenda // Manter compatibilidade
+                preco: precoVenda, // Manter compatibilidade
+                // Campos fiscais
+                codigo_barras: document.getElementById('produto-codigo-barras').value.trim() || null,
+                ncm: document.getElementById('produto-ncm').value.trim() || null,
+                cfop: document.getElementById('produto-cfop').value || '5102',
+                origem: parseInt(document.getElementById('produto-origem').value) || 0,
+                cst_icms: document.getElementById('produto-cst').value || null,
+                aliquota_icms: parseFloat(document.getElementById('produto-aliquota-icms').value) || 0,
+                cest: document.getElementById('produto-cest').value.trim() || null
             };
 
-            // Coletar sabores
-            const sabores = coletarSabores();
-
             if (editingId) {
-                await updateProdutoComSabores(editingId, produto, sabores);
+                await updateProduto(editingId, produto);
             } else {
-                await createProdutoComSabores(produto, sabores);
+                await createProduto(produto);
             }
 
             closeModal('modal-produto');
             document.getElementById('form-produto').reset();
-            limparSabores();
             editingId = null;
+            abrirTab('tab-basico');
             await loadProdutos();
         });
 
@@ -357,14 +372,17 @@
             document.getElementById('produto-preco-compra').value = produto.preco_compra || produto.preco || 0;
             document.getElementById('produto-preco-venda').value = produto.preco_venda || produto.preco || 0;
             
-            // Carregar sabores
-            limparSabores();
-            const sabores = await getSaboresProduto(id);
-            if (sabores && sabores.length > 0) {
-                sabores.forEach(s => adicionarSabor(s.sabor, s.quantidade, s.id));
-            }
+            // Campos fiscais
+            document.getElementById('produto-codigo-barras').value = produto.codigo_barras || '';
+            document.getElementById('produto-ncm').value = produto.ncm || '';
+            document.getElementById('produto-cfop').value = produto.cfop || '5102';
+            document.getElementById('produto-origem').value = produto.origem || '0';
+            document.getElementById('produto-cst').value = produto.cst_icms || produto.csosn || '102';
+            document.getElementById('produto-aliquota-icms').value = produto.aliquota_icms || 0;
+            document.getElementById('produto-cest').value = produto.cest || '';
             
             calcularMargem();
+            abrirTab('tab-basico');
             openModal('modal-produto');
         }
 
@@ -417,15 +435,6 @@
             const cursorPos = e.target.selectionStart;
             e.target.value = e.target.value.toUpperCase();
             e.target.setSelectionRange(cursorPos, cursorPos);
-        });
-
-        // Converter sabores para maiúsculas em tempo real (delegação de eventos)
-        document.getElementById('sabores-container').addEventListener('input', function(e) {
-            if (e.target.classList.contains('sabor-input')) {
-                const cursorPos = e.target.selectionStart;
-                e.target.value = e.target.value.toUpperCase();
-                e.target.setSelectionRange(cursorPos, cursorPos);
-            }
         });
 
         document.getElementById('search').addEventListener('input', debounce(loadProdutos, 500));

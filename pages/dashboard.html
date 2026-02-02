@@ -3,10 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Sistema de Compras</title>
+    <title>Dashboard - Sistema Distribuidora</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-gray-100">
     <!-- Navbar -->
@@ -25,87 +26,172 @@
                         <h2 class="text-3xl font-bold text-gray-900">
                             <i class="fas fa-chart-line mr-3 text-blue-600"></i>Dashboard
                         </h2>
-                        <p class="text-gray-600 mt-1">Visão geral do sistema</p>
+                        <p class="text-gray-600 mt-1">Visão geral da distribuidora</p>
                     </div>
-                    <button onclick="copiarLinkPedidoPublico()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition shadow-md">
-                        <i class="fas fa-link"></i>
-                        <span>Copiar Link Pedidos</span>
-                    </button>
+                    <div class="flex gap-2">
+                        <a href="pdv.html" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition shadow-md">
+                            <i class="fas fa-cash-register"></i>
+                            <span>Abrir PDV</span>
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            <!-- Stats Cards -->
+            <!-- Stats Cards - Financeiro -->
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <!-- Pedidos de Compra -->
-                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-blue-500">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-600 font-medium">Pedidos de Compra</p>
-                            <p id="stat-compras" class="text-3xl font-bold text-blue-600 mt-2">0</p>
-                            <p class="text-xs text-gray-500 mt-1">Aguardando: <span id="stat-compras-pendentes" class="font-semibold">0</span></p>
-                        </div>
-                        <div class="bg-blue-100 p-3 rounded-full">
-                            <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Pedidos de Venda -->
+                <!-- Vendas do Dia -->
                 <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-green-500">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-gray-600 font-medium">Pedidos de Venda</p>
-                            <p id="stat-vendas" class="text-3xl font-bold text-green-600 mt-2">0</p>
-                            <p class="text-xs text-gray-500 mt-1">Aguardando: <span id="stat-vendas-pendentes" class="font-semibold">0</span></p>
+                            <p class="text-sm text-gray-600 font-medium">Vendas Hoje</p>
+                            <p id="stat-vendas-hoje" class="text-2xl font-bold text-green-600 mt-2">R$ 0,00</p>
+                            <p class="text-xs text-gray-500 mt-1"><span id="stat-qtd-vendas" class="font-semibold">0</span> vendas</p>
                         </div>
                         <div class="bg-green-100 p-3 rounded-full">
-                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
+                            <i class="fas fa-cash-register text-green-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
 
-                <!-- Pedidos Finalizados (Geral) -->
-                <div class="bg-white rounded-lg shadow p-6 card-hover">
+                <!-- Contas a Receber -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-blue-500">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-gray-600">Finalizados Hoje</p>
-                            <p id="stat-aprovado" class="text-3xl font-bold text-purple-600 mt-2">0</p>
-                            <p class="text-xs text-gray-500 mt-1">Total: <span id="stat-valor-aprovado" class="font-semibold">R$ 0</span></p>
+                            <p class="text-sm text-gray-600 font-medium">A Receber</p>
+                            <p id="stat-a-receber" class="text-2xl font-bold text-blue-600 mt-2">R$ 0,00</p>
+                            <p class="text-xs text-red-500 mt-1">Vencido: <span id="stat-receber-vencido" class="font-semibold">R$ 0,00</span></p>
                         </div>
-                        <div class="bg-purple-100 p-3 rounded-full">
-                            <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-hand-holding-usd text-blue-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
 
-                <!-- Produtos Estoque Baixo -->
+                <!-- Contas a Pagar -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-red-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">A Pagar</p>
+                            <p id="stat-a-pagar" class="text-2xl font-bold text-red-600 mt-2">R$ 0,00</p>
+                            <p class="text-xs text-red-500 mt-1">Vencido: <span id="stat-pagar-vencido" class="font-semibold">R$ 0,00</span></p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <i class="fas fa-file-invoice-dollar text-red-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saldo -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-purple-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">Balanço do Mês</p>
+                            <p id="stat-saldo" class="text-2xl font-bold text-purple-600 mt-2">R$ 0,00</p>
+                            <p class="text-xs text-gray-500 mt-1">Recebido - Pago</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i class="fas fa-balance-scale text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Segunda linha de stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Estoque Baixo -->
                 <div class="bg-white rounded-lg shadow p-6 card-hover">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm text-gray-600">Estoque Baixo</p>
-                            <p id="stat-estoque-baixo" class="text-3xl font-bold text-red-600 mt-2">0</p>
-                            <p class="text-xs text-gray-500 mt-1">Requer atenção</p>
+                            <p id="stat-estoque-baixo" class="text-3xl font-bold text-orange-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Produtos abaixo do mínimo</p>
+                        </div>
+                        <div class="bg-orange-100 p-3 rounded-full">
+                            <i class="fas fa-boxes text-orange-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Produtos Vencendo -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Vencendo em 30 dias</p>
+                            <p id="stat-vencendo" class="text-3xl font-bold text-red-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Lotes próximos da validade</p>
                         </div>
                         <div class="bg-red-100 p-3 rounded-full">
-                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                            </svg>
+                            <i class="fas fa-calendar-times text-red-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compras Pendentes -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Compras Pendentes</p>
+                            <p id="stat-compras-pendentes" class="text-3xl font-bold text-blue-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Aguardando recebimento</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i class="fas fa-truck text-blue-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
             </div>
 
+            <!-- Gráficos -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Gráfico de Vendas -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-area text-green-500 mr-2"></i>
+                        Vendas dos Últimos 7 Dias
+                    </h3>
+                    <canvas id="chartVendas" height="200"></canvas>
+                </div>
+
+                <!-- Gráfico Financeiro -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-4">
+                        <i class="fas fa-chart-pie text-purple-500 mr-2"></i>
+                        Resumo Financeiro do Mês
+                    </h3>
+                    <canvas id="chartFinanceiro" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Alertas -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Produtos Vencendo -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-red-50">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-red-900">
+                                <i class="fas fa-exclamation-triangle mr-2"></i>
+                                Produtos Próximos da Validade
+                            </h3>
+                            <a href="estoque.html" class="text-sm text-red-600 hover:text-red-700">Ver todos →</a>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div id="produtos-vencendo" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Produtos com Estoque Baixo -->
                 <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <h3 class="text-lg font-semibold text-gray-900">⚠️ Alertas de Estoque</h3>
+                    <div class="px-6 py-4 border-b border-gray-200 bg-orange-50">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-orange-900">
+                                <i class="fas fa-box-open mr-2"></i>
+                                Estoque Baixo
+                            </h3>
+                            <a href="produtos.html" class="text-sm text-orange-600 hover:text-orange-700">Ver todos →</a>
+                        </div>
                     </div>
                     <div class="p-6">
                         <div id="produtos-estoque-baixo" class="space-y-3">
@@ -113,46 +199,61 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Pré-Pedidos Públicos Pendentes -->
+            <!-- Contas Vencendo -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Contas a Pagar Vencendo -->
                 <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-red-50">
                         <div class="flex justify-between items-center">
-                            <h3 class="text-lg font-semibold text-gray-900">🔔 Pré-Pedidos Públicos Pendentes</h3>
-                            <a href="/pages/pre-pedidos.html" class="text-sm text-purple-600 hover:text-purple-700">Ver todos →</a>
+                            <h3 class="text-lg font-semibold text-red-900">
+                                <i class="fas fa-calendar-alt mr-2"></i>
+                                Contas a Pagar (próx. 7 dias)
+                            </h3>
+                            <a href="contas-pagar.html" class="text-sm text-red-600 hover:text-red-700">Ver todas →</a>
                         </div>
                     </div>
                     <div class="p-6">
-                        <div id="pedidos-pendentes" class="space-y-3">
+                        <div id="contas-pagar-vencendo" class="space-y-3">
+                            <p class="text-gray-500 text-center py-4">Carregando...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contas a Receber Vencendo -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200 bg-blue-50">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-semibold text-blue-900">
+                                <i class="fas fa-calendar-check mr-2"></i>
+                                Contas a Receber (próx. 7 dias)
+                            </h3>
+                            <a href="contas-receber.html" class="text-sm text-blue-600 hover:text-blue-700">Ver todas →</a>
+                        </div>
+                    </div>
+                    <div class="p-6">
+                        <div id="contas-receber-vencendo" class="space-y-3">
                             <p class="text-gray-500 text-center py-4">Carregando...</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Últimos Pedidos Separados -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <!-- Últimos Pedidos de Compra -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-blue-50">
-                        <h3 class="text-lg font-semibold text-blue-900">🛒 Últimos Pedidos de Compra</h3>
-                    </div>
-                    <div class="p-6">
-                        <div id="ultimos-pedidos-compra" class="space-y-3">
-                            <p class="text-gray-500 text-center py-4">Carregando...</p>
-                        </div>
+            <!-- Últimas Vendas -->
+            <div class="bg-white rounded-lg shadow">
+                <div class="px-6 py-4 border-b border-gray-200 bg-green-50">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-green-900">
+                            <i class="fas fa-receipt mr-2"></i>
+                            Últimas Vendas
+                        </h3>
+                        <a href="vendas.html" class="text-sm text-green-600 hover:text-green-700">Ver todas →</a>
                     </div>
                 </div>
-
-                <!-- Últimas Vendas -->
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200 bg-green-50">
-                        <h3 class="text-lg font-semibold text-green-900">💰 Últimas Vendas</h3>
-                    </div>
-                    <div class="p-6">
-                        <div id="ultimos-pedidos-venda" class="space-y-3">
-                            <p class="text-gray-500 text-center py-4">Carregando...</p>
-                        </div>
+                <div class="p-6">
+                    <div id="ultimas-vendas" class="space-y-3">
+                        <p class="text-gray-500 text-center py-4">Carregando...</p>
                     </div>
                 </div>
             </div>
@@ -173,13 +274,13 @@
     <script src="../js/session-manager.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
-    <script src="../js/services/produtos.js"></script>
-    <script src="../js/services/pedidos.js"></script>
-    <script src="../js/services/pre-pedidos.js"></script>
     <script src="../components/navbar.js"></script>
     <script src="../components/sidebar.js"></script>
     
     <script>
+        let chartVendas = null;
+        let chartFinanceiro = null;
+
         // Inicializar
         (async () => {
             await checkAuth();
@@ -196,159 +297,549 @@
 
         async function loadDashboard() {
             try {
-                // Buscar todos os pedidos
-                const todosPedidos = await listPedidos({});
-                
-                // Separar por tipo
-                const compras = todosPedidos.filter(p => p.tipo_pedido === 'COMPRA' || !p.tipo_pedido);
-                const vendas = todosPedidos.filter(p => p.tipo_pedido === 'VENDA');
-                
-                // Estatísticas de COMPRAS
-                const comprasPendentes = compras.filter(p => p.status === 'ENVIADO').length;
-                document.getElementById('stat-compras').textContent = compras.length;
-                document.getElementById('stat-compras-pendentes').textContent = comprasPendentes;
-                
-                // Estatísticas de VENDAS
-                const vendasPendentes = vendas.filter(p => p.status === 'ENVIADO').length;
-                document.getElementById('stat-vendas').textContent = vendas.length;
-                document.getElementById('stat-vendas-pendentes').textContent = vendasPendentes;
-                
-                // Finalizados HOJE (compras + vendas)
-                const hoje = new Date();
-                hoje.setHours(0, 0, 0, 0);
-                const aprovadosHoje = todosPedidos.filter(p => {
-                    if (p.status !== 'FINALIZADO' || !p.data_finalizacao) return false;
-                    const dataFinal = new Date(p.data_finalizacao);
-                    dataFinal.setHours(0, 0, 0, 0);
-                    return dataFinal.getTime() === hoje.getTime();
-                });
-                
-                const valorAprovado = aprovadosHoje.reduce((sum, p) => sum + parseFloat(p.total || 0), 0);
-                document.getElementById('stat-aprovado').textContent = aprovadosHoje.length;
-                document.getElementById('stat-valor-aprovado').textContent = formatCurrency(valorAprovado);
-
-                // Produtos com estoque baixo
-                const produtosBaixo = await getProdutosEstoqueBaixo();
-                const containerEstoque = document.getElementById('produtos-estoque-baixo');
-                
-                if (produtosBaixo.length === 0) {
-                    containerEstoque.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum produto com estoque baixo</p>';
-                } else {
-                    document.getElementById('stat-estoque-baixo').textContent = produtosBaixo.length;
-                    containerEstoque.innerHTML = produtosBaixo.slice(0, 5).map(p => `
-                        <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg stock-alert border-l-4 border-red-400">
-                            <div class="flex-1">
-                                <p class="font-medium text-gray-900">${p.nome}</p>
-                                <p class="text-sm text-gray-600">Código: ${p.codigo}</p>
-                            </div>
-                            <div class="text-right">
-                                <p class="text-sm font-semibold text-red-600">
-                                    ${p.estoque_atual} ${p.unidade}
-                                </p>
-                                <p class="text-xs text-gray-500">Mín: ${p.estoque_minimo}</p>
-                            </div>
-                        </div>
-                    `).join('');
-                }
-
-                // Pré-pedidos públicos pendentes
-                const prePedidosPendentes = await listarPrePedidos({ status: 'PENDENTE' });
-                const containerPendentes = document.getElementById('pedidos-pendentes');
-                
-                if (!prePedidosPendentes || prePedidosPendentes.length === 0) {
-                    containerPendentes.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum pré-pedido pendente</p>';
-                } else {
-                    containerPendentes.innerHTML = prePedidosPendentes.slice(0, 5).map(p => {
-                        const statusColor = p.status === 'PENDENTE' ? 'bg-yellow-100 text-yellow-800' : 'bg-purple-100 text-purple-800';
-                        const horasRestantes = Math.floor((new Date(p.data_expiracao) - new Date()) / (1000 * 60 * 60));
-                        const expiracaoText = horasRestantes > 0 ? `⏱️ ${horasRestantes}h restantes` : '⚠️ Expirado';
-                        
-                        return `
-                            <a href="/pages/pre-pedidos.html?id=${p.id}" class="block">
-                                <div class="flex items-center justify-between p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition border-l-4 border-purple-400 cursor-pointer">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <p class="font-medium text-gray-900">${p.numero}</p>
-                                            <span class="text-xs px-2 py-1 rounded ${statusColor}">${p.status}</span>
-                                        </div>
-                                        <p class="text-sm text-gray-600">${p.nome_solicitante}</p>
-                                        <p class="text-xs text-gray-500">${expiracaoText}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="text-sm font-semibold text-gray-900">${formatCurrency(p.total)}</p>
-                                        <p class="text-xs text-gray-500">${formatDate(p.created_at)}</p>
-                                    </div>
-                                </div>
-                            </a>
-                        `;
-                    }).join('');
-                }
-
-                // Últimos pedidos de COMPRA
-                const containerCompras = document.getElementById('ultimos-pedidos-compra');
-                if (compras.length === 0) {
-                    containerCompras.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhum pedido de compra</p>';
-                } else {
-                    containerCompras.innerHTML = compras.slice(0, 5).map(p => `
-                        <a href="/pages/pedido-detalhe.html?id=${p.id}" class="block">
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-blue-50 transition border-l-4 border-blue-400">
-                                <div class="flex-1">
-                                    <p class="font-medium text-gray-900">${p.numero}</p>
-                                    <p class="text-sm text-gray-600">${p.fornecedor?.nome || 'Sem fornecedor'}</p>
-                                </div>
-                                <div class="text-right">
-                                    ${getStatusBadge(p.status)}
-                                    <p class="text-sm font-semibold text-gray-900 mt-1">${formatCurrency(p.total)}</p>
-                                </div>
-                            </div>
-                        </a>
-                    `).join('');
-                }
-
-                // Últimas VENDAS
-                const containerVendas = document.getElementById('ultimos-pedidos-venda');
-                if (vendas.length === 0) {
-                    containerVendas.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma venda registrada</p>';
-                } else {
-                    containerVendas.innerHTML = vendas.slice(0, 5).map(p => `
-                        <a href="/pages/venda-detalhe.html?id=${p.id}" class="block">
-                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-green-50 transition border-l-4 border-green-400">
-                                <div class="flex-1">
-                                    <p class="font-medium text-gray-900">${p.numero}</p>
-                                    <p class="text-sm text-gray-600">${p.cliente?.nome || 'Sem cliente'}</p>
-                                </div>
-                                <div class="text-right">
-                                    ${getStatusBadge(p.status)}
-                                    <p class="text-sm font-semibold text-gray-900 mt-1">${formatCurrency(p.total)}</p>
-                                </div>
-                            </div>
-                        </a>
-                    `).join('');
-                }
+                await Promise.all([
+                    carregarResumoFinanceiro(),
+                    carregarVendasHoje(),
+                    carregarEstoqueBaixo(),
+                    carregarProdutosVencendo(),
+                    carregarContasPagarVencendo(),
+                    carregarContasReceberVencendo(),
+                    carregarUltimasVendas(),
+                    carregarGraficoVendas(),
+                    carregarGraficoFinanceiro()
+                ]);
             } catch (error) {
                 console.error('Erro ao carregar dashboard:', error);
                 showToast('Erro ao carregar dashboard', 'error');
             }
         }
 
-        function copiarLinkPedidoPublico() {
-            // Construir URL da página pública
-            const origin = window.location.origin;
-            const linkPublico = `${origin}/pedido-publico.html`;
-            
-            // Copiar para clipboard
-            navigator.clipboard.writeText(linkPublico).then(() => {
-                showToast('✅ Link copiado: ' + linkPublico, 'success');
-            }).catch(() => {
-                // Fallback para navegadores antigos
-                const textarea = document.createElement('textarea');
-                textarea.value = linkPublico;
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                showToast('✅ Link copiado para a área de transferência!', 'success');
-            });
+        async function carregarResumoFinanceiro() {
+            try {
+                // Contas a receber pendentes
+                const { data: contasReceber, error: errReceber } = await supabase
+                    .from('contas_receber')
+                    .select('valor_original, valor_recebido, status, data_vencimento')
+                    .in('status', ['PENDENTE', 'VENCIDO', 'RECEBIDO_PARCIAL']);
+
+                if (errReceber) throw errReceber;
+
+                let totalReceber = 0;
+                let receberVencido = 0;
+                const hoje = new Date().toISOString().split('T')[0];
+
+                (contasReceber || []).forEach(c => {
+                    const saldo = (c.valor_original || 0) - (c.valor_recebido || 0);
+                    totalReceber += saldo;
+                    if (c.data_vencimento < hoje) {
+                        receberVencido += saldo;
+                    }
+                });
+
+                document.getElementById('stat-a-receber').textContent = formatCurrency(totalReceber);
+                document.getElementById('stat-receber-vencido').textContent = formatCurrency(receberVencido);
+
+                // Contas a pagar pendentes
+                const { data: contasPagar, error: errPagar } = await supabase
+                    .from('contas_pagar')
+                    .select('valor_original, valor_pago, status, data_vencimento')
+                    .in('status', ['PENDENTE', 'VENCIDO', 'PAGO_PARCIAL']);
+
+                if (errPagar) throw errPagar;
+
+                let totalPagar = 0;
+                let pagarVencido = 0;
+
+                (contasPagar || []).forEach(c => {
+                    const saldo = (c.valor_original || 0) - (c.valor_pago || 0);
+                    totalPagar += saldo;
+                    if (c.data_vencimento < hoje) {
+                        pagarVencido += saldo;
+                    }
+                });
+
+                document.getElementById('stat-a-pagar').textContent = formatCurrency(totalPagar);
+                document.getElementById('stat-pagar-vencido').textContent = formatCurrency(pagarVencido);
+
+                // Calcular balanço do mês (recebido - pago)
+                const inicioMes = new Date();
+                inicioMes.setDate(1);
+                const inicioMesStr = inicioMes.toISOString().split('T')[0];
+
+                const { data: recebidoMes } = await supabase
+                    .from('contas_receber')
+                    .select('valor_recebido')
+                    .eq('status', 'RECEBIDO')
+                    .gte('data_recebimento', inicioMesStr);
+
+                const { data: pagoMes } = await supabase
+                    .from('contas_pagar')
+                    .select('valor_pago')
+                    .eq('status', 'PAGO')
+                    .gte('data_pagamento', inicioMesStr);
+
+                const totalRecebidoMes = (recebidoMes || []).reduce((sum, c) => sum + (c.valor_recebido || 0), 0);
+                const totalPagoMes = (pagoMes || []).reduce((sum, c) => sum + (c.valor_pago || 0), 0);
+                const saldo = totalRecebidoMes - totalPagoMes;
+
+                const statSaldo = document.getElementById('stat-saldo');
+                statSaldo.textContent = formatCurrency(saldo);
+                statSaldo.className = `text-2xl font-bold mt-2 ${saldo >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                // Compras pendentes
+                const { data: comprasPendentes } = await supabase
+                    .from('pedidos_compra')
+                    .select('id')
+                    .in('status', ['PENDENTE', 'APROVADO']);
+
+                document.getElementById('stat-compras-pendentes').textContent = (comprasPendentes || []).length;
+
+            } catch (error) {
+                console.error('Erro ao carregar resumo financeiro:', error);
+            }
+        }
+
+        async function carregarVendasHoje() {
+            try {
+                const hoje = new Date().toISOString().split('T')[0];
+                
+                const { data: vendas, error } = await supabase
+                    .from('vendas')
+                    .select('total')
+                    .eq('status', 'FINALIZADA')
+                    .gte('data_venda', hoje + 'T00:00:00')
+                    .lte('data_venda', hoje + 'T23:59:59');
+
+                if (error) throw error;
+
+                const totalVendas = (vendas || []).reduce((sum, v) => sum + (v.total || 0), 0);
+                
+                document.getElementById('stat-vendas-hoje').textContent = formatCurrency(totalVendas);
+                document.getElementById('stat-qtd-vendas').textContent = (vendas || []).length;
+            } catch (error) {
+                console.error('Erro ao carregar vendas de hoje:', error);
+            }
+        }
+
+        async function carregarEstoqueBaixo() {
+            try {
+                const { data: produtos, error } = await supabase
+                    .from('produtos')
+                    .select('id, codigo, nome, marca, estoque_atual, estoque_minimo, unidade')
+                    .eq('active', true);
+
+                if (error) throw error;
+
+                // Filtrar apenas os que realmente estão baixos
+                const produtosBaixo = (produtos || []).filter(p => p.estoque_atual <= p.estoque_minimo);
+
+                document.getElementById('stat-estoque-baixo').textContent = produtosBaixo.length;
+
+                const container = document.getElementById('produtos-estoque-baixo');
+                
+                if (produtosBaixo.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum produto com estoque baixo</p>';
+                } else {
+                    container.innerHTML = produtosBaixo.slice(0, 5).map(p => `
+                        <div class="flex items-center justify-between p-3 bg-orange-50 rounded-lg border-l-4 border-orange-400">
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-900">${p.nome}</p>
+                                <p class="text-sm text-gray-600">${p.marca || ''} - ${p.codigo}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold text-orange-600">
+                                    ${p.estoque_atual} ${p.unidade || 'UN'}
+                                </p>
+                                <p class="text-xs text-gray-500">Mín: ${p.estoque_minimo}</p>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar estoque baixo:', error);
+                document.getElementById('produtos-estoque-baixo').innerHTML = 
+                    '<p class="text-red-500 text-center py-4">Erro ao carregar dados</p>';
+            }
+        }
+
+        async function carregarProdutosVencendo() {
+            try {
+                const hoje = new Date();
+                const em30dias = new Date();
+                em30dias.setDate(em30dias.getDate() + 30);
+
+                const { data: lotes, error } = await supabase
+                    .from('produto_lotes')
+                    .select(`
+                        id, numero_lote, data_validade, quantidade_atual,
+                        produto:produtos(nome, codigo, marca)
+                    `)
+                    .eq('status', 'ATIVO')
+                    .gt('quantidade_atual', 0)
+                    .lte('data_validade', em30dias.toISOString().split('T')[0])
+                    .order('data_validade', { ascending: true });
+
+                if (error) throw error;
+
+                document.getElementById('stat-vencendo').textContent = (lotes || []).length;
+
+                const container = document.getElementById('produtos-vencendo');
+                
+                if (!lotes || lotes.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhum produto próximo da validade</p>';
+                } else {
+                    container.innerHTML = lotes.slice(0, 5).map(l => {
+                        const dataValidade = new Date(l.data_validade + 'T00:00:00');
+                        const diasRestantes = Math.ceil((dataValidade - hoje) / (1000 * 60 * 60 * 24));
+                        
+                        let corBadge = 'bg-yellow-100 text-yellow-800';
+                        let icone = '⚠️';
+                        
+                        if (diasRestantes <= 0) {
+                            corBadge = 'bg-red-100 text-red-800';
+                            icone = '🚫';
+                        } else if (diasRestantes <= 7) {
+                            corBadge = 'bg-red-100 text-red-800';
+                            icone = '🔴';
+                        }
+
+                        return `
+                            <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg border-l-4 border-red-400">
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">${l.produto?.nome || 'Produto'}</p>
+                                    <p class="text-sm text-gray-600">Lote: ${l.numero_lote}</p>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs px-2 py-1 rounded ${corBadge}">
+                                        ${icone} ${diasRestantes <= 0 ? 'Vencido' : diasRestantes + ' dias'}
+                                    </span>
+                                    <p class="text-xs text-gray-500 mt-1">${l.quantidade_atual} unidades</p>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar produtos vencendo:', error);
+                document.getElementById('produtos-vencendo').innerHTML = 
+                    '<p class="text-red-500 text-center py-4">Erro ao carregar dados</p>';
+            }
+        }
+
+        async function carregarContasPagarVencendo() {
+            try {
+                const hoje = new Date().toISOString().split('T')[0];
+                const em7dias = new Date();
+                em7dias.setDate(em7dias.getDate() + 7);
+
+                const { data: contas, error } = await supabase
+                    .from('contas_pagar')
+                    .select(`
+                        id, descricao, valor_original, valor_pago, data_vencimento, status,
+                        fornecedor:fornecedores(razao_social, nome_fantasia)
+                    `)
+                    .in('status', ['PENDENTE', 'VENCIDO', 'PAGO_PARCIAL'])
+                    .lte('data_vencimento', em7dias.toISOString().split('T')[0])
+                    .order('data_vencimento', { ascending: true });
+
+                if (error) throw error;
+
+                const container = document.getElementById('contas-pagar-vencendo');
+                
+                if (!contas || contas.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhuma conta vencendo</p>';
+                } else {
+                    container.innerHTML = contas.slice(0, 5).map(c => {
+                        const saldo = (c.valor_original || 0) - (c.valor_pago || 0);
+                        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+                        const hojeDate = new Date();
+                        hojeDate.setHours(0, 0, 0, 0);
+                        const diasRestantes = Math.ceil((vencimento - hojeDate) / (1000 * 60 * 60 * 24));
+                        
+                        let corBadge = 'bg-yellow-100 text-yellow-800';
+                        if (diasRestantes <= 0) {
+                            corBadge = 'bg-red-100 text-red-800';
+                        } else if (diasRestantes <= 3) {
+                            corBadge = 'bg-orange-100 text-orange-800';
+                        }
+
+                        const fornecedor = c.fornecedor?.nome_fantasia || c.fornecedor?.razao_social || '';
+
+                        return `
+                            <a href="contas-pagar.html" class="block">
+                                <div class="flex items-center justify-between p-3 bg-red-50 rounded-lg hover:bg-red-100 transition border-l-4 border-red-400">
+                                    <div class="flex-1">
+                                        <p class="font-medium text-gray-900">${c.descricao}</p>
+                                        <p class="text-sm text-gray-600">${fornecedor}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-semibold text-red-600">${formatCurrency(saldo)}</p>
+                                        <span class="text-xs px-2 py-1 rounded ${corBadge}">
+                                            ${diasRestantes <= 0 ? 'Vencido' : diasRestantes + ' dias'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </a>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar contas a pagar:', error);
+                document.getElementById('contas-pagar-vencendo').innerHTML = 
+                    '<p class="text-red-500 text-center py-4">Erro ao carregar dados</p>';
+            }
+        }
+
+        async function carregarContasReceberVencendo() {
+            try {
+                const hoje = new Date().toISOString().split('T')[0];
+                const em7dias = new Date();
+                em7dias.setDate(em7dias.getDate() + 7);
+
+                const { data: contas, error } = await supabase
+                    .from('contas_receber')
+                    .select(`
+                        id, descricao, valor_original, valor_recebido, data_vencimento, status,
+                        cliente:clientes(nome, razao_social)
+                    `)
+                    .in('status', ['PENDENTE', 'VENCIDO', 'RECEBIDO_PARCIAL'])
+                    .lte('data_vencimento', em7dias.toISOString().split('T')[0])
+                    .order('data_vencimento', { ascending: true });
+
+                if (error) throw error;
+
+                const container = document.getElementById('contas-receber-vencendo');
+                
+                if (!contas || contas.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">✅ Nenhuma conta vencendo</p>';
+                } else {
+                    container.innerHTML = contas.slice(0, 5).map(c => {
+                        const saldo = (c.valor_original || 0) - (c.valor_recebido || 0);
+                        const vencimento = new Date(c.data_vencimento + 'T00:00:00');
+                        const hojeDate = new Date();
+                        hojeDate.setHours(0, 0, 0, 0);
+                        const diasRestantes = Math.ceil((vencimento - hojeDate) / (1000 * 60 * 60 * 24));
+                        
+                        let corBadge = 'bg-blue-100 text-blue-800';
+                        if (diasRestantes <= 0) {
+                            corBadge = 'bg-red-100 text-red-800';
+                        } else if (diasRestantes <= 3) {
+                            corBadge = 'bg-orange-100 text-orange-800';
+                        }
+
+                        const cliente = c.cliente?.razao_social || c.cliente?.nome || '';
+
+                        return `
+                            <a href="contas-receber.html" class="block">
+                                <div class="flex items-center justify-between p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition border-l-4 border-blue-400">
+                                    <div class="flex-1">
+                                        <p class="font-medium text-gray-900">${c.descricao}</p>
+                                        <p class="text-sm text-gray-600">${cliente}</p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-sm font-semibold text-blue-600">${formatCurrency(saldo)}</p>
+                                        <span class="text-xs px-2 py-1 rounded ${corBadge}">
+                                            ${diasRestantes <= 0 ? 'Vencido' : diasRestantes + ' dias'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </a>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar contas a receber:', error);
+                document.getElementById('contas-receber-vencendo').innerHTML = 
+                    '<p class="text-red-500 text-center py-4">Erro ao carregar dados</p>';
+            }
+        }
+
+        async function carregarUltimasVendas() {
+            try {
+                const { data: vendas, error } = await supabase
+                    .from('vendas')
+                    .select(`
+                        id, numero, total, data_venda, forma_pagamento, status,
+                        cliente:clientes(nome)
+                    `)
+                    .order('data_venda', { ascending: false })
+                    .limit(5);
+
+                if (error) throw error;
+
+                const container = document.getElementById('ultimas-vendas');
+                
+                if (!vendas || vendas.length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 text-center py-4">Nenhuma venda registrada</p>';
+                } else {
+                    container.innerHTML = vendas.map(v => {
+                        const statusClass = {
+                            'FINALIZADA': 'bg-green-100 text-green-800',
+                            'ABERTA': 'bg-yellow-100 text-yellow-800',
+                            'CANCELADA': 'bg-red-100 text-red-800'
+                        }[v.status] || 'bg-gray-100 text-gray-800';
+
+                        return `
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-green-50 transition border-l-4 border-green-400">
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">${v.numero}</p>
+                                    <p class="text-sm text-gray-600">${v.cliente?.nome || 'Consumidor Final'}</p>
+                                    <p class="text-xs text-gray-500">${formatDateTime(v.data_venda)}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-sm font-semibold text-green-600">${formatCurrency(v.total)}</p>
+                                    <span class="text-xs px-2 py-1 rounded ${statusClass}">${v.status}</span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                console.error('Erro ao carregar últimas vendas:', error);
+                document.getElementById('ultimas-vendas').innerHTML = 
+                    '<p class="text-red-500 text-center py-4">Erro ao carregar dados</p>';
+            }
+        }
+
+        async function carregarGraficoVendas() {
+            try {
+                const labels = [];
+                const valores = [];
+                
+                // Últimos 7 dias
+                for (let i = 6; i >= 0; i--) {
+                    const data = new Date();
+                    data.setDate(data.getDate() - i);
+                    const dataStr = data.toISOString().split('T')[0];
+                    
+                    labels.push(data.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit' }));
+                    
+                    const { data: vendas } = await supabase
+                        .from('vendas')
+                        .select('total')
+                        .eq('status', 'FINALIZADA')
+                        .gte('data_venda', dataStr + 'T00:00:00')
+                        .lte('data_venda', dataStr + 'T23:59:59');
+                    
+                    const totalDia = (vendas || []).reduce((sum, v) => sum + (v.total || 0), 0);
+                    valores.push(totalDia);
+                }
+
+                const ctx = document.getElementById('chartVendas').getContext('2d');
+                
+                if (chartVendas) chartVendas.destroy();
+                
+                chartVendas = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Vendas',
+                            data: valores,
+                            borderColor: '#22c55e',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: value => formatCurrency(value)
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Erro ao carregar gráfico de vendas:', error);
+            }
+        }
+
+        async function carregarGraficoFinanceiro() {
+            try {
+                const inicioMes = new Date();
+                inicioMes.setDate(1);
+                const inicioMesStr = inicioMes.toISOString().split('T')[0];
+
+                // Recebido no mês
+                const { data: recebido } = await supabase
+                    .from('contas_receber')
+                    .select('valor_recebido')
+                    .eq('status', 'RECEBIDO')
+                    .gte('data_recebimento', inicioMesStr);
+
+                // Pago no mês
+                const { data: pago } = await supabase
+                    .from('contas_pagar')
+                    .select('valor_pago')
+                    .eq('status', 'PAGO')
+                    .gte('data_pagamento', inicioMesStr);
+
+                // Vendas à vista no mês
+                const { data: vendasVista } = await supabase
+                    .from('vendas')
+                    .select('total')
+                    .eq('status', 'FINALIZADA')
+                    .neq('forma_pagamento', 'PRAZO')
+                    .gte('data_venda', inicioMesStr);
+
+                const totalRecebido = (recebido || []).reduce((sum, c) => sum + (c.valor_recebido || 0), 0);
+                const totalPago = (pago || []).reduce((sum, c) => sum + (c.valor_pago || 0), 0);
+                const totalVendasVista = (vendasVista || []).reduce((sum, v) => sum + (v.total || 0), 0);
+
+                const ctx = document.getElementById('chartFinanceiro').getContext('2d');
+                
+                if (chartFinanceiro) chartFinanceiro.destroy();
+                
+                chartFinanceiro = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Vendas à Vista', 'Recebimentos', 'Pagamentos'],
+                        datasets: [{
+                            data: [totalVendasVista, totalRecebido, totalPago],
+                            backgroundColor: ['#22c55e', '#3b82f6', '#ef4444'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return context.label + ': ' + formatCurrency(context.raw);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Erro ao carregar gráfico financeiro:', error);
+            }
+        }
+
+        // Funções auxiliares
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('pt-BR', { 
+                style: 'currency', 
+                currency: 'BRL' 
+            }).format(value || 0);
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '-';
+            return new Date(dateStr).toLocaleString('pt-BR');
         }
     </script>
 </body>

@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PDV - Ponto de Venda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Estilos específicos do PDV */
+        .pdv-container {
+            height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            overflow: hidden;
+        }
+        
+        .pdv-header {
+            background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+            color: white;
+            padding: 0.75rem 1rem;
+        }
+        
+        .pdv-main {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 1rem;
+            padding: 1rem;
+            overflow: hidden;
+        }
+        
+        @media (max-width: 1024px) {
+            .pdv-main {
+                grid-template-columns: 1fr;
+            }
+            .pdv-sidebar {
+                display: none;
+            }
+        }
+        
+        .pdv-items {
+            background: white;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .pdv-items-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .pdv-sidebar {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .pdv-footer {
+            background: #1e293b;
+            color: white;
+            padding: 1rem;
+        }
+        
+        .item-row {
+            display: grid;
+            grid-template-columns: 50px 1fr 80px 100px 80px 50px;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            transition: background 0.15s;
+        }
+        
+        .item-row:hover {
+            background: #f8fafc;
+        }
+        
+        .item-row.header {
+            background: #f1f5f9;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .total-display {
+            font-size: 3rem;
+            font-weight: 700;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .key-hint {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.5rem;
+            background: rgba(255,255,255,0.2);
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            margin-right: 0.5rem;
+        }
+        
+        .payment-btn {
+            flex: 1;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+        
+        .payment-btn:hover {
+            transform: scale(1.02);
+        }
+        
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        
+        .qty-btn:hover {
+            transform: scale(1.1);
+        }
+        
+        /* Animações */
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .item-row:not(.header) {
+            animation: slideIn 0.2s ease-out;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="pdv-container">
+        <!-- Header -->
+        <header class="pdv-header">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <a href="dashboard.html" class="text-white/80 hover:text-white">
+                        <i class="fas fa-arrow-left"></i>
+                    </a>
+                    <div>
+                        <h1 class="text-xl font-bold">PDV - Ponto de Venda</h1>
+                        <p class="text-sm text-white/80" id="info-caixa">Caixa: -- | Operador: --</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <span id="data-hora" class="text-sm"></span>
+                    <button onclick="abrirConfigCaixa()" class="bg-white/20 px-3 py-1 rounded hover:bg-white/30">
+                        <i class="fas fa-cog"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="pdv-main">
+            <!-- Área de Itens -->
+            <div class="pdv-items">
+                <!-- Input de código de barras -->
+                <div class="p-4 bg-gray-50 border-b">
+                    <div id="scanner-container"></div>
+                </div>
+                
+                <!-- Header dos itens -->
+                <div class="item-row header">
+                    <span>#</span>
+                    <span>Produto</span>
+                    <span class="text-center">Qtd</span>
+                    <span class="text-right">Unitário</span>
+                    <span class="text-right">Total</span>
+                    <span></span>
+                </div>
+                
+                <!-- Lista de itens -->
+                <div class="pdv-items-list" id="lista-itens">
+                    <div class="flex items-center justify-center h-full text-gray-400">
+                        <div class="text-center">
+                            <i class="fas fa-barcode text-6xl mb-4"></i>
+                            <p>Escaneie ou digite o código do produto</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Totais -->
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="text-sm opacity-80">Itens: <span id="total-itens">0</span></p>
+                            <p class="text-sm opacity-80" id="info-desconto" style="display:none;">
+                                Desconto: <span id="valor-desconto">R$ 0,00</span>
+                            </p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm opacity-80">TOTAL</p>
+                            <p class="total-display" id="total-venda">R$ 0,00</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="pdv-sidebar">
+                <!-- Cliente -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Cliente</label>
+                    <div class="flex gap-2">
+                        <select id="select-cliente" class="flex-1 px-3 py-2 border border-gray-300 rounded-lg">
+                            <option value="">Consumidor Final</option>
+                        </select>
+                        <button onclick="abrirNovoCliente()" class="px-3 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Ações Rápidas -->
+                <div class="mb-4">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Ações Rápidas</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="PDV.novaVenda()" class="p-3 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">
+                            <i class="fas fa-plus mr-1"></i> Nova Venda
+                            <span class="key-hint">F2</span>
+                        </button>
+                        <button onclick="abrirDesconto()" class="p-3 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">
+                            <i class="fas fa-percent mr-1"></i> Desconto
+                            <span class="key-hint">F5</span>
+                        </button>
+                        <button onclick="abrirBuscaProduto()" class="p-3 bg-gray-100 rounded-lg hover:bg-gray-200 text-sm">
+                            <i class="fas fa-search mr-1"></i> Buscar
+                            <span class="key-hint">F3</span>
+                        </button>
+                        <button onclick="confirmarCancelarVenda()" class="p-3 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 text-sm">
+                            <i class="fas fa-times mr-1"></i> Cancelar
+                            <span class="key-hint">F4</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Últimas vendas -->
+                <div class="flex-1 overflow-hidden">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Últimas Vendas</p>
+                    <div class="bg-gray-50 rounded-lg p-2 h-full overflow-y-auto" id="ultimas-vendas">
+                        <p class="text-center text-gray-400 text-sm py-4">Nenhuma venda hoje</p>
+                    </div>
+                </div>
+                
+                <!-- Resumo do caixa -->
+                <div class="mt-4 pt-4 border-t">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Resumo do Caixa</p>
+                    <div class="grid grid-cols-2 gap-2 text-sm">
+                        <div class="bg-green-50 p-2 rounded">
+                            <p class="text-green-600">Dinheiro</p>
+                            <p class="font-bold text-green-700" id="resumo-dinheiro">R$ 0,00</p>
+                        </div>
+                        <div class="bg-purple-50 p-2 rounded">
+                            <p class="text-purple-600">PIX</p>
+                            <p class="font-bold text-purple-700" id="resumo-pix">R$ 0,00</p>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded">
+                            <p class="text-blue-600">Débito</p>
+                            <p class="font-bold text-blue-700" id="resumo-debito">R$ 0,00</p>
+                        </div>
+                        <div class="bg-orange-50 p-2 rounded">
+                            <p class="text-orange-600">Crédito</p>
+                            <p class="font-bold text-orange-700" id="resumo-credito">R$ 0,00</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="pdv-footer">
+            <div class="flex items-center justify-between">
+                <div class="flex gap-2">
+                    <span class="key-hint">F2</span> Nova
+                    <span class="key-hint">F3</span> Buscar
+                    <span class="key-hint">F4</span> Cancelar
+                    <span class="key-hint">F5</span> Desconto
+                    <span class="key-hint">F6</span> Cliente
+                    <span class="key-hint">F10</span> Finalizar
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="abrirPagamento('DINHEIRO')" class="payment-btn bg-green-600 text-white hover:bg-green-700">
+                        <i class="fas fa-money-bill-wave mr-2"></i>Dinheiro
+                    </button>
+                    <button onclick="abrirPagamento('PIX')" class="payment-btn bg-purple-600 text-white hover:bg-purple-700">
+                        <i class="fas fa-qrcode mr-2"></i>PIX
+                    </button>
+                    <button onclick="abrirPagamento('DEBITO')" class="payment-btn bg-blue-600 text-white hover:bg-blue-700">
+                        <i class="fas fa-credit-card mr-2"></i>Débito
+                    </button>
+                    <button onclick="abrirPagamento('CREDITO')" class="payment-btn bg-orange-500 text-white hover:bg-orange-600">
+                        <i class="fas fa-credit-card mr-2"></i>Crédito
+                    </button>
+                    <button onclick="abrirPagamentoMultiplo()" class="payment-btn bg-gray-600 text-white hover:bg-gray-700">
+                        <i class="fas fa-layer-group mr-2"></i>Múltiplo
+                    </button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modal de Pagamento -->
+    <div id="modal-pagamento" class="modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold" id="titulo-pagamento">Pagamento</h3>
+                <button onclick="fecharModal('modal-pagamento')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="text-center mb-6">
+                    <p class="text-sm text-gray-500">Valor a pagar</p>
+                    <p class="text-4xl font-bold text-gray-900" id="valor-pagar">R$ 0,00</p>
+                </div>
+                
+                <!-- Para dinheiro: campo de valor recebido -->
+                <div id="campo-valor-recebido" class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Valor Recebido</label>
+                    <input type="number" id="input-valor-recebido" 
+                        class="w-full px-4 py-3 text-2xl text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        step="0.01" min="0" placeholder="0,00" autofocus>
+                </div>
+                
+                <!-- Troco -->
+                <div id="campo-troco" class="mb-6 text-center" style="display: none;">
+                    <p class="text-sm text-gray-500">Troco</p>
+                    <p class="text-3xl font-bold text-green-600" id="valor-troco">R$ 0,00</p>
+                </div>
+                
+                <!-- Parcelas (para crédito) -->
+                <div id="campo-parcelas" class="mb-4" style="display: none;">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Parcelas</label>
+                    <select id="select-parcelas" class="w-full px-4 py-3 border border-gray-300 rounded-lg">
+                        <option value="1">1x sem juros</option>
+                        <option value="2">2x sem juros</option>
+                        <option value="3">3x sem juros</option>
+                    </select>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button onclick="fecharModal('modal-pagamento')" 
+                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button onclick="confirmarPagamento()" 
+                        class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                        <i class="fas fa-check mr-2"></i>Confirmar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Desconto -->
+    <div id="modal-desconto" class="modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold">Aplicar Desconto</h3>
+                <button onclick="fecharModal('modal-desconto')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="flex gap-2 mb-4">
+                    <button onclick="setTipoDesconto('percentual')" id="btn-desc-percent" 
+                        class="flex-1 py-2 bg-blue-600 text-white rounded-lg">%</button>
+                    <button onclick="setTipoDesconto('valor')" id="btn-desc-valor" 
+                        class="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg">R$</button>
+                </div>
+                
+                <input type="number" id="input-desconto" 
+                    class="w-full px-4 py-3 text-2xl text-center border border-gray-300 rounded-lg mb-4"
+                    step="0.01" min="0" placeholder="0">
+                
+                <button onclick="aplicarDesconto()" 
+                    class="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                    Aplicar Desconto
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Abertura de Caixa -->
+    <div id="modal-abertura-caixa" class="modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-xl max-w-sm w-full mx-4">
+            <div class="px-6 py-4 border-b bg-blue-600 text-white rounded-t-xl">
+                <h3 class="text-lg font-semibold">
+                    <i class="fas fa-cash-register mr-2"></i>Abertura de Caixa
+                </h3>
+            </div>
+            
+            <div class="p-6">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Caixa</label>
+                    <select id="select-caixa" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="">Selecione o caixa...</option>
+                    </select>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Valor Inicial (Fundo de Troco)</label>
+                    <input type="number" id="input-valor-abertura" 
+                        class="w-full px-4 py-3 text-xl text-center border border-gray-300 rounded-lg"
+                        step="0.01" min="0" value="200" placeholder="0,00">
+                </div>
+                
+                <button onclick="confirmarAberturaCaixa()" 
+                    class="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                    <i class="fas fa-unlock mr-2"></i>Abrir Caixa
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg">
+            <div class="spinner mx-auto"></div>
+            <p class="mt-4 text-gray-700">Processando...</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/empresa.js"></script>
+    <script src="../js/services/clientes.js"></script>
+    <script src="../js/services/barcode-scanner.js"></script>
+    <script src="../js/services/focus-nfe.js"></script>
+    <script src="../js/services/pdv.js"></script>
+    
+    <script>
+        // Variáveis globais
+        let tipoDesconto = 'percentual';
+        let formaPagamentoAtual = null;
+        let formasPagamento = [];
+
+        // =====================================================
+        // INICIALIZAÇÃO
+        // =====================================================
+        
+        (async () => {
+            try {
+                await checkAuth();
+                
+                // Carregar formas de pagamento
+                await carregarFormasPagamento();
+                
+                // Carregar clientes
+                await carregarClientes();
+                
+                // Carregar caixas disponíveis
+                await carregarCaixas();
+                
+                // Inicializar PDV
+                await PDV.init();
+                
+                // Verificar se caixa está aberto
+                if (!PDV.sessaoCaixa) {
+                    document.getElementById('modal-abertura-caixa').classList.remove('hidden');
+                }
+                
+                // Inicializar scanner de código de barras
+                const scannerContainer = document.getElementById('scanner-container');
+                scannerContainer.innerHTML = BarcodeScanner.criarComponente({
+                    inputId: 'input-codigo',
+                    placeholder: 'Código de barras ou nome do produto',
+                    showCameraButton: true
+                });
+                
+                BarcodeScanner.inicializarComponente('input-codigo', async (codigo) => {
+                    await PDV.adicionarPorCodigo(codigo);
+                });
+                
+                // Atualizar relógio
+                atualizarRelogio();
+                setInterval(atualizarRelogio, 1000);
+                
+                // Escutar atualizações do PDV
+                window.addEventListener('pdv-atualizado', atualizarInterface);
+                
+                // Atualizar interface inicial
+                atualizarInterface();
+                
+            } catch (error) {
+                console.error('Erro ao inicializar PDV:', error);
+                showToast('Erro ao inicializar PDV', 'error');
+            }
+        })();
+
+        // =====================================================
+        // FUNÇÕES DE INTERFACE
+        // =====================================================
+        
+        function atualizarInterface() {
+            atualizarInfoCaixa();
+            atualizarListaItens();
+            atualizarTotais();
+            atualizarResumoCaixa();
+        }
+        
+        function atualizarInfoCaixa() {
+            const info = document.getElementById('info-caixa');
+            if (PDV.sessaoCaixa) {
+                info.textContent = `Caixa: ${PDV.sessaoCaixa.caixa?.nome || PDV.sessaoCaixa.caixa_id} | Operador: ${PDV.vendedor?.full_name || '--'}`;
+            } else {
+                info.textContent = 'Caixa: FECHADO | Operador: --';
+            }
+        }
+        
+        function atualizarListaItens() {
+            const lista = document.getElementById('lista-itens');
+            
+            if (!PDV.itens || PDV.itens.length === 0) {
+                lista.innerHTML = `
+                    <div class="flex items-center justify-center h-full text-gray-400">
+                        <div class="text-center">
+                            <i class="fas fa-barcode text-6xl mb-4"></i>
+                            <p>Escaneie ou digite o código do produto</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            lista.innerHTML = PDV.itens.map((item, index) => `
+                <div class="item-row" data-item-id="${item.id}">
+                    <span class="text-gray-500">${String(index + 1).padStart(3, '0')}</span>
+                    <div>
+                        <p class="font-medium">${item.descricao}</p>
+                        <p class="text-sm text-gray-500">${item.codigo_barras || item.produto_id.substring(0, 8)}</p>
+                    </div>
+                    <div class="flex items-center justify-center gap-1">
+                        <button onclick="alterarQtd('${item.id}', -1)" 
+                            class="qty-btn bg-red-100 text-red-600 hover:bg-red-200">-</button>
+                        <span class="w-10 text-center font-medium">${item.quantidade}</span>
+                        <button onclick="alterarQtd('${item.id}', 1)" 
+                            class="qty-btn bg-green-100 text-green-600 hover:bg-green-200">+</button>
+                    </div>
+                    <span class="text-right">${formatarMoeda(item.preco_unitario)}</span>
+                    <span class="text-right font-medium">${formatarMoeda(item.subtotal)}</span>
+                    <button onclick="removerItem('${item.id}')" 
+                        class="text-red-500 hover:text-red-700 p-1">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        function atualizarTotais() {
+            document.getElementById('total-itens').textContent = PDV.itens?.length || 0;
+            document.getElementById('total-venda').textContent = formatarMoeda(PDV.vendaAtual?.total || 0);
+            
+            const desconto = PDV.vendaAtual?.desconto_valor || 0;
+            const infoDesconto = document.getElementById('info-desconto');
+            if (desconto > 0) {
+                infoDesconto.style.display = 'block';
+                document.getElementById('valor-desconto').textContent = formatarMoeda(desconto);
+            } else {
+                infoDesconto.style.display = 'none';
+            }
+        }
+        
+        function atualizarResumoCaixa() {
+            if (PDV.sessaoCaixa) {
+                document.getElementById('resumo-dinheiro').textContent = formatarMoeda(PDV.sessaoCaixa.total_dinheiro || 0);
+                document.getElementById('resumo-pix').textContent = formatarMoeda(PDV.sessaoCaixa.total_pix || 0);
+                document.getElementById('resumo-debito').textContent = formatarMoeda(PDV.sessaoCaixa.total_debito || 0);
+                document.getElementById('resumo-credito').textContent = formatarMoeda(PDV.sessaoCaixa.total_credito || 0);
+            }
+        }
+        
+        function atualizarRelogio() {
+            const now = new Date();
+            document.getElementById('data-hora').textContent = now.toLocaleString('pt-BR');
+        }
+
+        // =====================================================
+        // CARREGAMENTO DE DADOS
+        // =====================================================
+        
+        async function carregarFormasPagamento() {
+            try {
+                const { data, error } = await supabase
+                    .from('formas_pagamento')
+                    .select('*')
+                    .eq('ativo', true)
+                    .order('ordem');
+                    
+                if (!error) {
+                    formasPagamento = data;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar formas de pagamento:', error);
+            }
+        }
+        
+        async function carregarClientes() {
+            try {
+                const clientes = await getClientes();
+                const select = document.getElementById('select-cliente');
+                select.innerHTML = '<option value="">Consumidor Final</option>';
+                clientes.forEach(c => {
+                    select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
+        }
+        
+        async function carregarCaixas() {
+            try {
+                const { data, error } = await supabase
+                    .from('caixas')
+                    .select('*')
+                    .eq('ativo', true)
+                    .order('numero');
+                    
+                const select = document.getElementById('select-caixa');
+                select.innerHTML = '<option value="">Selecione o caixa...</option>';
+                
+                if (data) {
+                    data.forEach(c => {
+                        select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar caixas:', error);
+            }
+        }
+
+        // =====================================================
+        // AÇÕES DO PDV
+        // =====================================================
+        
+        async function alterarQtd(itemId, delta) {
+            const item = PDV.itens.find(i => i.id === itemId);
+            if (item) {
+                await PDV.alterarQuantidade(itemId, item.quantidade + delta);
+            }
+        }
+        
+        async function removerItem(itemId) {
+            if (await confirmAction('Remover este item?')) {
+                await PDV.removerItem(itemId);
+            }
+        }
+        
+        async function confirmarCancelarVenda() {
+            if (await confirmAction('Cancelar a venda atual?')) {
+                await PDV.cancelarVenda();
+            }
+        }
+
+        // =====================================================
+        // PAGAMENTO
+        // =====================================================
+        
+        function abrirPagamento(tipo) {
+            if (!PDV.vendaAtual || PDV.itens.length === 0) {
+                showToast('Adicione itens à venda primeiro', 'warning');
+                return;
+            }
+            
+            formaPagamentoAtual = tipo;
+            
+            const modal = document.getElementById('modal-pagamento');
+            const titulo = document.getElementById('titulo-pagamento');
+            const valorPagar = document.getElementById('valor-pagar');
+            const campoRecebido = document.getElementById('campo-valor-recebido');
+            const campoTroco = document.getElementById('campo-troco');
+            const campoParcelas = document.getElementById('campo-parcelas');
+            const inputRecebido = document.getElementById('input-valor-recebido');
+            
+            // Configurar modal conforme tipo de pagamento
+            titulo.textContent = `Pagamento em ${tipo}`;
+            valorPagar.textContent = formatarMoeda(PDV.vendaAtual.total);
+            
+            // Mostrar/ocultar campos conforme tipo
+            if (tipo === 'DINHEIRO') {
+                campoRecebido.style.display = 'block';
+                campoTroco.style.display = 'block';
+                campoParcelas.style.display = 'none';
+                inputRecebido.value = '';
+                inputRecebido.focus();
+            } else if (tipo === 'CREDITO') {
+                campoRecebido.style.display = 'none';
+                campoTroco.style.display = 'none';
+                campoParcelas.style.display = 'block';
+            } else {
+                campoRecebido.style.display = 'none';
+                campoTroco.style.display = 'none';
+                campoParcelas.style.display = 'none';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+        
+        // Calcular troco ao digitar
+        document.getElementById('input-valor-recebido')?.addEventListener('input', function() {
+            const recebido = parseFloat(this.value) || 0;
+            const total = PDV.vendaAtual?.total || 0;
+            const troco = recebido - total;
+            
+            document.getElementById('valor-troco').textContent = formatarMoeda(Math.max(0, troco));
+            document.getElementById('campo-troco').style.display = troco >= 0 ? 'block' : 'none';
+        });
+        
+        async function confirmarPagamento() {
+            try {
+                showLoading(true);
+                
+                const forma = formasPagamento.find(f => f.tipo === formaPagamentoAtual);
+                if (!forma) {
+                    showToast('Forma de pagamento não encontrada', 'error');
+                    return;
+                }
+                
+                let pagamento = {
+                    forma_pagamento_id: forma.id,
+                    valor: PDV.vendaAtual.total,
+                    parcelas: 1
+                };
+                
+                // Dados específicos por tipo
+                if (formaPagamentoAtual === 'DINHEIRO') {
+                    const recebido = parseFloat(document.getElementById('input-valor-recebido').value) || 0;
+                    if (recebido < PDV.vendaAtual.total) {
+                        showToast('Valor recebido insuficiente', 'warning');
+                        return;
+                    }
+                    pagamento.valor_recebido = recebido;
+                    pagamento.troco = recebido - PDV.vendaAtual.total;
+                } else if (formaPagamentoAtual === 'CREDITO') {
+                    pagamento.parcelas = parseInt(document.getElementById('select-parcelas').value) || 1;
+                }
+                
+                // Finalizar venda
+                const resultado = await PDV.finalizarVenda([pagamento], 'NFCE');
+                
+                if (resultado) {
+                    fecharModal('modal-pagamento');
+                    
+                    // Mostrar resultado
+                    if (pagamento.troco > 0) {
+                        showToast(`Venda finalizada! Troco: ${formatarMoeda(pagamento.troco)}`, 'success');
+                    } else {
+                        showToast('Venda finalizada com sucesso!', 'success');
+                    }
+                }
+                
+            } catch (error) {
+                handleError(error, 'Erro ao processar pagamento');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // =====================================================
+        // DESCONTO
+        // =====================================================
+        
+        function abrirDesconto() {
+            if (!PDV.vendaAtual || PDV.itens.length === 0) {
+                showToast('Adicione itens à venda primeiro', 'warning');
+                return;
+            }
+            document.getElementById('modal-desconto').classList.remove('hidden');
+            document.getElementById('input-desconto').focus();
+        }
+        
+        function setTipoDesconto(tipo) {
+            tipoDesconto = tipo;
+            document.getElementById('btn-desc-percent').className = 
+                tipo === 'percentual' ? 'flex-1 py-2 bg-blue-600 text-white rounded-lg' : 'flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg';
+            document.getElementById('btn-desc-valor').className = 
+                tipo === 'valor' ? 'flex-1 py-2 bg-blue-600 text-white rounded-lg' : 'flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg';
+        }
+        
+        async function aplicarDesconto() {
+            const valor = parseFloat(document.getElementById('input-desconto').value) || 0;
+            if (valor > 0) {
+                await PDV.aplicarDesconto(tipoDesconto, valor);
+                fecharModal('modal-desconto');
+                document.getElementById('input-desconto').value = '';
+            }
+        }
+
+        // =====================================================
+        // CAIXA
+        // =====================================================
+        
+        async function confirmarAberturaCaixa() {
+            const caixaId = document.getElementById('select-caixa').value;
+            const valorAbertura = parseFloat(document.getElementById('input-valor-abertura').value) || 0;
+            
+            if (!caixaId) {
+                showToast('Selecione um caixa', 'warning');
+                return;
+            }
+            
+            try {
+                await PDV.abrirCaixa(caixaId, valorAbertura);
+                fecharModal('modal-abertura-caixa');
+                atualizarInterface();
+            } catch (error) {
+                handleError(error, 'Erro ao abrir caixa');
+            }
+        }
+
+        // =====================================================
+        // UTILITÁRIOS
+        // =====================================================
+        
+        function formatarMoeda(valor) {
+            return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+        
+        function fecharModal(id) {
+            document.getElementById(id)?.classList.add('hidden');
+        }
+        
+        function abrirBuscaProduto() {
+            document.getElementById('input-codigo')?.focus();
+        }
+        
+        function abrirNovoCliente() {
+            // TODO: Abrir modal de cadastro rápido de cliente
+            showToast('Funcionalidade em desenvolvimento', 'info');
+        }
+        
+        function abrirPagamentoMultiplo() {
+            // TODO: Modal de pagamento com múltiplas formas
+            showToast('Funcionalidade em desenvolvimento', 'info');
+        }
+        
+        function abrirConfigCaixa() {
+            // TODO: Configurações do caixa (sangria, suprimento, etc)
+            showToast('Funcionalidade em desenvolvimento', 'info');
+        }
+    </script>
+</body>
+</html>

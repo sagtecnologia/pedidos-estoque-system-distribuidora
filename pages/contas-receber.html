@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contas a Receber - Sistema Distribuidora</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div class="flex h-screen">
+        <div id="sidebar"></div>
+        
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <div id="navbar"></div>
+            
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- Cabeçalho -->
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">
+                            <i class="fas fa-hand-holding-usd text-green-500 mr-2"></i>
+                            Contas a Receber
+                        </h1>
+                        <p class="text-gray-600">Gerencie seus recebimentos</p>
+                    </div>
+                    <button onclick="abrirModalNovaConta()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                        <i class="fas fa-plus"></i>
+                        Nova Conta
+                    </button>
+                </div>
+
+                <!-- Cards de Resumo -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Total a Receber</p>
+                                <p class="text-2xl font-bold text-gray-800" id="totalPendente">R$ 0,00</p>
+                            </div>
+                            <div class="bg-blue-100 p-3 rounded-full">
+                                <i class="fas fa-clock text-blue-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Vencidas</p>
+                                <p class="text-2xl font-bold text-red-600" id="totalVencido">R$ 0,00</p>
+                            </div>
+                            <div class="bg-red-100 p-3 rounded-full">
+                                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Vence Hoje</p>
+                                <p class="text-2xl font-bold text-orange-600" id="totalHoje">R$ 0,00</p>
+                            </div>
+                            <div class="bg-orange-100 p-3 rounded-full">
+                                <i class="fas fa-calendar-day text-orange-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow p-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-gray-500 text-sm">Recebido no Mês</p>
+                                <p class="text-2xl font-bold text-green-600" id="totalRecebidoMes">R$ 0,00</p>
+                            </div>
+                            <div class="bg-green-100 p-3 rounded-full">
+                                <i class="fas fa-check-circle text-green-600 text-xl"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filtros -->
+                <div class="bg-white rounded-lg shadow p-4 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                            <input type="text" id="filtroTexto" placeholder="Descrição ou documento..."
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                            <select id="filtroCliente" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select id="filtroStatus" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500">
+                                <option value="">Todos</option>
+                                <option value="PENDENTE" selected>Pendente</option>
+                                <option value="VENCIDO">Vencido</option>
+                                <option value="RECEBIDO">Recebido</option>
+                                <option value="RECEBIDO_PARCIAL">Recebido Parcial</option>
+                                <option value="CANCELADO">Cancelado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Período</label>
+                            <select id="filtroPeriodo" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500">
+                                <option value="">Todos</option>
+                                <option value="hoje">Vence Hoje</option>
+                                <option value="semana">Próximos 7 dias</option>
+                                <option value="mes">Próximos 30 dias</option>
+                                <option value="vencido">Vencidos</option>
+                            </select>
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button onclick="filtrarContas()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center gap-2">
+                                <i class="fas fa-search"></i>
+                                Filtrar
+                            </button>
+                            <button onclick="limparFiltros()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Contas -->
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded">
+                                    </th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Documento</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cliente</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vencimento</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recebido</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelaContas" class="bg-white divide-y divide-gray-200">
+                                <tr>
+                                    <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                                        <i class="fas fa-spinner fa-spin text-3xl mb-2"></i>
+                                        <p>Carregando contas...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Ações em Lote -->
+                <div id="acoesLote" class="hidden fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-4">
+                    <span><strong id="qtdSelecionados">0</strong> conta(s) selecionada(s)</span>
+                    <button onclick="receberSelecionadas()" class="bg-green-600 hover:bg-green-700 px-4 py-2 rounded flex items-center gap-2">
+                        <i class="fas fa-check"></i> Receber Selecionadas
+                    </button>
+                    <button onclick="cancelarSelecao()" class="bg-gray-600 hover:bg-gray-700 px-3 py-2 rounded">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Nova/Editar Conta -->
+    <div id="modalConta" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800" id="tituloModalConta">Nova Conta a Receber</h2>
+                    <button onclick="fecharModalConta()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="formConta" onsubmit="salvarConta(event)">
+                    <input type="hidden" id="contaId">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Nº Documento</label>
+                            <input type="text" id="numeroDocumento" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                            <select id="categoria" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                <option value="VENDA">Venda</option>
+                                <option value="SERVICO">Serviço</option>
+                                <option value="OUTROS">Outros</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Descrição *</label>
+                            <input type="text" id="descricao" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                            <select id="clienteId" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Valor *</label>
+                            <input type="text" id="valorOriginal" required class="w-full border border-gray-300 rounded-lg px-3 py-2" 
+                                   onkeyup="formatarMoeda(this)">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Desconto</label>
+                            <input type="text" id="valorDesconto" class="w-full border border-gray-300 rounded-lg px-3 py-2" 
+                                   onkeyup="formatarMoeda(this)" value="R$ 0,00">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data Emissão</label>
+                            <input type="date" id="dataEmissao" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data Vencimento *</label>
+                            <input type="date" id="dataVencimento" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Parcela</label>
+                            <div class="flex gap-2">
+                                <input type="number" id="parcelaAtual" min="1" value="1" class="w-20 border border-gray-300 rounded-lg px-3 py-2">
+                                <span class="flex items-center text-gray-500">/</span>
+                                <input type="number" id="totalParcelas" min="1" value="1" class="w-20 border border-gray-300 rounded-lg px-3 py-2">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Forma Recebimento</label>
+                            <select id="formaRecebimento" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                <option value="">Selecione...</option>
+                                <option value="BOLETO">Boleto</option>
+                                <option value="PIX">PIX</option>
+                                <option value="TRANSFERENCIA">Transferência</option>
+                                <option value="DINHEIRO">Dinheiro</option>
+                                <option value="CHEQUE">Cheque</option>
+                                <option value="CARTAO">Cartão</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                            <textarea id="observacoes" rows="2" class="w-full border border-gray-300 rounded-lg px-3 py-2"></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" onclick="fecharModalConta()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-save mr-2"></i>Salvar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Receber Conta -->
+    <div id="modalReceber" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Receber Conta</h2>
+                    <button onclick="fecharModalReceber()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                
+                <form id="formReceber" onsubmit="confirmarRecebimento(event)">
+                    <input type="hidden" id="recebimentoContaId">
+                    
+                    <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                        <p class="text-sm text-gray-600">Documento: <strong id="recebimentoDocumento"></strong></p>
+                        <p class="text-sm text-gray-600">Cliente: <strong id="recebimentoCliente"></strong></p>
+                        <p class="text-sm text-gray-600">Valor Total: <strong id="recebimentoValorTotal"></strong></p>
+                        <p class="text-sm text-gray-600">Já Recebido: <strong id="recebimentoValorRecebido"></strong></p>
+                        <p class="text-lg text-gray-800 mt-2">Saldo: <strong class="text-green-600" id="recebimentoSaldo"></strong></p>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Valor a Receber *</label>
+                            <input type="text" id="recebimentoValor" required class="w-full border border-gray-300 rounded-lg px-3 py-2" 
+                                   onkeyup="formatarMoeda(this)">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data Recebimento *</label>
+                            <input type="date" id="recebimentoData" required class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Forma de Recebimento</label>
+                            <select id="recebimentoForma" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                                <option value="PIX">PIX</option>
+                                <option value="DINHEIRO">Dinheiro</option>
+                                <option value="TRANSFERENCIA">Transferência</option>
+                                <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                                <option value="CARTAO_DEBITO">Cartão de Débito</option>
+                                <option value="BOLETO">Boleto</option>
+                                <option value="CHEQUE">Cheque</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Juros/Multa</label>
+                            <input type="text" id="recebimentoJuros" class="w-full border border-gray-300 rounded-lg px-3 py-2" 
+                                   onkeyup="formatarMoeda(this)" value="R$ 0,00">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Desconto</label>
+                            <input type="text" id="recebimentoDesconto" class="w-full border border-gray-300 rounded-lg px-3 py-2" 
+                                   onkeyup="formatarMoeda(this)" value="R$ 0,00">
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end gap-2 mt-6">
+                        <button type="button" onclick="fecharModalReceber()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                            <i class="fas fa-check mr-2"></i>Confirmar Recebimento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script>
+        let contas = [];
+        let clientes = [];
+        let contasSelecionadas = new Set();
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await verificarAutenticacao();
+            await carregarClientes();
+            await carregarContas();
+            atualizarResumo();
+        });
+
+        async function carregarClientes() {
+            try {
+                const { data, error } = await supabase
+                    .from('clientes')
+                    .select('id, nome, razao_social')
+                    .eq('active', true)
+                    .order('nome');
+
+                if (error) throw error;
+                
+                clientes = data || [];
+                
+                const selectCliente = document.getElementById('clienteId');
+                const filtroCliente = document.getElementById('filtroCliente');
+                
+                clientes.forEach(c => {
+                    const nome = c.razao_social || c.nome;
+                    selectCliente.innerHTML += `<option value="${c.id}">${nome}</option>`;
+                    filtroCliente.innerHTML += `<option value="${c.id}">${nome}</option>`;
+                });
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
+        }
+
+        async function carregarContas() {
+            try {
+                let query = supabase
+                    .from('contas_receber')
+                    .select(`
+                        *,
+                        cliente:clientes(nome, razao_social)
+                    `)
+                    .order('data_vencimento', { ascending: true });
+
+                const status = document.getElementById('filtroStatus').value;
+                if (status) query = query.eq('status', status);
+
+                const cliente = document.getElementById('filtroCliente').value;
+                if (cliente) query = query.eq('cliente_id', cliente);
+
+                const texto = document.getElementById('filtroTexto').value;
+                if (texto) {
+                    query = query.or(`descricao.ilike.%${texto}%,numero_documento.ilike.%${texto}%`);
+                }
+
+                const periodo = document.getElementById('filtroPeriodo').value;
+                if (periodo) {
+                    const hoje = new Date().toISOString().split('T')[0];
+                    if (periodo === 'hoje') {
+                        query = query.eq('data_vencimento', hoje);
+                    } else if (periodo === 'semana') {
+                        const semana = new Date();
+                        semana.setDate(semana.getDate() + 7);
+                        query = query.gte('data_vencimento', hoje).lte('data_vencimento', semana.toISOString().split('T')[0]);
+                    } else if (periodo === 'mes') {
+                        const mes = new Date();
+                        mes.setDate(mes.getDate() + 30);
+                        query = query.gte('data_vencimento', hoje).lte('data_vencimento', mes.toISOString().split('T')[0]);
+                    } else if (periodo === 'vencido') {
+                        query = query.lt('data_vencimento', hoje);
+                    }
+                }
+
+                const { data, error } = await query;
+
+                if (error) throw error;
+                
+                contas = data || [];
+                renderizarTabela();
+                atualizarResumo();
+            } catch (error) {
+                console.error('Erro ao carregar contas:', error);
+                showToast('Erro ao carregar contas', 'error');
+            }
+        }
+
+        function renderizarTabela() {
+            const tbody = document.getElementById('tabelaContas');
+            
+            if (contas.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-3xl mb-2"></i>
+                            <p>Nenhuma conta encontrada</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = contas.map(conta => {
+                const clienteNome = conta.cliente ? 
+                    (conta.cliente.razao_social || conta.cliente.nome) : 'Não informado';
+                
+                const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                const diasVencer = Math.ceil((vencimento - hoje) / (1000 * 60 * 60 * 24));
+                
+                let vencimentoClass = 'text-gray-600';
+                let vencimentoBadge = '';
+                
+                if (conta.status === 'VENCIDO' || diasVencer < 0) {
+                    vencimentoClass = 'text-red-600 font-semibold';
+                    vencimentoBadge = `<span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded">Vencido há ${Math.abs(diasVencer)} dias</span>`;
+                } else if (diasVencer === 0) {
+                    vencimentoClass = 'text-orange-600 font-semibold';
+                    vencimentoBadge = `<span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">Vence hoje</span>`;
+                } else if (diasVencer <= 7) {
+                    vencimentoClass = 'text-yellow-600';
+                    vencimentoBadge = `<span class="text-xs bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded">Vence em ${diasVencer} dias</span>`;
+                }
+
+                const statusClass = {
+                    'PENDENTE': 'bg-blue-100 text-blue-800',
+                    'VENCIDO': 'bg-red-100 text-red-800',
+                    'RECEBIDO': 'bg-green-100 text-green-800',
+                    'RECEBIDO_PARCIAL': 'bg-yellow-100 text-yellow-800',
+                    'CANCELADO': 'bg-gray-100 text-gray-800'
+                }[conta.status] || 'bg-gray-100 text-gray-800';
+
+                const statusText = {
+                    'PENDENTE': 'Pendente',
+                    'VENCIDO': 'Vencido',
+                    'RECEBIDO': 'Recebido',
+                    'RECEBIDO_PARCIAL': 'Recebido Parcial',
+                    'CANCELADO': 'Cancelado'
+                }[conta.status] || conta.status;
+
+                const podeReceber = ['PENDENTE', 'VENCIDO', 'RECEBIDO_PARCIAL'].includes(conta.status);
+
+                return `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3">
+                            ${podeReceber ? `
+                                <input type="checkbox" class="checkConta rounded" data-id="${conta.id}" 
+                                       onchange="toggleSelecao('${conta.id}')" ${contasSelecionadas.has(conta.id) ? 'checked' : ''}>
+                            ` : ''}
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${conta.numero_documento || '-'}</td>
+                        <td class="px-4 py-3">
+                            <div class="text-sm font-medium text-gray-900">${conta.descricao}</div>
+                            <div class="text-xs text-gray-500">${conta.parcela_atual}/${conta.total_parcelas} parcela(s)</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600">${clienteNome}</td>
+                        <td class="px-4 py-3">
+                            <div class="${vencimentoClass}">${formatarData(conta.data_vencimento)}</div>
+                            ${vencimentoBadge}
+                        </td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">${formatarMoedaValor(conta.valor_original)}</td>
+                        <td class="px-4 py-3 text-sm text-green-600">${formatarMoedaValor(conta.valor_recebido || 0)}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs font-semibold rounded-full ${statusClass}">${statusText}</span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="flex gap-1">
+                                ${podeReceber ? `
+                                    <button onclick="abrirModalReceber('${conta.id}')" 
+                                            class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded text-xs" title="Receber">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                ` : ''}
+                                <button onclick="editarConta('${conta.id}')" 
+                                        class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs" title="Editar">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                ${conta.status !== 'RECEBIDO' ? `
+                                    <button onclick="cancelarConta('${conta.id}')" 
+                                            class="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs" title="Cancelar">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function atualizarResumo() {
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            
+            let pendente = 0;
+            let vencido = 0;
+            let venceHoje = 0;
+            let recebidoMes = 0;
+
+            const mesAtual = hoje.getMonth();
+            const anoAtual = hoje.getFullYear();
+
+            contas.forEach(conta => {
+                const saldo = (conta.valor_original - (conta.valor_recebido || 0));
+                
+                if (conta.status === 'RECEBIDO') {
+                    const dataRecebimento = conta.data_recebimento ? new Date(conta.data_recebimento) : null;
+                    if (dataRecebimento && dataRecebimento.getMonth() === mesAtual && dataRecebimento.getFullYear() === anoAtual) {
+                        recebidoMes += conta.valor_recebido || 0;
+                    }
+                } else if (['PENDENTE', 'VENCIDO', 'RECEBIDO_PARCIAL'].includes(conta.status)) {
+                    pendente += saldo;
+                    
+                    const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
+                    if (vencimento < hoje) {
+                        vencido += saldo;
+                    } else if (vencimento.getTime() === hoje.getTime()) {
+                        venceHoje += saldo;
+                    }
+                }
+            });
+
+            document.getElementById('totalPendente').textContent = formatarMoedaValor(pendente);
+            document.getElementById('totalVencido').textContent = formatarMoedaValor(vencido);
+            document.getElementById('totalHoje').textContent = formatarMoedaValor(venceHoje);
+            document.getElementById('totalRecebidoMes').textContent = formatarMoedaValor(recebidoMes);
+        }
+
+        function abrirModalNovaConta() {
+            document.getElementById('tituloModalConta').textContent = 'Nova Conta a Receber';
+            document.getElementById('formConta').reset();
+            document.getElementById('contaId').value = '';
+            document.getElementById('dataEmissao').value = new Date().toISOString().split('T')[0];
+            document.getElementById('valorDesconto').value = 'R$ 0,00';
+            document.getElementById('modalConta').classList.remove('hidden');
+        }
+
+        function fecharModalConta() {
+            document.getElementById('modalConta').classList.add('hidden');
+        }
+
+        async function editarConta(id) {
+            const conta = contas.find(c => c.id === id);
+            if (!conta) return;
+
+            document.getElementById('tituloModalConta').textContent = 'Editar Conta a Receber';
+            document.getElementById('contaId').value = conta.id;
+            document.getElementById('numeroDocumento').value = conta.numero_documento || '';
+            document.getElementById('categoria').value = conta.categoria || 'VENDA';
+            document.getElementById('descricao').value = conta.descricao;
+            document.getElementById('clienteId').value = conta.cliente_id || '';
+            document.getElementById('valorOriginal').value = formatarMoedaValor(conta.valor_original);
+            document.getElementById('valorDesconto').value = formatarMoedaValor(conta.valor_desconto || 0);
+            document.getElementById('dataEmissao').value = conta.data_emissao || '';
+            document.getElementById('dataVencimento').value = conta.data_vencimento;
+            document.getElementById('parcelaAtual').value = conta.parcela_atual;
+            document.getElementById('totalParcelas').value = conta.total_parcelas;
+            document.getElementById('formaRecebimento').value = conta.forma_recebimento || '';
+            document.getElementById('observacoes').value = conta.observacoes || '';
+            
+            document.getElementById('modalConta').classList.remove('hidden');
+        }
+
+        async function salvarConta(event) {
+            event.preventDefault();
+            
+            const id = document.getElementById('contaId').value;
+            const dados = {
+                numero_documento: document.getElementById('numeroDocumento').value || null,
+                categoria: document.getElementById('categoria').value,
+                descricao: document.getElementById('descricao').value,
+                cliente_id: document.getElementById('clienteId').value || null,
+                valor_original: parseMoeda(document.getElementById('valorOriginal').value),
+                valor_desconto: parseMoeda(document.getElementById('valorDesconto').value),
+                data_emissao: document.getElementById('dataEmissao').value || null,
+                data_vencimento: document.getElementById('dataVencimento').value,
+                parcela_atual: parseInt(document.getElementById('parcelaAtual').value),
+                total_parcelas: parseInt(document.getElementById('totalParcelas').value),
+                forma_recebimento: document.getElementById('formaRecebimento').value || null,
+                observacoes: document.getElementById('observacoes').value || null
+            };
+
+            try {
+                let result;
+                if (id) {
+                    result = await supabase.from('contas_receber').update(dados).eq('id', id);
+                } else {
+                    result = await supabase.from('contas_receber').insert(dados);
+                }
+
+                if (result.error) throw result.error;
+
+                showToast(id ? 'Conta atualizada com sucesso!' : 'Conta criada com sucesso!', 'success');
+                fecharModalConta();
+                await carregarContas();
+            } catch (error) {
+                console.error('Erro ao salvar conta:', error);
+                showToast('Erro ao salvar conta: ' + error.message, 'error');
+            }
+        }
+
+        function abrirModalReceber(id) {
+            const conta = contas.find(c => c.id === id);
+            if (!conta) return;
+
+            const saldo = conta.valor_original - (conta.valor_recebido || 0) + (conta.valor_juros || 0) - (conta.valor_desconto || 0);
+            const clienteNome = conta.cliente ? (conta.cliente.razao_social || conta.cliente.nome) : 'Não informado';
+
+            document.getElementById('recebimentoContaId').value = conta.id;
+            document.getElementById('recebimentoDocumento').textContent = conta.numero_documento || conta.descricao;
+            document.getElementById('recebimentoCliente').textContent = clienteNome;
+            document.getElementById('recebimentoValorTotal').textContent = formatarMoedaValor(conta.valor_original);
+            document.getElementById('recebimentoValorRecebido').textContent = formatarMoedaValor(conta.valor_recebido || 0);
+            document.getElementById('recebimentoSaldo').textContent = formatarMoedaValor(saldo);
+            document.getElementById('recebimentoValor').value = formatarMoedaValor(saldo);
+            document.getElementById('recebimentoData').value = new Date().toISOString().split('T')[0];
+            document.getElementById('recebimentoJuros').value = 'R$ 0,00';
+            document.getElementById('recebimentoDesconto').value = 'R$ 0,00';
+            
+            document.getElementById('modalReceber').classList.remove('hidden');
+        }
+
+        function fecharModalReceber() {
+            document.getElementById('modalReceber').classList.add('hidden');
+        }
+
+        async function confirmarRecebimento(event) {
+            event.preventDefault();
+
+            const id = document.getElementById('recebimentoContaId').value;
+            const conta = contas.find(c => c.id === id);
+            if (!conta) return;
+
+            const valorRecebido = parseMoeda(document.getElementById('recebimentoValor').value);
+            const juros = parseMoeda(document.getElementById('recebimentoJuros').value);
+            const desconto = parseMoeda(document.getElementById('recebimentoDesconto').value);
+            const dataRecebimento = document.getElementById('recebimentoData').value;
+            const formaRecebimento = document.getElementById('recebimentoForma').value;
+
+            const totalRecebido = (conta.valor_recebido || 0) + valorRecebido;
+            const saldo = conta.valor_original - totalRecebido + juros - desconto;
+
+            const novoStatus = saldo <= 0 ? 'RECEBIDO' : 'RECEBIDO_PARCIAL';
+
+            try {
+                // Atualizar conta
+                const { error: errorConta } = await supabase
+                    .from('contas_receber')
+                    .update({
+                        valor_recebido: totalRecebido,
+                        valor_juros: (conta.valor_juros || 0) + juros,
+                        valor_desconto: (conta.valor_desconto || 0) + desconto,
+                        data_recebimento: novoStatus === 'RECEBIDO' ? dataRecebimento : null,
+                        forma_recebimento: formaRecebimento,
+                        status: novoStatus
+                    })
+                    .eq('id', id);
+
+                if (errorConta) throw errorConta;
+
+                // Registrar movimentação financeira
+                const { error: errorMov } = await supabase
+                    .from('movimentacoes_financeiras')
+                    .insert({
+                        tipo: 'RECEBIMENTO',
+                        conta_receber_id: id,
+                        valor: valorRecebido,
+                        data_movimento: dataRecebimento,
+                        forma: formaRecebimento,
+                        observacoes: `Recebimento ${novoStatus === 'RECEBIDO' ? 'total' : 'parcial'} da conta`
+                    });
+
+                if (errorMov) console.error('Erro ao registrar movimentação:', errorMov);
+
+                // Atualizar saldo do cliente se houver
+                if (conta.cliente_id) {
+                    await supabase.rpc('atualizar_saldo_cliente', {
+                        p_cliente_id: conta.cliente_id,
+                        p_valor: -valorRecebido
+                    }).catch(e => console.log('RPC não encontrada, ignorando'));
+                }
+
+                showToast('Recebimento registrado com sucesso!', 'success');
+                fecharModalReceber();
+                await carregarContas();
+            } catch (error) {
+                console.error('Erro ao registrar recebimento:', error);
+                showToast('Erro ao registrar recebimento: ' + error.message, 'error');
+            }
+        }
+
+        async function cancelarConta(id) {
+            if (!confirm('Tem certeza que deseja cancelar esta conta?')) return;
+
+            try {
+                const { error } = await supabase
+                    .from('contas_receber')
+                    .update({ status: 'CANCELADO' })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                showToast('Conta cancelada com sucesso!', 'success');
+                await carregarContas();
+            } catch (error) {
+                console.error('Erro ao cancelar conta:', error);
+                showToast('Erro ao cancelar conta: ' + error.message, 'error');
+            }
+        }
+
+        function toggleSelecao(id) {
+            if (contasSelecionadas.has(id)) {
+                contasSelecionadas.delete(id);
+            } else {
+                contasSelecionadas.add(id);
+            }
+            atualizarAcoesLote();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll').checked;
+            const checkboxes = document.querySelectorAll('.checkConta');
+            
+            contasSelecionadas.clear();
+            
+            if (selectAll) {
+                checkboxes.forEach(cb => {
+                    cb.checked = true;
+                    contasSelecionadas.add(cb.dataset.id);
+                });
+            } else {
+                checkboxes.forEach(cb => cb.checked = false);
+            }
+            
+            atualizarAcoesLote();
+        }
+
+        function atualizarAcoesLote() {
+            const acoesLote = document.getElementById('acoesLote');
+            const qtd = contasSelecionadas.size;
+            
+            if (qtd > 0) {
+                acoesLote.classList.remove('hidden');
+                document.getElementById('qtdSelecionados').textContent = qtd;
+            } else {
+                acoesLote.classList.add('hidden');
+            }
+        }
+
+        function cancelarSelecao() {
+            contasSelecionadas.clear();
+            document.querySelectorAll('.checkConta').forEach(cb => cb.checked = false);
+            document.getElementById('selectAll').checked = false;
+            atualizarAcoesLote();
+        }
+
+        async function receberSelecionadas() {
+            if (contasSelecionadas.size === 0) return;
+            
+            const dataRecebimento = new Date().toISOString().split('T')[0];
+            
+            try {
+                for (const id of contasSelecionadas) {
+                    const conta = contas.find(c => c.id === id);
+                    if (!conta) continue;
+
+                    const saldo = conta.valor_original - (conta.valor_recebido || 0);
+
+                    await supabase
+                        .from('contas_receber')
+                        .update({
+                            valor_recebido: conta.valor_original,
+                            data_recebimento: dataRecebimento,
+                            status: 'RECEBIDO'
+                        })
+                        .eq('id', id);
+
+                    await supabase
+                        .from('movimentacoes_financeiras')
+                        .insert({
+                            tipo: 'RECEBIMENTO',
+                            conta_receber_id: id,
+                            valor: saldo,
+                            data_movimento: dataRecebimento,
+                            observacoes: 'Recebimento total (baixa em lote)'
+                        });
+                }
+
+                showToast(`${contasSelecionadas.size} conta(s) recebida(s) com sucesso!`, 'success');
+                cancelarSelecao();
+                await carregarContas();
+            } catch (error) {
+                console.error('Erro ao receber contas:', error);
+                showToast('Erro ao receber contas: ' + error.message, 'error');
+            }
+        }
+
+        function filtrarContas() {
+            carregarContas();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtroTexto').value = '';
+            document.getElementById('filtroCliente').value = '';
+            document.getElementById('filtroStatus').value = 'PENDENTE';
+            document.getElementById('filtroPeriodo').value = '';
+            carregarContas();
+        }
+
+        // Funções auxiliares
+        function formatarMoeda(input) {
+            let valor = input.value.replace(/\D/g, '');
+            valor = (parseInt(valor) / 100).toFixed(2);
+            input.value = 'R$ ' + valor.replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        }
+
+        function parseMoeda(valor) {
+            return parseFloat(valor.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0;
+        }
+
+        function formatarMoedaValor(valor) {
+            return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+        }
+
+        function formatarData(data) {
+            if (!data) return '-';
+            return new Date(data + 'T00:00:00').toLocaleDateString('pt-BR');
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 ${
+                type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+            } text-white`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

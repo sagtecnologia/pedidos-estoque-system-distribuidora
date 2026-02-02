@@ -61,6 +61,17 @@ function createSidebar() {
                 </div>
 
                 <div class="mt-6">
+                    <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Vendas</h3>
+                    
+                    <a href="/pages/pdv.html" id="menu-pdv" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md bg-green-600 hover:bg-green-700 transition mt-1">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        <span class="font-semibold">PDV - Caixa</span>
+                    </a>
+                </div>
+
+                <div class="mt-6">
                     <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Operações</h3>
                     
                     <a href="/pages/estoque.html" id="menu-estoque" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition mt-1">
@@ -115,11 +126,32 @@ function createSidebar() {
                         <span id="badge-pre-pedidos" class="hidden ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-purple-500 text-white"></span>
                     </a>
 
-                    <a href="/pages/analise.html" id="menu-analise" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition">
+                </div>
+
+                <div class="mt-6">
+                    <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Financeiro</h3>
+                    
+                    <a href="/pages/contas-pagar.html" id="menu-contas-pagar" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition mt-1">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <span class="flex-1">Contas a Pagar</span>
+                        <span id="badge-contas-pagar" class="hidden ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-red-500 text-white"></span>
+                    </a>
+
+                    <a href="/pages/contas-receber.html" id="menu-contas-receber" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="flex-1">Contas a Receber</span>
+                        <span id="badge-contas-receber" class="hidden ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-500 text-white"></span>
+                    </a>
+
+                    <a href="/pages/analise-financeira.html" id="menu-analise-financeira" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition">
                         <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
                         </svg>
-                        Análise de Lucros
+                        Análise Financeira
                     </a>
                 </div>
 
@@ -154,30 +186,31 @@ async function initSidebar() {
 
         // VENDEDOR: Só vê vendas e clientes
         if (role === 'VENDEDOR') {
-            // Esconder: produtos, fornecedores, usuários, aprovações de usuários, config empresa, estoque, compras, aprovações, análise
+            // Esconder: produtos, fornecedores, usuários, aprovações de usuários, config empresa, estoque, compras, aprovações, financeiro
             hideMenuItems(['menu-produtos', 'menu-fornecedores', 'menu-usuarios', 'menu-aprovacao-usuarios', 
-                          'menu-config-empresa', 'menu-estoque', 'menu-compras', 'menu-aprovacao', 'menu-analise']);
+                          'menu-config-empresa', 'menu-estoque', 'menu-compras', 'menu-aprovacao', 
+                          'menu-contas-pagar', 'menu-contas-receber', 'menu-analise-financeira']);
         }
 
-        // COMPRADOR: Só vê compras, estoque, produtos e fornecedores
+        // COMPRADOR: Só vê compras, estoque, produtos, fornecedores e contas a pagar
         if (role === 'COMPRADOR') {
-            // Esconder: vendas, clientes, usuários, aprovações de usuários, config empresa, aprovações, análise
+            // Esconder: vendas, clientes, usuários, aprovações de usuários, config empresa, aprovações, contas a receber
             hideMenuItems(['menu-vendas', 'menu-clientes', 'menu-usuarios', 'menu-aprovacao-usuarios', 
-                          'menu-config-empresa', 'menu-aprovacao', 'menu-analise']);
+                          'menu-config-empresa', 'menu-aprovacao', 'menu-contas-receber', 'menu-analise-financeira']);
         }
 
         // APROVADOR: Só vê aprovações
         if (role === 'APROVADOR') {
-            // Esconder: produtos, fornecedores, clientes, usuários, aprovações de usuários, config empresa, estoque, compras, vendas, análise
+            // Esconder: produtos, fornecedores, clientes, usuários, aprovações de usuários, config empresa, estoque, compras, vendas, financeiro
             hideMenuItems(['menu-produtos', 'menu-fornecedores', 'menu-clientes', 'menu-usuarios', 
                           'menu-aprovacao-usuarios', 'menu-config-empresa', 'menu-estoque', 
-                          'menu-compras', 'menu-vendas', 'menu-analise']);
+                          'menu-compras', 'menu-vendas', 'menu-contas-pagar', 'menu-contas-receber', 'menu-analise-financeira']);
         }
 
         // ADMIN: Vê tudo (não esconde nada)
-        // Análise de Lucros e Reprocessar Estoque são exclusivos do ADMIN
+        // Análise Financeira e Reprocessar Estoque são exclusivos do ADMIN
         if (role !== 'ADMIN') {
-            hideMenuItems(['menu-analise', 'menu-reprocessar-estoque']);
+            hideMenuItems(['menu-analise-financeira', 'menu-reprocessar-estoque']);
         }
     }
 
