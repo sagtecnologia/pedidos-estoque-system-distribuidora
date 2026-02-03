@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marcas - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">
+                        <i class="fas fa-tag mr-3 text-purple-600"></i>Marcas
+                    </h2>
+                    <p class="text-gray-600 mt-1">Gerenciamento de marcas de produtos</p>
+                </div>
+                <button onclick="abrirModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                    + Nova Marca
+                </button>
+            </div>
+
+            <!-- Tabela -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descrição</th>
+                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="marcas-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal-marca" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Nova Marca</h3>
+                <button onclick="fecharModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-marca" class="px-6 py-4">
+                <input type="hidden" id="marca-id">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome*</label>
+                    <input type="text" id="marca-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Coca-Cola">
+                </div>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                    <textarea id="marca-descricao" class="w-full px-4 py-2 border border-gray-300 rounded-lg" rows="3" placeholder="Descrição da marca (opcional)"></textarea>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="marca-ativo" checked class="rounded border-gray-300 text-blue-600">
+                        <span class="ml-2 text-sm text-gray-700">Ativo</span>
+                    </label>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="fecharModal()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/modal.js"></script>
+    <script>
+        // =====================================================
+        // MARCAS PAGE
+        // =====================================================
+
+        let editingId = null;
+
+        (async () => {
+            try {
+                await checkAuth();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                await loadMarcas();
+            } catch (error) {
+                console.error('Erro ao inicializar marcas:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
+        })();
+
+        async function loadMarcas() {
+            try {
+                const { data, error } = await supabase
+                    .from('marcas')
+                    .select('*')
+                    .order('nome');
+
+                if (error) throw error;
+
+                document.getElementById('marcas-tbody').innerHTML = data.map(m => `
+                    <tr>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900">${m.nome}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${m.descricao || '-'}</td>
+                        <td class="px-6 py-4 text-center">
+                            ${m.ativo 
+                                ? '<span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs">Ativo</span>'
+                                : '<span class="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">Inativo</span>'
+                            }
+                        </td>
+                        <td class="px-6 py-4 text-sm space-x-2">
+                            <button onclick="editarMarca('${m.id}')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                            <button onclick="deletarMarca('${m.id}')" class="text-red-600 hover:text-red-800">Excluir</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                handleError(error, 'Erro ao carregar marcas');
+            }
+        }
+
+        async function editarMarca(id) {
+            try {
+                const { data, error } = await supabase
+                    .from('marcas')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error) throw error;
+
+                editingId = id;
+                document.getElementById('modal-title').textContent = 'Editar Marca';
+                document.getElementById('marca-id').value = data.id;
+                document.getElementById('marca-nome').value = data.nome;
+                document.getElementById('marca-descricao').value = data.descricao || '';
+                document.getElementById('marca-ativo').checked = data.ativo;
+                abrirModal();
+            } catch (error) {
+                handleError(error, 'Erro ao buscar marca');
+            }
+        }
+
+        async function deletarMarca(id) {
+            if (!confirm('Deseja realmente excluir esta marca?')) return;
+
+            try {
+                const { error } = await supabase
+                    .from('marcas')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                showToast('Marca excluída com sucesso!', 'success');
+                await loadMarcas();
+            } catch (error) {
+                handleError(error, 'Erro ao excluir marca');
+            }
+        }
+
+        function abrirModal() {
+            editingId = null;
+            document.getElementById('modal-title').textContent = 'Nova Marca';
+            document.getElementById('form-marca').reset();
+            document.getElementById('marca-id').value = '';
+            document.getElementById('marca-ativo').checked = true;
+            document.getElementById('modal-marca').classList.remove('hidden');
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-marca').classList.add('hidden');
+        }
+
+        document.getElementById('form-marca').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const marca = {
+                nome: document.getElementById('marca-nome').value.trim().toUpperCase(),
+                descricao: document.getElementById('marca-descricao').value.trim(),
+                ativo: document.getElementById('marca-ativo').checked
+            };
+
+            try {
+                showLoading(true);
+
+                if (editingId) {
+                    const { error } = await supabase
+                        .from('marcas')
+                        .update(marca)
+                        .eq('id', editingId);
+
+                    if (error) throw error;
+                    showToast('Marca atualizada com sucesso!', 'success');
+                } else {
+                    const { error } = await supabase
+                        .from('marcas')
+                        .insert([marca]);
+
+                    if (error) throw error;
+                    showToast('Marca criada com sucesso!', 'success');
+                }
+
+                fecharModal();
+                await loadMarcas();
+            } catch (error) {
+                handleError(error, editingId ? 'Erro ao atualizar marca' : 'Erro ao criar marca');
+            } finally {
+                showLoading(false);
+            }
+        });
+
+        document.getElementById('modal-marca').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('modal-marca')) {
+                fecharModal();
+            }
+        });
+    </script>
+</body>
+</html>

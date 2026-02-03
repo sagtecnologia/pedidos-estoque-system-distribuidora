@@ -7,61 +7,107 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 1rem;
+        }
+        .modal-backdrop.hidden {
+            display: none;
+        }
+        .btn-action {
+            transition: all 0.2s ease;
+        }
+        .btn-action:hover {
+            transform: scale(1.05);
+        }
+        .table-row-hover:hover {
+            background-color: #f3f4f6;
+        }
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-50">
     <div id="navbar"></div>
     <div id="sidebar-container"></div>
 
     <main class="lg:ml-64 pt-16">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="flex justify-between items-center mb-8">
-                <div>
-                    <h2 class="text-3xl font-bold text-gray-900">
-                        <i class="fas fa-box mr-3 text-purple-600"></i>Produtos
-                    </h2>
-                    <p class="text-gray-600 mt-1">Gerenciamento de produtos</p>
-                </div>
-                <button onclick="openModal('modal-produto')" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-                    + Novo Produto
-                </button>
-            </div>
-
-            <!-- Filtros -->
-            <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <input 
-                        type="text" 
-                        id="search" 
-                        placeholder="Buscar por nome ou código..."
-                        class="px-4 py-2 border border-gray-300 rounded-lg"
-                    >
-                    <select id="filter-categoria" class="px-4 py-2 border border-gray-300 rounded-lg">
-                        <option value="">Todas as categorias</option>
-                    </select>
-                    <button onclick="loadProdutos()" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition">
-                        Filtrar
+            <!-- Header -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-4xl font-bold text-gray-900 flex items-center">
+                            <i class="fas fa-box mr-4 text-blue-600"></i>Produtos
+                        </h1>
+                        <p class="text-gray-600 mt-2">Gerenciamento completo de inventário</p>
+                    </div>
+                    <button onclick="openModalProduto()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
+                        <i class="fas fa-plus"></i> Novo Produto
                     </button>
                 </div>
             </div>
 
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-search mr-2"></i>Buscar
+                        </label>
+                        <input type="text" id="search" placeholder="Nome ou código..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-filter mr-2"></i>Categoria
+                        </label>
+                        <select id="categoria-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="filterProdutos()">
+                            <option value="">Todas as categorias</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="loadProdutos()" class="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fas fa-redo"></i> Atualizar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Tabela -->
-            <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="w-full">
+                        <thead class="bg-gradient-to-r from-gray-100 to-gray-50 border-b border-gray-200">
                             <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Código</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoria</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cód. Barras</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Preço</th>
-                                <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Fiscal</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Código</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Produto</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Categoria</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Estoque</th>
+                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Preço</th>
+                                <th class="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Ações</th>
                             </tr>
                         </thead>
-                        <tbody id="produtos-tbody" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                        <tbody id="produtos-tbody" class="divide-y divide-gray-200">
+                            <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                                <i class="fas fa-spinner fa-spin mr-2"></i>Carregando produtos...
+                            </td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -71,147 +117,330 @@
 
     <!-- Modal Produto -->
     <div id="modal-produto" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center px-6 py-4 border-b sticky top-0 bg-white z-10">
-                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Novo Produto</h3>
-                <button onclick="closeModal('modal-produto')" class="text-gray-400 hover:text-gray-600">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-gradient-to-r from-blue-600 to-blue-700 sticky top-0">
+                <h3 id="modal-title" class="text-xl font-bold text-white">Novo Produto</h3>
+                <button onclick="closeModal('modal-produto')" class="text-blue-100 hover:text-white transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             <form id="form-produto" class="px-6 py-4">
                 <input type="hidden" id="produto-id">
                 
-                <!-- Tabs -->
-                <div class="flex border-b mb-4">
-                    <button type="button" onclick="abrirTab('tab-basico')" class="tab-btn px-4 py-2 font-medium text-blue-600 border-b-2 border-blue-600" data-tab="tab-basico">
-                        <i class="fas fa-info-circle mr-1"></i>Básico
-                    </button>
-                    <button type="button" onclick="abrirTab('tab-fiscal')" class="tab-btn px-4 py-2 font-medium text-gray-500 hover:text-gray-700" data-tab="tab-fiscal">
-                        <i class="fas fa-file-invoice mr-1"></i>Fiscal
-                    </button>
+                <!-- Abas de Formulário -->
+                <div class="border-b border-gray-200 mb-6">
+                    <nav class="-mb-px flex space-x-8 overflow-x-auto">
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-blue-600 text-blue-600 font-semibold text-sm" data-tab="tab-basico">
+                            <i class="fas fa-info-circle mr-2"></i>Dados Básicos
+                        </button>
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-900 text-sm" data-tab="tab-estoque">
+                            <i class="fas fa-warehouse mr-2"></i>Estoque
+                        </button>
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-900 text-sm" data-tab="tab-precos">
+                            <i class="fas fa-tag mr-2"></i>Preços
+                        </button>
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-transparent text-gray-600 hover:text-gray-900 text-sm" data-tab="tab-fiscal">
+                            <i class="fas fa-file-invoice mr-2"></i>Dados Fiscais
+                        </button>
+                    </nav>
                 </div>
-                
-                <!-- Tab Básico -->
-                <div id="tab-basico" class="tab-content">
-                    <!-- Informações Básicas -->
-                    <h4 class="text-md font-semibold text-gray-700 mb-3">Informações Básicas</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+
+                <!-- TAB: DADOS BÁSICOS -->
+                <div id="tab-basico" class="tab-content space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="md:col-span-2">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Produto*</label>
-                            <input type="text" id="produto-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Coca-Cola 350ml Lata">
-                            <p class="text-xs text-gray-500 mt-1">O código será gerado automaticamente</p>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-barcode mr-2 text-blue-600"></i>Nome do Produto*
+                            </label>
+                            <input type="text" id="produto-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Código de Barras (EAN)</label>
-                            <input type="text" id="produto-codigo-barras" maxlength="14" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="7891234567890">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-code mr-2 text-blue-600"></i>Código
+                            </label>
+                            <div class="flex gap-2">
+                                <input type="text" id="produto-codigo" readonly class="flex-1 px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                                <button type="button" onclick="gerarCodigoAutomatico()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap" title="Gerar código automático">
+                                    <i class="fas fa-magic"></i>
+                                </button>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">Gerado automaticamente</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
-                            <input type="text" id="produto-marca" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Coca-Cola">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Código de Barras</label>
+                            <input type="text" id="produto-codigo-barras" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
-                            <input type="text" id="produto-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Ex: Refrigerantes">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Unidade*</label>
-                            <select id="produto-unidade" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                <option value="UN">UN - Unidade</option>
-                                <option value="KG">KG - Quilograma</option>
-                                <option value="L">L - Litro</option>
-                                <option value="M">M - Metro</option>
-                                <option value="CX">CX - Caixa</option>
-                                <option value="PC">PC - Peça</option>
-                                <option value="FD">FD - Fardo</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Mínimo</label>
-                            <input type="number" step="0.01" id="produto-estoque-minimo" value="5" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Compra (R$)*</label>
-                            <input type="number" step="0.01" id="produto-preco-compra" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Venda (R$)*</label>
-                            <input type="number" step="0.01" id="produto-preco-venda" value="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00" oninput="calcularMargem()">
-                        </div>
-                        <div class="md:col-span-2" id="margem-lucro-container" style="display: none;">
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <div class="flex justify-between items-center">
-                                    <span class="text-sm font-medium text-gray-700">Margem de Lucro:</span>
-                                    <span id="margem-lucro" class="text-lg font-bold text-blue-600">0%</span>
-                                </div>
-                                <div class="flex justify-between items-center mt-2">
-                                    <span class="text-sm font-medium text-gray-700">Lucro Unitário:</span>
-                                    <span id="lucro-unitario" class="text-lg font-bold text-green-600">R$ 0,00</span>
-                                </div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-list mr-2 text-blue-600"></i>Categoria
+                            </label>
+                            <div class="flex gap-2">
+                                <select id="produto-categoria" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="">Selecione uma categoria</option>
+                                </select>
+                                <button type="button" onclick="openModalNovaCategoria()" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition" title="Adicionar nova categoria">
+                                    <i class="fas fa-plus"></i>
+                                </button>
                             </div>
                         </div>
-                    </div>
-                </div>
-                
-                <!-- Tab Fiscal -->
-                <div id="tab-fiscal" class="tab-content hidden">
-                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                        <p class="text-sm text-yellow-800">
-                            <i class="fas fa-info-circle mr-2"></i>Dados obrigatórios para emissão de NFC-e/NF-e
-                        </p>
-                    </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">NCM *</label>
-                            <input type="text" id="produto-ncm" maxlength="8" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="22030000">
-                            <p class="text-xs text-gray-500 mt-1">Ex: 22030000 (Cervejas)</p>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-tag mr-2 text-blue-600"></i>Marca
+                            </label>
+                            <div class="flex gap-2">
+                                <select id="produto-marca" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="">Selecione uma marca</option>
+                                </select>
+                                <button type="button" onclick="openModalNovaMarca()" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition" title="Adicionar nova marca">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">CFOP *</label>
-                            <select id="produto-cfop" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                <option value="5102">5102 - Venda mercadoria (dentro estado)</option>
-                                <option value="5405">5405 - Venda c/ ST (dentro estado)</option>
-                                <option value="6102">6102 - Venda mercadoria (fora estado)</option>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Unidade</label>
+                            <select id="produto-unidade" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="UN">Unidade</option>
+                                <option value="KG">Kg</option>
+                                <option value="L">Litro</option>
+                                <option value="M">Metro</option>
+                                <option value="CX">Caixa</option>
+                                <option value="PCT">Pacote</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Origem *</label>
-                            <select id="produto-origem" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                <option value="0">0 - Nacional</option>
-                                <option value="1">1 - Estrangeira (importação direta)</option>
-                                <option value="2">2 - Estrangeira (mercado interno)</option>
-                            </select>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Volume (ml)</label>
+                            <input type="number" id="produto-volume" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">CST/CSOSN *</label>
-                            <select id="produto-cst" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
-                                <optgroup label="Simples Nacional">
-                                    <option value="102">102 - Tributado sem crédito</option>
-                                    <option value="500">500 - ICMS cobrado anteriormente por ST</option>
-                                    <option value="103">103 - Isento</option>
-                                </optgroup>
-                                <optgroup label="Lucro Real/Presumido">
-                                    <option value="00">00 - Tributada integralmente</option>
-                                    <option value="60">60 - ICMS cobrado anteriormente por ST</option>
-                                    <option value="40">40 - Isenta</option>
-                                </optgroup>
-                            </select>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Embalagem</label>
+                            <input type="text" id="produto-embalagem" placeholder="Ex: Caixa com 12" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Alíquota ICMS (%)</label>
-                            <input type="number" step="0.01" min="0" max="100" id="produto-aliquota-icms" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="18.00" value="0">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Qtd. por Embalagem</label>
+                            <input type="number" id="produto-qtd-embalagem" min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">CEST</label>
-                            <input type="text" id="produto-cest" maxlength="7" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0300100">
-                            <p class="text-xs text-gray-500 mt-1">Obrigatório para ST</p>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Descrição</label>
+                            <textarea id="produto-descricao" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                         </div>
                     </div>
                 </div>
 
-                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                    <button type="button" onclick="closeModal('modal-produto')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar Produto</button>
+                <!-- TAB: ESTOQUE -->
+                <div id="tab-estoque" class="tab-content hidden space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Estoque Atual</label>
+                            <input type="number" id="produto-estoque" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="bg-yellow-50 p-4 rounded-lg">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Estoque Mínimo</label>
+                            <input type="number" id="produto-estoque-minimo" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Estoque Máximo</label>
+                            <input type="number" id="produto-estoque-maximo" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Localização no Depósito</label>
+                            <input type="text" id="produto-localizacao" placeholder="Ex: A-1-1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Controla Validade?</label>
+                            <select id="produto-controla-validade" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="true">Sim</option>
+                                <option value="false">Não</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Dias de Alerta (Validade)</label>
+                            <input type="number" id="produto-dias-alerta" min="1" value="30" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: PREÇOS -->
+                <div id="tab-precos" class="tab-content hidden space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Preço de Compra</label>
+                            <input type="number" id="produto-preco-compra" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Preço de Venda*</label>
+                            <input type="number" id="produto-preco-venda" step="0.01" min="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Margem (%)</label>
+                            <input type="number" id="produto-margem" step="0.01" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white font-bold text-green-600">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: DADOS FISCAIS -->
+                <div id="tab-fiscal" class="tab-content hidden space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">NCM <span class="text-xs text-gray-500">(Nomenclatura Comum do Mercosul)</span></label>
+                            <input type="text" id="produto-ncm" placeholder="Ex: 12345678" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Código de classificação fiscal do produto</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">CEST <span class="text-xs text-gray-500">(Substituição Tributária)</span></label>
+                            <input type="text" id="produto-cest" placeholder="Ex: 12345678" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Código de substituição tributária</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">CFOP Venda <span class="text-xs text-gray-500">(Op. Fiscal)</span></label>
+                            <input type="text" id="produto-cfop-venda" value="5102" placeholder="Ex: 5102" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Padrão: 5102 - Venda para consumidor final</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">CFOP Compra <span class="text-xs text-gray-500">(Op. Fiscal)</span></label>
+                            <input type="text" id="produto-cfop-compra" value="1102" placeholder="Ex: 1102" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <p class="text-xs text-gray-500 mt-1">Padrão: 1102 - Compra para revenda</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">CST ICMS</label>
+                            <select id="produto-cst-icms" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Selecione CST ICMS</option>
+                                <option value="000">000 - Tributada integralmente</option>
+                                <option value="010">010 - Tributada com cobrança de ICMS por ST</option>
+                                <option value="020">020 - Com redução de BC</option>
+                                <option value="030">030 - Isenta ou não trib. com cobrança de ICMS por ST</option>
+                                <option value="040">040 - Isenta</option>
+                                <option value="041">041 - Não tributada</option>
+                                <option value="050">050 - Suspensão</option>
+                                <option value="051">051 - Diferimento</option>
+                                <option value="060">060 - ICMS cobrado anteriormente por ST</option>
+                                <option value="070">070 - Com redução de BC e cobrança de ICMS por ST</option>
+                                <option value="090">090 - Outras</option>
+                                <optgroup label="Simples Nacional">
+                                    <option value="101">101 - SN Tributada com permissão de crédito</option>
+                                    <option value="102">102 - SN Tributada sem permissão de crédito</option>
+                                    <option value="103">103 - SN Isenção para faixa de receita bruta</option>
+                                    <option value="201">201 - SN com crédito e ICMS por ST</option>
+                                    <option value="202">202 - SN sem crédito e ICMS por ST</option>
+                                    <option value="203">203 - SN isenta com ICMS por ST</option>
+                                    <option value="300">300 - SN Imune</option>
+                                    <option value="400">400 - SN Não tributada</option>
+                                    <option value="500">500 - SN ICMS cobrado por ST</option>
+                                    <option value="900">900 - SN Outros</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">CST PIS</label>
+                            <select id="produto-cst-pis" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Selecione CST PIS</option>
+                                <option value="01">01 - Tributável com Alíquota Básica</option>
+                                <option value="02">02 - Tributável com Alíquota Diferenciada</option>
+                                <option value="03">03 - Tributável por Unidade de Medida</option>
+                                <option value="04">04 - Monofásica - Revenda a Alíquota Zero</option>
+                                <option value="06">06 - Tributável a Alíquota Zero</option>
+                                <option value="07">07 - Isenta da Contribuição</option>
+                                <option value="08">08 - Sem Incidência da Contribuição</option>
+                                <option value="09">09 - Com Suspensão da Contribuição</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="50">50 - Com Direito a Crédito - Vinculada a Receita Tributada</option>
+                                <option value="51">51 - Com Direito a Crédito - Vinculada a Receita Não Tributada</option>
+                                <option value="70">70 - Aquisição sem Direito a Crédito</option>
+                                <option value="71">71 - Aquisição com Isenção</option>
+                                <option value="72">72 - Aquisição com Suspensão</option>
+                                <option value="73">73 - Aquisição a Alíquota Zero</option>
+                                <option value="74">74 - Aquisição sem Incidência</option>
+                                <option value="75">75 - Aquisição por Substituição Tributária</option>
+                                <option value="98">98 - Outras Operações de Entrada</option>
+                                <option value="99">99 - Outras Operações</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">CST COFINS</label>
+                            <select id="produto-cst-cofins" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="">Selecione CST COFINS</option>
+                                <option value="01">01 - Tributável com Alíquota Básica</option>
+                                <option value="02">02 - Tributável com Alíquota Diferenciada</option>
+                                <option value="03">03 - Tributável por Unidade de Medida</option>
+                                <option value="04">04 - Monofásica - Revenda a Alíquota Zero</option>
+                                <option value="06">06 - Tributável a Alíquota Zero</option>
+                                <option value="07">07 - Isenta da Contribuição</option>
+                                <option value="08">08 - Sem Incidência da Contribuição</option>
+                                <option value="09">09 - Com Suspensão da Contribuição</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="50">50 - Com Direito a Crédito - Vinculada a Receita Tributada</option>
+                                <option value="51">51 - Com Direito a Crédito - Vinculada a Receita Não Tributada</option>
+                                <option value="70">70 - Aquisição sem Direito a Crédito</option>
+                                <option value="71">71 - Aquisição com Isenção</option>
+                                <option value="72">72 - Aquisição com Suspensão</option>
+                                <option value="73">73 - Aquisição a Alíquota Zero</option>
+                                <option value="74">74 - Aquisição sem Incidência</option>
+                                <option value="75">75 - Aquisição por Substituição Tributária</option>
+                                <option value="98">98 - Outras Operações de Entrada</option>
+                                <option value="99">99 - Outras Operações</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-8 sticky bottom-0 bg-white py-4 border-t">
+                    <button type="button" onclick="closeModal('modal-produto')" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="px-6 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:shadow-lg transition font-medium">
+                        <i class="fas fa-save mr-2"></i>Salvar Produto
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Nova Categoria -->
+    <div id="modal-nova-categoria" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-gradient-to-r from-green-600 to-green-700">
+                <h3 class="text-lg font-bold text-white">Nova Categoria</h3>
+                <button onclick="closeModal('modal-nova-categoria')" class="text-green-100 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-nova-categoria" class="px-6 py-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Nome da Categoria*</label>
+                    <input type="text" id="nova-categoria-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Descrição</label>
+                    <textarea id="nova-categoria-descricao" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6 border-t pt-4">
+                    <button type="button" onclick="closeModal('modal-nova-categoria')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Criar Categoria</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Nova Marca -->
+    <div id="modal-nova-marca" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-gradient-to-r from-purple-600 to-purple-700">
+                <h3 class="text-lg font-bold text-white">Nova Marca</h3>
+                <button onclick="closeModal('modal-nova-marca')" class="text-purple-100 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-nova-marca" class="px-6 py-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Nome da Marca*</label>
+                    <input type="text" id="nova-marca-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Descrição</label>
+                    <textarea id="nova-marca-descricao" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6 border-t pt-4">
+                    <button type="button" onclick="closeModal('modal-nova-marca')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition">Criar Marca</button>
                 </div>
             </form>
         </div>
@@ -226,218 +455,884 @@
     <script src="../js/session-manager.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
-    <script src="../js/services/produtos.js"></script>
     <script src="../components/navbar.js"></script>
     <script src="../components/sidebar.js"></script>
     <script src="../components/modal.js"></script>
-    
-    <script>
-        let editingId = null;
-        let saboresCount = 0;
 
+    <!-- Modal Produto -->
+    <div id="modal-produto" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b sticky top-0 bg-white">
+                <h3 id="modal-title" class="text-lg font-semibold text-gray-900">Novo Produto</h3>
+                <button onclick="closeModal('modal-produto')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-produto" class="px-6 py-4">
+                <input type="hidden" id="produto-id">
+                
+                <!-- Abas de Formulário -->
+                <div class="border-b border-gray-200 mb-4">
+                    <nav class="-mb-px flex space-x-8">
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-blue-600 text-blue-600 font-medium" data-tab="tab-basico">
+                            Dados Básicos
+                        </button>
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="tab-estoque">
+                            Estoque
+                        </button>
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="tab-precos">
+                            Preços
+                        </button>
+                        <button type="button" class="tab-btn py-2 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-tab="tab-fiscal">
+                            Dados Fiscais
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- TAB: DADOS BÁSICOS -->
+                <div id="tab-basico" class="tab-content">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome*</label>
+                            <input type="text" id="produto-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Código*</label>
+                            <input type="text" id="produto-codigo" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Código de Barras</label>
+                            <input type="text" id="produto-codigo-barras" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                            <div class="flex gap-2">
+                                <select id="produto-categoria" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
+                                    <option value="">Selecione uma categoria</option>
+                                </select>
+                                <button type="button" onclick="openModalNovaCategoria()" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700" title="Adicionar nova categoria">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                            <div class="flex gap-2">
+                                <select id="produto-marca" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg">
+                                    <option value="">Selecione uma marca</option>
+                                </select>
+                                <button type="button" onclick="openModalNovaMarca()" class="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700" title="Adicionar nova marca">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Unidade</label>
+                            <select id="produto-unidade" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="UN">Unidade</option>
+                                <option value="KG">Kg</option>
+                                <option value="L">Litro</option>
+                                <option value="M">Metro</option>
+                                <option value="CX">Caixa</option>
+                                <option value="PCT">Pacote</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Volume (ml)</label>
+                            <input type="number" id="produto-volume" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Embalagem</label>
+                            <input type="text" id="produto-embalagem" placeholder="Ex: Caixa com 12" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade por Embalagem</label>
+                            <input type="number" id="produto-qtd-embalagem" min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                            <textarea id="produto-descricao" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: ESTOQUE -->
+                <div id="tab-estoque" class="tab-content hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Atual</label>
+                            <input type="number" id="produto-estoque" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Mínimo</label>
+                            <input type="number" id="produto-estoque-minimo" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Máximo</label>
+                            <input type="number" id="produto-estoque-maximo" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Localização</label>
+                            <input type="text" id="produto-localizacao" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Controla Validade?</label>
+                            <select id="produto-controla-validade" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="true">Sim</option>
+                                <option value="false">Não</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Dias de Alerta (Validade)</label>
+                            <input type="number" id="produto-dias-alerta" min="1" value="30" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: PREÇOS -->
+                <div id="tab-precos" class="tab-content hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Compra</label>
+                            <input type="number" id="produto-preco-compra" step="0.01" min="0" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Venda*</label>
+                            <input type="number" id="produto-preco-venda" step="0.01" min="0" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Margem (%)</label>
+                            <input type="number" id="produto-margem" step="0.01" readonly class="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB: DADOS FISCAIS -->
+                <div id="tab-fiscal" class="tab-content hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">NCM <span class="text-xs text-gray-500">(Nomenclatura Comum do Mercosul)</span></label>
+                            <input type="text" id="produto-ncm" placeholder="Ex: 12345678" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Código de classificação fiscal do produto</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CEST <span class="text-xs text-gray-500">(Código Especificador da Substituição Tributária)</span></label>
+                            <input type="text" id="produto-cest" placeholder="Ex: 12345678" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Código de substituição tributária</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CFOP Venda <span class="text-xs text-gray-500">(Classificação Fiscal de Operação)</span></label>
+                            <input type="text" id="produto-cfop-venda" value="5102" placeholder="Ex: 5102" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Código da operação de venda (padrão: 5102 - Venda para consumidor final)</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CFOP Compra <span class="text-xs text-gray-500">(Classificação Fiscal de Operação)</span></label>
+                            <input type="text" id="produto-cfop-compra" value="1102" placeholder="Ex: 1102" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Código da operação de compra (padrão: 1102 - Compra para revenda)</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST ICMS <span class="text-xs text-gray-500">(Código de Situação Tributária)</span></label>
+                            <input type="text" id="produto-cst-icms" placeholder="Ex: 00" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Situação tributária do ICMS</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST PIS <span class="text-xs text-gray-500">(Código de Situação Tributária)</span></label>
+                            <input type="text" id="produto-cst-pis" placeholder="Ex: 01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Situação tributária do PIS</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST COFINS <span class="text-xs text-gray-500">(Código de Situação Tributária)</span></label>
+                            <input type="text" id="produto-cst-cofins" placeholder="Ex: 01" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                            <p class="text-xs text-gray-500 mt-1">Situação tributária do COFINS</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 mt-6 sticky bottom-0 bg-white py-3 border-t">
+                    <button type="button" onclick="closeModal('modal-produto')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <!-- Modal Nova Categoria -->
+    <div id="modal-nova-categoria" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Nova Categoria</h3>
+                <button onclick="closeModal('modal-nova-categoria')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-nova-categoria" class="px-6 py-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome da Categoria*</label>
+                    <input type="text" id="nova-categoria-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                    <textarea id="nova-categoria-descricao" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6 border-t pt-4">
+                    <button type="button" onclick="closeModal('modal-nova-categoria')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Criar Categoria</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Nova Marca -->
+    <div id="modal-nova-marca" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b">
+                <h3 class="text-lg font-semibold text-gray-900">Nova Marca</h3>
+                <button onclick="closeModal('modal-nova-marca')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="form-nova-marca" class="px-6 py-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome da Marca*</label>
+                    <input type="text" id="nova-marca-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                </div>
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                    <textarea id="nova-marca-descricao" rows="2" class="w-full px-4 py-2 border border-gray-300 rounded-lg"></textarea>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6 border-t pt-4">
+                    <button type="button" onclick="closeModal('modal-nova-marca')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Criar Marca</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let produtosData = [];
+        let categoriasData = [];
+        let marcasData = [];
+        let selectedProductId = null;
+
+        // ======== INICIALIZAÇÃO ========
         (async () => {
-            await checkAuth();
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
-            await loadProdutos();
-            await loadCategorias();
+            try {
+                console.log('=== INICIANDO PRODUTOS ===');
+                
+                console.log('1. Verificando checkAuth...');
+                await checkAuth();
+                console.log('✅ checkAuth OK');
+                
+                console.log('2. Criando navbar...');
+                document.getElementById('navbar').innerHTML = createNavbar();
+                console.log('✅ navbar OK');
+                
+                console.log('3. Criando sidebar...');
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                console.log('✅ sidebar OK');
+                
+                console.log('4. Inicializando navbar...');
+                await initNavbar();
+                console.log('✅ initNavbar OK');
+                
+                console.log('5. Inicializando sidebar...');
+                await initSidebar();
+                console.log('✅ initSidebar OK');
+                
+                console.log('6. Carregando categorias...');
+                await loadCategorias();
+                console.log('✅ loadCategorias OK');
+                
+                console.log('7. Carregando marcas...');
+                await loadMarcas();
+                console.log('✅ loadMarcas OK');
+                
+                console.log('8. Carregando produtos...');
+                await loadProdutos();
+                console.log('✅ loadProdutos OK');
+                
+                console.log('9. Setup tab navigation...');
+                setupTabNavigation();
+                console.log('✅ setupTabNavigation OK');
+                
+                console.log('10. Setup price calculation...');
+                setupPriceCalculation();
+                console.log('✅ setupPriceCalculation OK');
+                
+                console.log('11. Setup modal forms...');
+                setupModalForms();
+                console.log('✅ setupModalForms OK');
+                
+                console.log('12. Setup form submit...');
+                setupFormSubmit();
+                console.log('✅ setupFormSubmit OK');
+                
+                console.log('=== PRODUTOS INICIALIZADO COM SUCESSO ===');
+                
+            } catch (error) {
+                console.error('💥 ERRO AO INICIALIZAR PRODUTOS:', error);
+                showToast('Erro ao carregar página de produtos', 'error');
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
         })();
 
-        // === TABS ===
-        function abrirTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
-                btn.classList.add('text-gray-500');
+        // ======== SETUP DE FORM ========
+        function setupFormSubmit() {
+            const form = document.getElementById('form-produto');
+            form?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await saveProduto();
             });
-            
-            document.getElementById(tabId).classList.remove('hidden');
-            const btnAtivo = document.querySelector(`[data-tab="${tabId}"]`);
-            btnAtivo.classList.remove('text-gray-500');
-            btnAtivo.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
         }
 
-        async function loadCategorias() {
-            const categorias = await getCategorias();
-            const select = document.getElementById('filter-categoria');
-            categorias.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat;
-                option.textContent = cat;
-                select.appendChild(option);
+        function setupModalForms() {
+            // Event listeners para fechar modais
+            document.addEventListener('click', (e) => {
+                if (e.target.classList.contains('modal-backdrop')) {
+                    e.target.classList.add('hidden');
+                }
             });
+
+            // Botões de fechar
+            document.querySelectorAll('[data-close-modal]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const modalId = e.target.getAttribute('data-close-modal');
+                    closeModal(modalId);
+                });
+            });
+        }
+
+        function setupModalForms() {
+            document.getElementById('form-nova-categoria')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await saveNovaCategoria();
+            });
+
+            document.getElementById('form-nova-marca')?.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                await saveNovaMarca();
+            });
+
+            // Tab navigation com classList
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const tabId = btn.dataset.tab;
+                    switchTab(tabId);
+                });
+            });
+        }
+
+        // ======== TABS ========
+        function setupTabNavigation() {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const tabId = btn.dataset.tab;
+                    switchTab(tabId);
+                });
+            });
+        }
+
+        function switchTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+
+            // Remove active state from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-blue-600', 'text-blue-600', 'font-semibold');
+                btn.classList.add('border-transparent', 'text-gray-600');
+            });
+
+            // Show selected tab
+            document.getElementById(tabId)?.classList.remove('hidden');
+
+            // Activate button
+            const activeBtn = document.querySelector(`[data-tab="${tabId}"]`);
+            if (activeBtn) {
+                activeBtn.classList.remove('border-transparent', 'text-gray-600');
+                activeBtn.classList.add('border-blue-600', 'text-blue-600', 'font-semibold');
+            }
+        }
+
+        // ======== PREÇO ========
+        function setupPriceCalculation() {
+            const precoCompraInput = document.getElementById('produto-preco-compra');
+            const precoVendaInput = document.getElementById('produto-preco-venda');
+
+            precoCompraInput?.addEventListener('change', calcularMargem);
+            precoVendaInput?.addEventListener('change', calcularMargem);
+        }
+
+        function calcularMargem() {
+            const precoCompra = parseFloat(document.getElementById('produto-preco-compra').value) || 0;
+            const precoVenda = parseFloat(document.getElementById('produto-preco-venda').value) || 0;
+
+            let margem = 0;
+            if (precoCompra > 0) {
+                margem = ((precoVenda - precoCompra) / precoCompra) * 100;
+            }
+
+            document.getElementById('produto-margem').value = margem.toFixed(2);
+        }
+
+        // ======== CÓDIGO AUTOMÁTICO ========
+        async function gerarCodigoAutomatico() {
+            try {
+                const marcaId = document.getElementById('produto-marca').value || null;
+                const codigo = await generateProductCode(marcaId);
+                document.getElementById('produto-codigo').value = codigo;
+                showToast('Código gerado com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao gerar código:', error);
+                showToast('Erro ao gerar código', 'error');
+            }
+        }
+
+        // ======== MODAL CATEGORIA ========
+        function openModalNovaCategoria() {
+            document.getElementById('nova-categoria-nome').value = '';
+            document.getElementById('nova-categoria-descricao').value = '';
+            openModal('modal-nova-categoria');
+        }
+
+        async function saveNovaCategoria() {
+            const nome = document.getElementById('nova-categoria-nome').value;
+            const descricao = document.getElementById('nova-categoria-descricao').value;
+
+            try {
+                showLoading(true);
+                const { data, error } = await window.supabase
+                    .from('categorias')
+                    .insert([{ nome, descricao: descricao || null }])
+                    .select();
+
+                if (error) throw error;
+
+                showToast('Categoria criada com sucesso!', 'success');
+                closeModal('modal-nova-categoria');
+                await loadCategorias();
+                document.getElementById('produto-categoria').value = data[0].id;
+            } catch (error) {
+                console.error('❌ Erro ao criar categoria:', error);
+                showToast('Erro ao criar categoria', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======== MODAL MARCA ========
+        function openModalNovaMarca() {
+            document.getElementById('nova-marca-nome').value = '';
+            document.getElementById('nova-marca-descricao').value = '';
+            openModal('modal-nova-marca');
+        }
+
+        async function saveNovaMarca() {
+            const nome = document.getElementById('nova-marca-nome').value;
+            const descricao = document.getElementById('nova-marca-descricao').value;
+
+            try {
+                showLoading(true);
+                const { data, error } = await window.supabase
+                    .from('marcas')
+                    .insert([{ nome, descricao: descricao || null }])
+                    .select();
+
+                if (error) throw error;
+
+                showToast('Marca criada com sucesso!', 'success');
+                closeModal('modal-nova-marca');
+                await loadMarcas();
+                document.getElementById('produto-marca').value = data[0].id;
+            } catch (error) {
+                console.error('❌ Erro ao criar marca:', error);
+                showToast('Erro ao criar marca', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ======== CARREGAR DADOS ========
+        async function listProdutos() {
+            const { data, error } = await window.supabase
+                .from('produtos')
+                .select(`
+                    *,
+                    categoria:categorias(nome),
+                    marca:marcas(nome)
+                `)
+                .eq('active', true)
+                .order('nome');
+            
+            if (error) throw error;
+            return data || [];
         }
 
         async function loadProdutos() {
-            const search = document.getElementById('search').value;
-            const categoria = document.getElementById('filter-categoria').value;
-            const produtos = await listProdutos({ search, categoria });
-            
+            try {
+                showLoading(true);
+                produtosData = await listProdutos();
+                console.log('✓ Produtos carregados:', { total: produtosData?.length || 0, data: produtosData });
+                renderProdutos(produtosData);
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+                showToast('Erro ao carregar produtos', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadCategorias() {
+            try {
+                const { data: categorias } = await window.supabase
+                    .from('categorias')
+                    .select('*')
+                    .order('nome');
+
+                categoriasData = categorias || [];
+
+                // Atualizar select de categoria no modal
+                const selectProduto = document.getElementById('produto-categoria');
+                const selectFiltro = document.getElementById('categoria-filter');
+
+                if (selectProduto) {
+                    const current = selectProduto.value;
+                    selectProduto.innerHTML = '<option value="">Selecione uma categoria</option>';
+                    categorias?.forEach(cat => {
+                        selectProduto.innerHTML += `<option value="${cat.id}">${cat.nome}</option>`;
+                    });
+                    if (current) selectProduto.value = current;
+                }
+
+                if (selectFiltro) {
+                    const current = selectFiltro.value;
+                    selectFiltro.innerHTML = '<option value="">Todas as categorias</option>';
+                    categorias?.forEach(cat => {
+                        selectFiltro.innerHTML += `<option value="${cat.id}">${cat.nome}</option>`;
+                    });
+                    if (current) selectFiltro.value = current;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar categorias:', error);
+            }
+        }
+
+        async function loadMarcas() {
+            try {
+                const { data: marcas } = await window.supabase
+                    .from('marcas')
+                    .select('*')
+                    .order('nome');
+
+                marcasData = marcas || [];
+
+                const select = document.getElementById('produto-marca');
+                if (select) {
+                    const current = select.value;
+                    select.innerHTML = '<option value="">Selecione uma marca</option>';
+                    marcas?.forEach(marca => {
+                        select.innerHTML += `<option value="${marca.id}">${marca.nome}</option>`;
+                    });
+                    if (current) select.value = current;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar marcas:', error);
+            }
+        }
+
+        // ======== RENDERIZAR ========
+        function renderProdutos(produtos) {
             const tbody = document.getElementById('produtos-tbody');
-            if (produtos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum produto encontrado</td></tr>';
+            if (!tbody) {
+                console.error('❌ Elemento #produtos-tbody não encontrado');
                 return;
             }
 
+            if (!produtos || produtos.length === 0) {
+                console.log('ℹ Nenhum produto para renderizar');
+                tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-8 text-center text-gray-500"><i class="fas fa-inbox mr-2"></i>Nenhum produto encontrado</td></tr>';
+                return;
+            }
+
+            console.log(`✓ Renderizando ${produtos.length} produtos`);
             tbody.innerHTML = produtos.map(p => {
-                const fiscalOk = p.ncm && p.cfop && (p.cst_icms || p.csosn);
+                // Buscar nome da categoria
+                const categoria = categoriasData.find(c => c.id === p.categoria_id);
+                const categoriaNome = categoria ? categoria.nome : 'Sem categoria';
+                
                 return `
-                <tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 text-sm text-gray-900">${p.codigo}</td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm font-medium text-gray-900">${p.nome}</div>
-                        ${p.marca ? `<div class="text-xs text-gray-500">Marca: ${p.marca}</div>` : ''}
+                <tr class="table-row-hover border-b border-gray-200">
+                    <td class="px-6 py-4 text-sm font-mono text-blue-600">${p.codigo || 'N/A'}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.nome}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs">${categoriaNome}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm text-gray-600">${p.categoria || '-'}</td>
-                    <td class="px-6 py-4 text-sm font-mono text-gray-600">${p.codigo_barras || '-'}</td>
-                    <td class="px-6 py-4 text-sm ${p.estoque_atual <= p.estoque_minimo ? 'text-red-600 font-semibold' : 'text-gray-900'}">
-                        ${p.estoque_atual} ${p.unidade}
-                        ${p.estoque_atual <= p.estoque_minimo ? '<span class="text-xs">(Baixo)</span>' : ''}
+                    <td class="px-6 py-4 text-sm">
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                            (p.estoque_atual || 0) <= (p.estoque_minimo || 10) 
+                                ? 'bg-red-100 text-red-700' 
+                                : (p.estoque_atual || 0) <= 50
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-green-100 text-green-700'
+                        }">
+                            ${(p.estoque_atual || 0).toFixed(2)} ${p.unidade || 'UN'}
+                        </span>
                     </td>
-                    <td class="px-6 py-4">
-                        <div class="text-sm text-gray-600">Compra: ${formatCurrency(p.preco_compra || p.preco || 0)}</div>
-                        <div class="text-sm font-medium text-gray-900">Venda: ${formatCurrency(p.preco_venda || p.preco || 0)}</div>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        ${fiscalOk 
-                            ? '<span class="text-green-600" title="Dados fiscais OK"><i class="fas fa-check-circle"></i></span>'
-                            : '<span class="text-yellow-500" title="Dados fiscais incompletos"><i class="fas fa-exclamation-circle"></i></span>'
-                        }
-                    </td>
-                    <td class="px-6 py-4 text-sm space-x-2">
-                        <button onclick="editProduto('${p.id}')" class="text-blue-600 hover:text-blue-800">Editar</button>
-                        <button onclick="deleteProdutoHandler('${p.id}')" class="text-red-600 hover:text-red-800">Excluir</button>
+                    <td class="px-6 py-4 text-sm font-semibold text-gray-900">R$ ${(p.preco_venda || 0).toFixed(2)}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <div class="flex items-center space-x-1">
+                            <button onclick="editProduto(${p.id})" class="btn-action px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center gap-1">
+                                <i class="fas fa-edit"></i><span class="hidden sm:inline">Editar</span>
+                            </button>
+                            <button onclick="deleteProdutoConfirm(${p.id})" class="btn-action px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition flex items-center gap-1">
+                                <i class="fas fa-trash"></i><span class="hidden sm:inline">Excluir</span>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `}).join('');
         }
 
-        document.getElementById('form-produto').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const precoCompra = parseFloat(document.getElementById('produto-preco-compra').value) || 0;
-            const precoVenda = parseFloat(document.getElementById('produto-preco-venda').value) || 0;
-            
-            // Validar e formatar nome e marca
-            let nome = document.getElementById('produto-nome').value.trim().toUpperCase();
-            let marca = document.getElementById('produto-marca').value.trim().toUpperCase();
-            
-            const produto = {
-                // Código será gerado automaticamente
-                nome: nome,
-                marca: marca,
-                categoria: document.getElementById('produto-categoria').value.trim() || null,
-                unidade: document.getElementById('produto-unidade').value,
-                estoque_minimo: parseFloat(document.getElementById('produto-estoque-minimo').value),
-                preco_compra: precoCompra,
-                preco_venda: precoVenda,
-                preco: precoVenda, // Manter compatibilidade
-                // Campos fiscais
-                codigo_barras: document.getElementById('produto-codigo-barras').value.trim() || null,
-                ncm: document.getElementById('produto-ncm').value.trim() || null,
-                cfop: document.getElementById('produto-cfop').value || '5102',
-                origem: parseInt(document.getElementById('produto-origem').value) || 0,
-                cst_icms: document.getElementById('produto-cst').value || null,
-                aliquota_icms: parseFloat(document.getElementById('produto-aliquota-icms').value) || 0,
-                cest: document.getElementById('produto-cest').value.trim() || null
-            };
+        // ======== FILTRAR ========
+        function filterProdutos() {
+            const search = (document.getElementById('search')?.value || '').toLowerCase();
+            const categoria = document.getElementById('categoria-filter')?.value || '';
 
-            if (editingId) {
-                await updateProduto(editingId, produto);
-            } else {
-                await createProduto(produto);
+            const filtered = produtosData.filter(p => {
+                const matchSearch = !search || 
+                    p.nome.toLowerCase().includes(search) || 
+                    (p.codigo && p.codigo.toLowerCase().includes(search));
+                
+                const matchCategoria = !categoria || p.categoria_id == categoria;
+                
+                return matchSearch && matchCategoria;
+            });
+
+            renderProdutos(filtered);
+        }
+
+        // Listener para filtro
+        document.getElementById('search')?.addEventListener('keyup', filterProdutos);
+        document.getElementById('categoria-filter')?.addEventListener('change', filterProdutos);
+
+        // ======== MODAL PRODUTO ========
+        async function openModalProduto() {
+            selectedProductId = null;
+            document.getElementById('produto-id').value = '';
+            document.getElementById('modal-title').textContent = 'Novo Produto';
+            document.getElementById('form-produto').reset();
+            
+            // Gerar código automático
+            try {
+                const codigo = await generateProductCode(null);
+                document.getElementById('produto-codigo').value = codigo;
+            } catch (error) {
+                console.log('Erro ao gerar código automático');
             }
 
-            closeModal('modal-produto');
-            document.getElementById('form-produto').reset();
-            editingId = null;
-            abrirTab('tab-basico');
-            await loadProdutos();
-        });
-
-        async function editProduto(id) {
-            const produto = await getProduto(id);
-            if (!produto) return;
-
-            editingId = id;
-            document.getElementById('modal-title').textContent = 'Editar Produto';
-            // Código não é editável - gerado automaticamente
-            document.getElementById('produto-nome').value = produto.nome;
-            document.getElementById('produto-marca').value = produto.marca || '';
-            document.getElementById('produto-categoria').value = produto.categoria || '';
-            document.getElementById('produto-unidade').value = produto.unidade;
-            document.getElementById('produto-estoque-minimo').value = produto.estoque_minimo;
-            document.getElementById('produto-preco-compra').value = produto.preco_compra || produto.preco || 0;
-            document.getElementById('produto-preco-venda').value = produto.preco_venda || produto.preco || 0;
-            
-            // Campos fiscais
-            document.getElementById('produto-codigo-barras').value = produto.codigo_barras || '';
-            document.getElementById('produto-ncm').value = produto.ncm || '';
-            document.getElementById('produto-cfop').value = produto.cfop || '5102';
-            document.getElementById('produto-origem').value = produto.origem || '0';
-            document.getElementById('produto-cst').value = produto.cst_icms || produto.csosn || '102';
-            document.getElementById('produto-aliquota-icms').value = produto.aliquota_icms || 0;
-            document.getElementById('produto-cest').value = produto.cest || '';
-            
-            calcularMargem();
-            abrirTab('tab-basico');
+            switchTab('tab-basico');
             openModal('modal-produto');
         }
 
-        async function deleteProdutoHandler(id) {
-            const success = await deleteProduto(id);
-            if (success) await loadProdutos();
+        async function editProduto(id) {
+            console.log('Editando produto ID:', id, 'Produtos disponíveis:', produtosData.length);
+            const produto = produtosData.find(p => p.id === id);
+            if (!produto) {
+                console.error('Produto não encontrado. ID buscado:', id, 'IDs disponíveis:', produtosData.map(p => p.id));
+                showToast('Produto não encontrado', 'error');
+                return;
+            }
+            console.log('Produto encontrado:', produto);
+
+            selectedProductId = id;
+            document.getElementById('produto-id').value = produto.id;
+            document.getElementById('modal-title').textContent = 'Editar Produto';
+            
+            // Dados Básicos
+            document.getElementById('produto-nome').value = produto.nome || '';
+            document.getElementById('produto-codigo').value = produto.codigo || '';
+            document.getElementById('produto-codigo-barras').value = produto.codigo_barras || '';
+            document.getElementById('produto-categoria').value = produto.categoria_id || '';
+            document.getElementById('produto-marca').value = produto.marca_id || '';
+            document.getElementById('produto-unidade').value = produto.unidade || 'UN';
+            document.getElementById('produto-volume').value = produto.volume_ml || '';
+            document.getElementById('produto-embalagem').value = produto.embalagem || '';
+            document.getElementById('produto-qtd-embalagem').value = produto.quantidade_embalagem || 1;
+            document.getElementById('produto-descricao').value = produto.descricao || '';
+
+            // Estoque
+            document.getElementById('produto-estoque').value = produto.estoque_atual || '';
+            document.getElementById('produto-estoque-minimo').value = produto.estoque_minimo || '';
+            document.getElementById('produto-estoque-maximo').value = produto.estoque_maximo || '';
+            document.getElementById('produto-localizacao').value = produto.localizacao || '';
+            document.getElementById('produto-controla-validade').value = produto.controla_validade ? 'true' : 'false';
+            document.getElementById('produto-dias-alerta').value = produto.dias_alerta_validade || 30;
+
+            // Preços
+            document.getElementById('produto-preco-compra').value = produto.preco_custo || '';
+            document.getElementById('produto-preco-venda').value = produto.preco_venda || '';
+            calcularMargem();
+
+            // Dados Fiscais
+            document.getElementById('produto-ncm').value = produto.ncm || '';
+            document.getElementById('produto-cest').value = produto.cest || '';
+            document.getElementById('produto-cfop-venda').value = produto.cfop_venda || '5102';
+            document.getElementById('produto-cfop-compra').value = produto.cfop_compra || '1102';
+            document.getElementById('produto-cst-icms').value = produto.cst_icms || '';
+            document.getElementById('produto-cst-pis').value = produto.cst_pis || '';
+            document.getElementById('produto-cst-cofins').value = produto.cst_cofins || '';
+
+            switchTab('tab-basico');
+            openModal('modal-produto');
         }
 
-        // Calcular margem de lucro
-        function calcularMargem() {
-            const precoCompra = parseFloat(document.getElementById('produto-preco-compra').value) || 0;
-            const precoVenda = parseFloat(document.getElementById('produto-preco-venda').value) || 0;
+        async function saveProduto() {
+            const id = document.getElementById('produto-id').value;
             
-            const margemContainer = document.getElementById('margem-lucro-container');
-            
-            if (precoCompra > 0 && precoVenda > 0) {
-                const lucro = precoVenda - precoCompra;
-                const margemPercent = ((lucro / precoCompra) * 100).toFixed(2);
-                
-                document.getElementById('margem-lucro').textContent = margemPercent + '%';
-                document.getElementById('lucro-unitario').textContent = formatCurrency(lucro);
-                
-                // Colorir margem baseada no valor
-                const margemEl = document.getElementById('margem-lucro');
-                if (margemPercent < 10) {
-                    margemEl.className = 'text-lg font-bold text-red-600';
-                } else if (margemPercent < 30) {
-                    margemEl.className = 'text-lg font-bold text-yellow-600';
+            const data = {
+                nome: document.getElementById('produto-nome').value,
+                codigo: document.getElementById('produto-codigo').value,
+                codigo_barras: document.getElementById('produto-codigo-barras').value || null,
+                categoria_id: document.getElementById('produto-categoria').value || null,
+                marca_id: document.getElementById('produto-marca').value || null,
+                unidade: document.getElementById('produto-unidade').value,
+                volume_ml: parseFloat(document.getElementById('produto-volume').value) || null,
+                embalagem: document.getElementById('produto-embalagem').value || null,
+                quantidade_embalagem: parseInt(document.getElementById('produto-qtd-embalagem').value) || 1,
+                descricao: document.getElementById('produto-descricao').value || null,
+                estoque_atual: parseFloat(document.getElementById('produto-estoque').value) || 0,
+                estoque_minimo: parseFloat(document.getElementById('produto-estoque-minimo').value) || 0,
+                estoque_maximo: parseFloat(document.getElementById('produto-estoque-maximo').value) || 0,
+                localizacao: document.getElementById('produto-localizacao').value || null,
+                controla_validade: document.getElementById('produto-controla-validade').value === 'true',
+                dias_alerta_validade: parseInt(document.getElementById('produto-dias-alerta').value) || 30,
+                preco_custo: parseFloat(document.getElementById('produto-preco-compra').value) || 0,
+                preco_venda: parseFloat(document.getElementById('produto-preco-venda').value) || 0,
+                ncm: document.getElementById('produto-ncm').value || null,
+                cest: document.getElementById('produto-cest').value || null,
+                cfop_venda: document.getElementById('produto-cfop-venda').value || '5102',
+                cfop_compra: document.getElementById('produto-cfop-compra').value || '1102',
+                cst_icms: document.getElementById('produto-cst-icms').value || null,
+                cst_pis: document.getElementById('produto-cst-pis').value || null,
+                cst_cofins: document.getElementById('produto-cst-cofins').value || null
+            };
+
+            // Validação
+            if (!data.nome.trim()) {
+                showToast('Nome do produto é obrigatório', 'error');
+                return;
+            }
+            if (!data.codigo.trim()) {
+                showToast('Código do produto é obrigatório', 'error');
+                return;
+            }
+            if (data.preco_venda <= 0) {
+                showToast('Preço de venda deve ser maior que zero', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                let result;
+
+                if (id) {
+                    result = await updateProduto(id, data);
+                    showToast('Produto atualizado com sucesso!', 'success');
                 } else {
-                    margemEl.className = 'text-lg font-bold text-green-600';
+                    result = await createProduto(data);
+                    showToast('Produto criado com sucesso!', 'success');
                 }
-                
-                margemContainer.style.display = 'block';
-            } else {
-                margemContainer.style.display = 'none';
+
+                closeModal('modal-produto');
+                await loadProdutos();
+            } catch (error) {
+                console.error('Erro ao salvar produto:', error);
+                showToast('Erro ao salvar produto', 'error');
+            } finally {
+                showLoading(false);
             }
         }
 
-        // Adicionar listener no preço de compra também
-        document.getElementById('produto-preco-compra').addEventListener('input', calcularMargem);
+        async function deleteProdutoConfirm(id) {
+            console.log('Deletando produto ID:', id);
+            if (confirm('Tem certeza que deseja excluir este produto?')) {
+                try {
+                    showLoading(true);
+                    await deleteProduto(id);
+                    showToast('Produto excluído com sucesso!', 'success');
+                    await loadProdutos();
+                } catch (error) {
+                    console.error('Erro ao deletar produto:', error);
+                    showToast('Erro ao deletar produto', 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+        }
 
-        // Converter nome e marca para maiúsculas em tempo real
-        document.getElementById('produto-nome').addEventListener('input', function(e) {
-            const cursorPos = e.target.selectionStart;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(cursorPos, cursorPos);
-        });
-        
-        document.getElementById('produto-marca').addEventListener('input', function(e) {
-            const cursorPos = e.target.selectionStart;
-            e.target.value = e.target.value.toUpperCase();
-            e.target.setSelectionRange(cursorPos, cursorPos);
-        });
+        async function createProduto(data) {
+            const { data: result, error } = await window.supabase
+                .from('produtos')
+                .insert([data])
+                .select();
+            
+            if (error) throw error;
+            return result;
+        }
 
-        document.getElementById('search').addEventListener('input', debounce(loadProdutos, 500));
+        async function updateProduto(id, data) {
+            const { data: result, error } = await window.supabase
+                .from('produtos')
+                .update(data)
+                .eq('id', id)
+                .select();
+            
+            if (error) throw error;
+            return result;
+        }
+
+        async function deleteProduto(id) {
+            const { error } = await window.supabase
+                .from('produtos')
+                .update({ active: false })
+                .eq('id', id);
+            
+            if (error) throw error;
+        }
+
+        // ======== FUNÇÕES DE MODAL ========
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+                // Limpar formulários se necessário
+                if (modalId === 'modal-produto') {
+                    resetProdutoForm();
+                }
+            }
+        }
+
+        function resetProdutoForm() {
+            selectedProductId = null;
+            document.getElementById('produto-id').value = '';
+            document.getElementById('modal-title').textContent = 'Novo Produto';
+            document.getElementById('form-produto').reset();
+        }
     </script>
 </body>
 </html>

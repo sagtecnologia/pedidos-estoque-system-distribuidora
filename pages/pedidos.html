@@ -350,12 +350,18 @@
         let produtosCadastrados = [];
 
         (async () => {
-            await checkAuth();
-            currentUser = await getCurrentUser();
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
+            try {
+                await checkAuth();
+                currentUser = await getCurrentUser();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+            } catch (error) {
+                console.error('Erro ao inicializar pedidos:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
             
             // Definir data padrão (últimos 30 dias)
             const hoje = new Date();

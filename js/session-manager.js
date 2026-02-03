@@ -293,9 +293,17 @@ class SessionManager {
                 }
             }
             
-            // Limpar dados locais
-            localStorage.clear();
-            sessionStorage.clear();
+            // Limpar dados locais (seguro)
+            try {
+                if (typeof localStorage !== 'undefined' && localStorage) {
+                    localStorage.clear();
+                }
+                if (typeof sessionStorage !== 'undefined' && sessionStorage) {
+                    sessionStorage.clear();
+                }
+            } catch (storageError) {
+                console.warn('Storage não disponível para limpeza:', storageError.message);
+            }
             
             // Redirecionar para login
             window.location.href = '/index.html';
@@ -312,34 +320,45 @@ class SessionManager {
             if (!window.supabase) return;
             
             // Verificar se há sessão ativa no Supabase
-            const { data: { session }, error } = await window.supabase.auth.getSession();
-            
-            if (error || !session) {
-                console.warn('⚠️  Sessão inválida detectada, redirecionando para login...');
-                await this.performLogout('sessao-invalida');
-                return;
-            }
-            
-            // Verificar se o token não está expirado
-            const expiresAt = session.expires_at * 1000; // Converter para milissegundos
-            const now = Date.now();
-            
-            if (expiresAt <= now) {
-                console.warn('⚠️  Token expirado, redirecionando para login...');
-                await this.performLogout('token-expirado');
-                return;
-            }
-            
-            // Verificar se o usuário ainda está ativo no banco
-            const { data: userData, error: userError } = await window.supabase
-                .from('users')
-                .select('active')
-                .eq('id', session.user.id)
-                .single();
-            
-            if (userError || !userData || !userData.active) {
-                console.warn('⚠️  Usuário não está mais ativo, redirecionando para login...');
-                await this.performLogout('usuario-inativo');
+            try {
+                const { data: { session }, error } = await window.supabase.auth.getSession();
+                
+                if (error || !session) {
+                    console.warn('⚠️  Sessão inválida detectada, redirecionando para login...');
+                    await this.performLogout('sessao-invalida');
+                    return;
+                }
+                
+                // Verificar se o token não está expirado
+                const expiresAt = session.expires_at * 1000; // Converter para milissegundos
+                const now = Date.now();
+                
+                if (expiresAt <= now) {
+                    console.warn('⚠️  Token expirado, redirecionando para login...');
+                    await this.performLogout('token-expirado');
+                    return;
+                }
+                
+                // Verificar se o usuário ainda está ativo no banco
+                try {
+                    const { data: userData, error: userError } = await window.supabase
+                        .from('users')
+                        .select('active')
+                        .eq('id', session.user.id)
+                        .single();
+                    
+                    if (userError || !userData || !userData.active) {
+                        console.warn('⚠️  Usuário não está mais ativo, redirecionando para login...');
+                        await this.performLogout('usuario-inativo');
+                        return;
+                    }
+                } catch (dbError) {
+                    console.warn('Erro ao consultar usuário no banco (Session Manager):', dbError);
+                    // Não faz logout por erro de DB - pode ser temporário
+                }
+            } catch (storageError) {
+                console.warn('⚠️  Erro de acesso ao storage (Session Manager):', storageError);
+                // Em contexto sandbox, não forçar logout por erro de storage
                 return;
             }
             
@@ -481,8 +500,8 @@ function initSessionManager() {
     }
     
     // Inicializar apenas uma vez
-    if (!sessionManager) {
-        sessionManager = new SessionManager({
+    if (!window.sessionManager) {
+        window.sessionManager = new SessionManager({
             inactivityTimeout: 15 * 60 * 1000, // 15 minutos
             warningTime: 2 * 60 * 1000 // 2 minutos de aviso
         });
@@ -491,4 +510,3 @@ function initSessionManager() {
 
 // Exportar para uso global
 window.SessionManager = SessionManager;
-window.sessionManager = sessionManager;

@@ -448,22 +448,66 @@
     <script src="../js/services/empresa.js"></script>
     <script src="../js/services/clientes.js"></script>
     <script src="../js/services/barcode-scanner.js"></script>
+    <script src="../js/services/produto-search.js"></script>
     <script src="../js/services/focus-nfe.js"></script>
     <script src="../js/services/pdv.js"></script>
     
     <script>
+        // DEBUG: Log de carregamento dos scripts
+        console.log('🔍 PDV Script iniciado');
+        console.log('PDV carregado?', typeof PDV !== 'undefined');
+        console.log('ProdutoSearch carregado?', typeof ProdutoSearch !== 'undefined');
+        
         // Variáveis globais
         let tipoDesconto = 'percentual';
         let formaPagamentoAtual = null;
         let formasPagamento = [];
 
         // =====================================================
+        // AGUARDAR CARREGAMENTO DE SERVIÇOS
+        // =====================================================
+        
+        async function aguardarServicosCarregados(timeout = 15000) {
+            const inicio = Date.now();
+            const servicos = ['PDV', 'ProdutoSearch'];
+            
+            while (Date.now() - inicio < timeout) {
+                const carregados = servicos.every(s => typeof window[s] !== 'undefined');
+                
+                if (carregados) {
+                    console.log('✅ Todos os serviços carregados:', servicos);
+                    return true;
+                }
+                
+                const statusCarregamento = servicos.map(s => 
+                    `${s}: ${typeof window[s] !== 'undefined' ? '✓' : '✗'}`
+                ).join(' | ');
+                console.log(`Aguardando serviços... [${statusCarregamento}]`);
+                
+                await new Promise(resolve => setTimeout(resolve, 200));
+            }
+            
+            const statusFinal = servicos.map(s => 
+                `${s}: ${typeof window[s] !== 'undefined' ? '✓' : '✗'}`
+            ).join(', ');
+            throw new Error(`Timeout ao carregar serviços (${timeout}ms). Status: ${statusFinal}`);
+        }
+
+        // =====================================================
         // INICIALIZAÇÃO
         // =====================================================
         
-        (async () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             try {
-                await checkAuth();
+                // Aguardar serviços carregarem
+                await aguardarServicosCarregados();
+                
+                // Verificar autenticação
+                const { data: { session } } = await window.supabase.auth.getSession();
+                if (!session) {
+                    window.location.href = '/index.html';
+                    return;
+                }
                 
                 // Carregar formas de pagamento
                 await carregarFormasPagamento();
@@ -482,16 +526,16 @@
                     document.getElementById('modal-abertura-caixa').classList.remove('hidden');
                 }
                 
-                // Inicializar scanner de código de barras
+                // Inicializar scanner de código de barras e busca de produtos
                 const scannerContainer = document.getElementById('scanner-container');
-                scannerContainer.innerHTML = BarcodeScanner.criarComponente({
+                scannerContainer.innerHTML = ProdutoSearch.criarComponente({
                     inputId: 'input-codigo',
                     placeholder: 'Código de barras ou nome do produto',
                     showCameraButton: true
                 });
                 
-                BarcodeScanner.inicializarComponente('input-codigo', async (codigo) => {
-                    await PDV.adicionarPorCodigo(codigo);
+                ProdutoSearch.inicializarComponente('input-codigo', async (produto) => {
+                    await PDV.adicionarPorCodigo(produto);
                 });
                 
                 // Atualizar relógio
@@ -506,9 +550,9 @@
                 
             } catch (error) {
                 console.error('Erro ao inicializar PDV:', error);
-                showToast('Erro ao inicializar PDV', 'error');
+                showToast('Erro ao inicializar PDV: ' + error.message, 'error');
             }
-        })();
+        });
 
         // =====================================================
         // FUNÇÕES DE INTERFACE
@@ -523,6 +567,303 @@
         
         function atualizarInfoCaixa() {
             const info = document.getElementById('info-caixa');
+            if (PDV.sessaoCaixa) {
+                info.textContent = `Caixa: ${PDV.sessaoCaixa.caixa?.nome || PDV.sessaoCaixa.caixa_id} | Operador: ${PDV.vendedor?.full_name || '--'}`;
+            } else {
+                info.textContent = 'Caixa: FECHADO | Operador: --';
+            }
+        }
+        
+        function atualizarListaItens() {
+            const lista = document.getElementById('lista-itens');
+            
+            if (!PDV.itens || PDV.itens.length === 0) {
+                lista.innerHTML = `
+                    <div class="flex items-center justify-center h-full text-gray-400">
+                        <div class="text-center">
+                            <i class="fas fa-barcode text-6xl mb-4"></i>
+                            <p>Escaneie ou digite o código do produto</p>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            lista.innerHTML = PDV.itens.map((item, index) => `
+                <div class="item-row" data-item-id="${item.id}">
+                    <span class="text-gray-500">${String(index + 1).padStart(3, '0')}</span>
+                    <div>
+                        <p class="font-medium">${item.descricao}</p>
+                        <p class="text-sm text-gray-500">${item.codigo_barras || item.produto_id.substring(0, 8)}</p>
+                    </div>
+                    <div class="flex items-center justify-center gap-1">
+                        <button onclick="alterarQtd('${item.id}', -1)" 
+                            class="qty-btn bg-red-100 text-red-600 hover:bg-red-200">-</button>
+                        <span class="w-10 text-center font-medium">${item.quantidade}</span>
+                        <button onclick="alterarQtd('${item.id}', 1)" 
+                            class="qty-btn bg-green-100 text-green-600 hover:bg-green-200">+</button>
+                    </div>
+                    <span class="text-right">${formatarMoeda(item.preco_unitario)}</span>
+                    <span class="text-right font-medium">${formatarMoeda(item.subtotal)}</span>
+                    <button onclick="removerItem('${item.id}')" 
+                        class="text-red-500 hover:text-red-700 p-1">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+        
+        function atualizarTotais() {
+            document.getElementById('total-itens').textContent = PDV.itens?.length || 0;
+            document.getElementById('total-venda').textContent = formatarMoeda(PDV.vendaAtual?.total || 0);
+            
+            const desconto = PDV.vendaAtual?.desconto_valor || 0;
+            const infoDesconto = document.getElementById('info-desconto');
+            if (desconto > 0) {
+                infoDesconto.style.display = 'block';
+                document.getElementById('valor-desconto').textContent = formatarMoeda(desconto);
+            } else {
+                infoDesconto.style.display = 'none';
+            }
+        }
+        
+        function atualizarResumoCaixa() {
+            if (PDV.sessaoCaixa) {
+                document.getElementById('resumo-dinheiro').textContent = formatarMoeda(PDV.sessaoCaixa.total_dinheiro || 0);
+                document.getElementById('resumo-pix').textContent = formatarMoeda(PDV.sessaoCaixa.total_pix || 0);
+                document.getElementById('resumo-debito').textContent = formatarMoeda(PDV.sessaoCaixa.total_debito || 0);
+                document.getElementById('resumo-credito').textContent = formatarMoeda(PDV.sessaoCaixa.total_credito || 0);
+            }
+        }
+        
+        function atualizarRelogio() {
+            const now = new Date();
+            document.getElementById('data-hora').textContent = now.toLocaleString('pt-BR');
+        }
+
+        // =====================================================
+        // CARREGAMENTO DE DADOS
+        // =====================================================
+        
+        async function carregarFormasPagamento() {
+            try {
+                const { data, error } = await window.supabase
+                    .from('formas_pagamento')
+                    .select('*')
+                    .eq('ativo', true)
+                    .order('ordem');
+                    
+                if (!error) {
+                    formasPagamento = data;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar formas de pagamento:', error);
+            }
+        }
+        
+        async function carregarClientes() {
+            try {
+                const { data, error } = await window.supabase
+                    .from('clientes')
+                    .select('id, nome')
+                    .order('nome');
+                
+                const select = document.getElementById('select-cliente');
+                select.innerHTML = '<option value="">Consumidor Final</option>';
+                if (data) {
+                    data.forEach(c => {
+                        select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+                    });
+                }
+            } catch (error) {
+                console.error('Erro ao carregar clientes:', error);
+            }
+        }
+        
+        async function carregarCaixas() {
+            try {
+                const { data, error } = await window.supabase
+                    .from('caixas')
+                    .select('*')
+                    .eq('active', true)
+                    .order('numero');
+                    
+                const select = document.getElementById('select-caixa');
+                select.innerHTML = '<option value="">Selecione o caixa...</option>';
+                
+                if (data && data.length > 0) {
+                    data.forEach(c => {
+                        select.innerHTML += `<option value="${c.id}">${c.numero} - ${c.nome}</option>`;
+                    });
+                } else {
+                    select.innerHTML += '<option value="" disabled>Nenhum caixa cadastrado</option>';
+                }
+            } catch (error) {
+                console.error('Erro ao carregar caixas:', error);
+                showToast('Erro ao carregar caixas disponíveis', 'error');
+            }
+        }
+
+        // =====================================================
+        // AÇÕES DO PDV
+        // =====================================================
+        
+        async function alterarQtd(itemId, delta) {
+            const item = PDV.itens.find(i => i.id === itemId);
+            if (item) {
+                await PDV.alterarQuantidade(itemId, item.quantidade + delta);
+            }
+        }
+        
+        async function removerItem(itemId) {
+            if (confirm('Remover este item?')) {
+                await PDV.removerItem(itemId);
+            }
+        }
+        
+        async function confirmarCancelarVenda() {
+            if (confirm('Cancelar a venda atual?')) {
+                await PDV.cancelarVenda();
+            }
+        }
+
+        // =====================================================
+        // PAGAMENTO
+        // =====================================================
+        
+        function abrirPagamento(tipo) {
+            if (!PDV.vendaAtual || PDV.itens.length === 0) {
+                showToast('Adicione itens à venda primeiro', 'warning');
+                return;
+            }
+            
+            formaPagamentoAtual = tipo;
+            
+            const modal = document.getElementById('modal-pagamento');
+            const titulo = document.getElementById('titulo-pagamento');
+            const valorPagar = document.getElementById('valor-pagar');
+            const campoRecebido = document.getElementById('campo-valor-recebido');
+            const campoTroco = document.getElementById('campo-troco');
+            const campoParcelas = document.getElementById('campo-parcelas');
+            const inputRecebido = document.getElementById('input-valor-recebido');
+            
+            titulo.textContent = `Pagamento em ${tipo}`;
+            valorPagar.textContent = formatarMoeda(PDV.vendaAtual.total);
+            
+            if (tipo === 'DINHEIRO') {
+                campoRecebido.style.display = 'block';
+                campoTroco.style.display = 'block';
+                campoParcelas.style.display = 'none';
+                inputRecebido.value = '';
+                inputRecebido.focus();
+            } else if (tipo === 'CREDITO') {
+                campoRecebido.style.display = 'none';
+                campoTroco.style.display = 'none';
+                campoParcelas.style.display = 'block';
+            } else {
+                campoRecebido.style.display = 'none';
+                campoTroco.style.display = 'none';
+                campoParcelas.style.display = 'none';
+            }
+            
+            modal.classList.remove('hidden');
+        }
+        
+        document.getElementById('input-valor-recebido')?.addEventListener('input', function() {
+            const recebido = parseFloat(this.value) || 0;
+            const total = PDV.vendaAtual?.total || 0;
+            const troco = recebido - total;
+            
+            document.getElementById('valor-troco').textContent = formatarMoeda(Math.max(0, troco));
+            document.getElementById('campo-troco').style.display = troco >= 0 ? 'block' : 'none';
+        });
+        
+        async function confirmarPagamento() {
+            try {
+                const recebido = parseFloat(document.getElementById('input-valor-recebido').value) || 0;
+                if (recebido < PDV.vendaAtual.total) {
+                    showToast('Valor recebido insuficiente', 'warning');
+                    return;
+                }
+                
+                await PDV.finalizarVenda();
+                document.getElementById('modal-pagamento').classList.add('hidden');
+                showToast('Venda finalizada com sucesso!', 'success');
+            } catch (error) {
+                handleError(error, 'Erro ao processar pagamento');
+            }
+        }
+
+        // =====================================================
+        // DESCONTO
+        // =====================================================
+        
+        function abrirDesconto() {
+            if (!PDV.vendaAtual || PDV.itens.length === 0) {
+                showToast('Adicione itens à venda primeiro', 'warning');
+                return;
+            }
+            document.getElementById('modal-desconto').classList.remove('hidden');
+            document.getElementById('input-desconto').focus();
+        }
+        
+        function setTipoDesconto(tipo) {
+            tipoDesconto = tipo;
+            document.getElementById('btn-desc-percent').className = 
+                tipo === 'percentual' ? 'flex-1 py-2 bg-blue-600 text-white rounded-lg' : 'flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg';
+            document.getElementById('btn-desc-valor').className = 
+                tipo === 'valor' ? 'flex-1 py-2 bg-blue-600 text-white rounded-lg' : 'flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg';
+        }
+        
+        async function aplicarDesconto() {
+            const valor = parseFloat(document.getElementById('input-desconto').value) || 0;
+            if (valor > 0) {
+                await PDV.aplicarDesconto(tipoDesconto, valor);
+                document.getElementById('modal-desconto').classList.add('hidden');
+                document.getElementById('input-desconto').value = '';
+            }
+        }
+
+        // =====================================================
+        // CAIXA
+        // =====================================================
+        
+        async function confirmarAberturaCaixa() {
+            try {
+                const caixaId = document.getElementById('select-caixa').value;
+                const valorAbertura = parseFloat(document.getElementById('input-valor-abertura').value) || 0;
+                
+                if (!caixaId) {
+                    showToast('Selecione um caixa', 'warning');
+                    return;
+                }
+                
+                await PDV.abrirCaixa(caixaId, valorAbertura);
+                document.getElementById('modal-abertura-caixa').classList.add('hidden');
+                atualizarInterface();
+            } catch (error) {
+                handleError(error, 'Erro ao abrir caixa');
+            }
+        }
+        
+        function abrirBuscaProduto() {
+            document.getElementById('input-codigo')?.focus();
+        }
+        
+        function abrirNovoCliente() {
+            showToast('Funcionalidade em desenvolvimento', 'info');
+        }
+
+        // =====================================================
+        // UTILITÁRIOS
+        // =====================================================
+        
+        function formatarMoeda(valor) {
+            return (valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+    </script>
+</body>
+</html>
             if (PDV.sessaoCaixa) {
                 info.textContent = `Caixa: ${PDV.sessaoCaixa.caixa?.nome || PDV.sessaoCaixa.caixa_id} | Operador: ${PDV.vendedor?.full_name || '--'}`;
             } else {
@@ -632,22 +973,25 @@
         
         async function carregarCaixas() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await window.supabase
                     .from('caixas')
                     .select('*')
-                    .eq('ativo', true)
+                    .eq('active', true)
                     .order('numero');
                     
                 const select = document.getElementById('select-caixa');
                 select.innerHTML = '<option value="">Selecione o caixa...</option>';
                 
-                if (data) {
+                if (data && data.length > 0) {
                     data.forEach(c => {
-                        select.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+                        select.innerHTML += `<option value="${c.id}">${c.numero} - ${c.nome}</option>`;
                     });
+                } else {
+                    select.innerHTML += '<option value="" disabled>Nenhum caixa cadastrado</option>';
                 }
             } catch (error) {
                 console.error('Erro ao carregar caixas:', error);
+                showToast('Erro ao carregar caixas disponíveis', 'error');
             }
         }
 
@@ -811,6 +1155,76 @@
         // =====================================================
         // CAIXA
         // =====================================================
+        
+        async function confirmarAberturaCaixa() {
+            try {
+                const caixaId = document.getElementById('select-caixa').value;
+                const valorAbertura = parseFloat(document.getElementById('input-valor-abertura').value) || 0;
+                
+                if (!caixaId) {
+                    showToast('Selecione um caixa', 'warning');
+                    return;
+                }
+                
+                showLoading(true);
+                
+                // Verificar se já há uma sessão aberta para este caixa
+                const { data: sessaoExistente } = await window.supabase
+                    .from('caixa_sessoes')
+                    .select('*')
+                    .eq('caixa_id', caixaId)
+                    .is('data_fechamento', null)
+                    .single();
+                    
+                if (sessaoExistente) {
+                    showToast('Este caixa já está aberto', 'warning');
+                    return;
+                }
+                
+                // Obter usuário atual
+                const { data: { user } } = await window.supabase.auth.getUser();
+                if (!user) {
+                    showToast('Usuário não autenticado', 'error');
+                    return;
+                }
+                
+                // Criar nova sessão
+                const { data, error } = await window.supabase
+                    .from('caixa_sessoes')
+                    .insert([{
+                        caixa_id: caixaId,
+                        operador_id: user.id,
+                        valor_abertura: valorAbertura
+                    }])
+                    .select('*, caixas(*)')
+                    .single();
+                    
+                if (error) throw error;
+                
+                // Atualizar PDV
+                PDV.sessaoCaixa = data;
+                PDV.vendedor = user;
+                
+                // Fechar modal
+                document.getElementById('modal-abertura-caixa').classList.add('hidden');
+                
+                // Atualizar interface
+                atualizarInterface();
+                
+                showToast(`Caixa ${data.caixas.nome} aberto com sucesso!`, 'success');
+                
+            } catch (error) {
+                console.error('Erro ao abrir caixa:', error);
+                showToast('Erro ao abrir caixa', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function abrirConfigCaixa() {
+            // Função para configurações do caixa
+            showToast('Configurações do caixa em desenvolvimento', 'info');
+        }
         
         async function confirmarAberturaCaixa() {
             const caixaId = document.getElementById('select-caixa').value;

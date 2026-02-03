@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produtos - Debug</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div class="p-8">
+        <h1 class="text-3xl font-bold">Produtos - Página de Debug</h1>
+        <p>Testando apenas a estrutura básica.</p>
+        
+        <button id="btnTeste" class="bg-blue-500 text-white px-4 py-2 rounded">
+            Teste
+        </button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script>
+        console.log('Iniciando página produtos debug...');
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                console.log('DOM carregado');
+                
+                const user = await checkAuth();
+                console.log('Auth checked:', user);
+                
+                // Teste simples de botão
+                const btnTeste = document.getElementById('btnTeste');
+                if (btnTeste) {
+                    btnTeste.onclick = async function() {
+                        console.log('Botão clicado!');
+                        alert('Funciona!');
+                    };
+                }
+                
+                console.log('Página inicializada com sucesso');
+            } catch (error) {
+                console.error('Erro na inicialização:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-﻿// =====================================================
+// =====================================================
 // SERVIÇO DE FORNECEDORES
 // =====================================================
 
@@ -12,7 +12,7 @@ async function listFornecedores(filters = {}) {
             .order('razao_social');
 
         if (filters.search) {
-            query = query.or(azao_social.ilike.%js\services\fornecedores.js.bak{filters.search}%,nome_fantasia.ilike.%js\services\fornecedores.js.bak{filters.search}%,cnpj.ilike.%js\services\fornecedores.js.bak{filters.search}%);
+            query = query.or(`razao_social.ilike.%${filters.search}%,nome_fantasia.ilike.%${filters.search}%,cnpj.ilike.%${filters.search}%`);
         }
 
         const { data, error } = await query;
@@ -26,9 +26,6 @@ async function listFornecedores(filters = {}) {
     }
 }
 
-// Buscar fornecedor por ID
-async function getFornecedor(id) {
-    try {
         const { data, error } = await window.supabase
             .from('fornecedores')
             .select('*')
@@ -51,7 +48,7 @@ async function createFornecedor(fornecedor) {
         
         const user = await getCurrentUser();
         
-        const { data, error } = await window.supabase
+        const { data, error } = await supabase
             .from('fornecedores')
             .insert([{
                 ...fornecedor,
@@ -77,8 +74,8 @@ async function createFornecedor(fornecedor) {
 async function updateFornecedor(id, fornecedor) {
     try {
         showLoading(true);
-        
-        const { data, error } = await window.supabase
+
+        const { data, error } = await supabase
             .from('fornecedores')
             .update(fornecedor)
             .eq('id', id)
@@ -98,16 +95,16 @@ async function updateFornecedor(id, fornecedor) {
     }
 }
 
-// Excluir fornecedor
+// Deletar fornecedor (soft delete)
 async function deleteFornecedor(id) {
-    if (!confirm('Tem certeza que deseja excluir este fornecedor?')) {
-        return false;
-    }
-    
     try {
+        if (!await confirmAction('Deseja realmente excluir este fornecedor?')) {
+            return false;
+        }
+
         showLoading(true);
-        
-        const { error } = await window.supabase
+
+        const { error } = await supabase
             .from('fornecedores')
             .update({ active: false })
             .eq('id', id);

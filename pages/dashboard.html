@@ -283,16 +283,23 @@
 
         // Inicializar
         (async () => {
-            await checkAuth();
-            
-            // Renderizar navbar e sidebar
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
-            
-            // Carregar dados
-            await loadDashboard();
+            try {
+                await checkAuth();
+                
+                // Renderizar navbar e sidebar
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                
+                // Carregar dados
+                await loadDashboard();
+            } catch (error) {
+                console.error('Erro ao inicializar dashboard:', error);
+                // Em caso de erro, mostrar página básica
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
         })();
 
         async function loadDashboard() {

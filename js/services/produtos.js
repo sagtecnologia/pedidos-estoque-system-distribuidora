@@ -5,14 +5,14 @@
 // Listar produtos
 async function listProdutos(filters = {}) {
     try {
-        let query = supabase
+        let query = window.supabase
             .from('produtos')
             .select('*')
             .eq('active', true)
             .order('nome');
 
         if (filters.categoria) {
-            query = query.eq('categoria', filters.categoria);
+            query = query.eq('categoria_id', filters.categoria);
         }
 
         if (filters.search) {
@@ -33,7 +33,7 @@ async function listProdutos(filters = {}) {
 // Buscar produto por ID
 async function getProduto(id) {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
             .select('*')
             .eq('id', id)
@@ -51,38 +51,31 @@ async function getProduto(id) {
 // Criar produto
 async function createProduto(produto) {
     try {
-        showLoading(true);
+        // Gerar código automático se não existir
+        if (!produto.codigo) {
+            produto.codigo = await generateProductCode(produto.marca_id);
+        }
         
-        const user = await getCurrentUser();
-        
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
-            .insert([{
-                ...produto,
-                created_by: user.id
-            }])
+            .insert([produto])
             .select()
             .single();
 
         if (error) throw error;
 
-        showToast('Produto criado com sucesso!', 'success');
         return data;
         
     } catch (error) {
         handleError(error, 'Erro ao criar produto');
         return null;
-    } finally {
-        showLoading(false);
     }
 }
 
 // Atualizar produto
 async function updateProduto(id, produto) {
     try {
-        showLoading(true);
-
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
             .update(produto)
             .eq('id', id)
@@ -91,27 +84,18 @@ async function updateProduto(id, produto) {
 
         if (error) throw error;
 
-        showToast('Produto atualizado com sucesso!', 'success');
         return data;
         
     } catch (error) {
         handleError(error, 'Erro ao atualizar produto');
         return null;
-    } finally {
-        showLoading(false);
     }
 }
 
 // Deletar produto (soft delete)
 async function deleteProduto(id) {
     try {
-        if (!await confirmAction('Deseja realmente excluir este produto?')) {
-            return false;
-        }
-
-        showLoading(true);
-
-        const { error } = await supabase
+        const { error } = await window.supabase
             .from('produtos')
             .update({ active: false })
             .eq('id', id);
@@ -124,8 +108,6 @@ async function deleteProduto(id) {
     } catch (error) {
         handleError(error, 'Erro ao excluir produto');
         return false;
-    } finally {
-        showLoading(false);
     }
 }
 
@@ -133,7 +115,7 @@ async function deleteProduto(id) {
 async function getProdutosEstoqueBaixo() {
     try {
         // Usar rpc ou filtrar no cliente, pois Supabase não permite comparar colunas diretamente
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
             .select('*')
             .eq('active', true)
@@ -153,17 +135,15 @@ async function getProdutosEstoqueBaixo() {
 // Listar categorias
 async function getCategorias() {
     try {
-        const { data, error } = await supabase
-            .from('produtos')
-            .select('categoria')
-            .eq('active', true)
-            .not('categoria', 'is', null);
+        const { data, error } = await window.supabase
+            .from('categorias')
+            .select('*')
+            .eq('active', true);
 
         if (error) throw error;
 
-        // Remover duplicatas
-        const categorias = [...new Set(data.map(p => p.categoria))];
-        return categorias.sort();
+        // Retornar lista de categorias
+        return data.map(c => ({ id: c.id, nome: c.nome }));
         
     } catch (error) {
         handleError(error, 'Erro ao buscar categorias');
@@ -176,12 +156,24 @@ async function getCategorias() {
 // =====================================================
 
 // Gerar código automático do produto
-async function generateProductCode(marca) {
+async function generateProductCode(marcaId) {
     try {
-        // Buscar último código da marca
-        const prefixo = marca ? marca.substring(0, 3).toUpperCase() : 'PRD';
+        let prefixo = 'PRD';
         
-        const { data, error } = await supabase
+        // Se tiver marca_id, buscar o nome e extrair prefixo
+        if (marcaId) {
+            const { data, error } = await window.supabase
+                .from('marcas')
+                .select('nome')
+                .eq('id', marcaId)
+                .single();
+
+            if (!marcaError && marcaData) {
+                prefixo = marcaData.nome.substring(0, 3).toUpperCase();
+            }
+        }
+        
+        const { data, error } = await window.supabase
             .from('produtos')
             .select('codigo')
             .like('codigo', `${prefixo}-%`)
@@ -219,7 +211,7 @@ async function generateProductCode(marca) {
 // Buscar sabores de um produto
 async function getSaboresProduto(produtoId) {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('produto_sabores')
             .select('*')
             .eq('produto_id', produtoId)
@@ -243,16 +235,14 @@ async function createProdutoComSabores(produto, sabores) {
         const user = await getCurrentUser();
         
         // Gerar código automático baseado na marca
-        const codigo = await generateProductCode(produto.marca);
+        const codigo = await generateProductCode(produto.marca_id);
         
         // 1. Criar produto
-        const { data: produtoData, error: produtoError } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
             .insert([{
                 ...produto,
-                codigo: codigo, // Código gerado automaticamente
-                estoque_atual: 0, // Será calculado automaticamente pelo trigger
-                created_by: user.id
+                codigo: codigo // Código gerado automaticamente
             }])
             .select()
             .single();
@@ -268,7 +258,7 @@ async function createProdutoComSabores(produto, sabores) {
                 ativo: true
             }));
 
-            const { error: saboresError } = await supabase
+            const { error: saboresError } = await window.supabase
                 .from('produto_sabores')
                 .insert(saboresInsert);
 
@@ -292,7 +282,7 @@ async function updateProdutoComSabores(id, produto, sabores) {
         showLoading(true);
 
         // 1. Atualizar produto
-        const { data: produtoData, error: produtoError } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
             .update(produto)
             .eq('id', id)
@@ -309,7 +299,7 @@ async function updateProdutoComSabores(id, produto, sabores) {
         // 3. Desativar sabores removidos
         const idsRemovidos = idsExistentes.filter(id => !idsRecebidos.includes(id));
         if (idsRemovidos.length > 0) {
-            const { error: deleteError } = await supabase
+            const { error: deleteError } = await window.supabase
                 .from('produto_sabores')
                 .update({ ativo: false })
                 .in('id', idsRemovidos);
@@ -321,7 +311,7 @@ async function updateProdutoComSabores(id, produto, sabores) {
         for (const sabor of sabores) {
             if (sabor.id) {
                 // Atualizar existente
-                const { error: updateError } = await supabase
+                const { error: updateError } = await window.supabase
                     .from('produto_sabores')
                     .update({
                         sabor: sabor.sabor,
@@ -332,7 +322,7 @@ async function updateProdutoComSabores(id, produto, sabores) {
                 if (updateError) throw updateError;
             } else {
                 // Inserir novo
-                const { error: insertError } = await supabase
+                const { error: insertError } = await window.supabase
                     .from('produto_sabores')
                     .insert([{
                         produto_id: id,
@@ -359,17 +349,15 @@ async function updateProdutoComSabores(id, produto, sabores) {
 // Listar marcas
 async function getMarcas() {
     try {
-        const { data, error } = await supabase
-            .from('produtos')
-            .select('marca')
-            .eq('active', true)
-            .not('marca', 'is', null);
+        const { data, error } = await window.supabase
+            .from('marcas')
+            .select('id, nome')
+            .eq('ativo', true)
+            .order('nome');
 
         if (error) throw error;
 
-        // Remover duplicatas
-        const marcas = [...new Set(data.map(p => p.marca))];
-        return marcas.sort();
+        return data || [];
         
     } catch (error) {
         handleError(error, 'Erro ao buscar marcas');
@@ -380,7 +368,7 @@ async function getMarcas() {
 // Listar produtos por marca
 async function getProdutosPorMarca(marca) {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await window.supabase
             .from('produtos')
             .select('*')
             .eq('marca', marca)

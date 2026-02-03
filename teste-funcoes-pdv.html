@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Rápido - Funções PDV</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+</head>
+<body>
+    <div style="font-family: Arial, sans-serif; padding: 20px; max-width: 800px;">
+        <h1>🧪 Teste Rápido - Funções PDV</h1>
+        
+        <div style="background: #f0f9ff; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <h3>📋 Instruções:</h3>
+            <ol>
+                <li>Execute o script SQL no <strong>Supabase SQL Editor</strong></li>
+                <li>Clique nos botões abaixo para testar as funções</li>
+                <li>Verifique se aparecem resultados ou mensagens de erro</li>
+            </ol>
+        </div>
+
+        <div style="display: grid; gap: 10px; margin-bottom: 20px;">
+            <button onclick="verificarFuncoes()" style="padding: 10px; background: #3b82f6; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                🔍 Verificar se funções existem
+            </button>
+            
+            <button onclick="testarBuscaCodigo()" style="padding: 10px; background: #10b981; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                📦 Testar busca por código
+            </button>
+            
+            <button onclick="testarBuscaNome()" style="padding: 10px; background: #8b5cf6; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                🏷️ Testar busca por nome
+            </button>
+            
+            <button onclick="testarBuscaUniversal()" style="padding: 10px; background: #f59e0b; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                🌐 Testar busca universal
+            </button>
+        </div>
+
+        <div id="resultados" style="background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; white-space: pre-wrap; font-family: monospace;"></div>
+    </div>
+
+    <script>
+        // Inicializar Supabase
+        const { createClient } = supabase;
+        const supabaseClient = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey);
+        
+        function log(message) {
+            const resultados = document.getElementById('resultados');
+            const timestamp = new Date().toLocaleTimeString();
+            resultados.textContent += `[${timestamp}] ${message}\n`;
+            resultados.scrollTop = resultados.scrollHeight;
+        }
+
+        async function verificarFuncoes() {
+            log('🔍 Verificando se funções existem no banco...');
+            
+            try {
+                // Testar com dados válidos
+                const { data, error } = await supabaseClient.rpc('buscar_produtos_nome', {
+                    p_termo: 'a'
+                });
+
+                if (error) {
+                    if (error.message.includes('could not find function')) {
+                        log('❌ Função buscar_produtos_nome NÃO existe');
+                        log('➡️ Execute o script CORRECAO_DEFINITIVA_PDV.sql');
+                    } else {
+                        log(`⚠️ Erro inesperado: ${error.message}`);
+                    }
+                } else {
+                    log('✅ Função buscar_produtos_nome existe e funciona');
+                    log(`📊 Retornou ${data ? data.length : 0} resultados`);
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na verificação: ${error.message}`);
+            }
+        }
+
+        async function testarBuscaCodigo() {
+            log('📦 Testando busca por código de barras...');
+            
+            try {
+                const { data, error } = await supabaseClient.rpc('buscar_produto_codigo_barras', {
+                    p_codigo: '123'
+                });
+
+                if (error) {
+                    log(`❌ Erro: ${error.message}`);
+                } else {
+                    log(`✅ Resultado: ${JSON.stringify(data, null, 2)}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na busca por código: ${error.message}`);
+            }
+        }
+
+        async function testarBuscaNome() {
+            log('🏷️ Testando busca por nome...');
+            
+            try {
+                const { data, error } = await supabaseClient.rpc('buscar_produtos_nome', {
+                    p_termo: 'a'
+                });
+
+                if (error) {
+                    log(`❌ Erro: ${error.message}`);
+                } else {
+                    log(`✅ Resultado: Encontrados ${data ? data.length : 0} produtos`);
+                    if (data && data.length > 0) {
+                        data.slice(0, 3).forEach((produto, i) => {
+                            log(`   ${i+1}. ${produto.nome} - R$ ${produto.preco_venda}`);
+                        });
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na busca por nome: ${error.message}`);
+            }
+        }
+
+        async function testarBuscaUniversal() {
+            log('🌐 Testando busca universal...');
+            
+            try {
+                const { data, error } = await supabaseClient.rpc('buscar_produto_universal', {
+                    p_busca: 'teste'
+                });
+
+                if (error) {
+                    log(`❌ Erro: ${error.message}`);
+                } else {
+                    log(`✅ Resultado: ${JSON.stringify(data, null, 2)}`);
+                }
+                
+            } catch (error) {
+                log(`❌ Erro na busca universal: ${error.message}`);
+            }
+        }
+
+        // Log inicial
+        log('🚀 Teste de funções PDV carregado');
+        log('💡 Clique nos botões para testar cada função');
+        log('');
+    </script>
+</body>
+</html>

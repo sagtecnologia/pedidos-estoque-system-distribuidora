@@ -7,7 +7,7 @@ async function login(email, password) {
     try {
         showLoading(true);
         
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await window.supabase.auth.signInWithPassword({
             email,
             password
         });
@@ -16,23 +16,8 @@ async function login(email, password) {
 
         // Verificar se o email foi confirmado
         if (!data.user.email_confirmed_at) {
-            await supabase.auth.signOut();
+            await window.supabase.auth.signOut();
             showToast('❌ Você precisa confirmar seu email antes de fazer login! Verifique sua caixa de entrada.', 'error', 6000);
-            return;
-        }
-
-        // Buscar dados do usuário
-        const { data: userData, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-
-        if (userError) throw userError;
-
-        if (!userData.active) {
-            await supabase.auth.signOut();
-            showToast('⏳ Sua conta está aguardando aprovação do administrador. Você receberá um email quando for aprovada.', 'warning', 6000);
             return;
         }
 
@@ -52,7 +37,7 @@ async function register(email, password, fullName, role = 'COMPRADOR', whatsapp 
         showLoading(true);
 
         // Criar usuário no auth do Supabase
-        const { data: authData, error: authError } = await supabase.auth.signUp({
+        const { data: authData, error: authError } = await window.supabase.auth.signUp({
             email,
             password
         });
@@ -67,7 +52,7 @@ async function register(email, password, fullName, role = 'COMPRADOR', whatsapp 
         }
 
         // Criar registro na tabela users (PENDENTE DE APROVAÇÃO)
-        const { error: userError } = await supabase
+        const { error: userError } = await window.supabase
             .from('users')
             .insert([{
                 id: authData.user.id,
@@ -175,25 +160,58 @@ function showEmailConfirmationModal(email) {
 async function logout() {
     try {
         // Verificar se há sessão ativa antes de tentar logout
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
+        try {
+            const { data: { session } } = await window.supabase.auth.getSession();
+            
+            if (session) {
+                const { error } = await window.supabase.auth.signOut();
+                if (error) throw error;
+            }
+            
+            // Limpar qualquer dado local (seguro)
+            try {
+                // Tentar limpar apenas se storage estiver disponível
+                if (typeof localStorage !== 'undefined' && localStorage) {
+                    localStorage.clear();
+                }
+                if (typeof sessionStorage !== 'undefined' && sessionStorage) {
+                    sessionStorage.clear();
+                }
+            } catch (storageError) {
+                console.warn('Storage não disponível para limpeza:', storageError.message);
+            }
+            
+            showToast('Logout realizado com sucesso!', 'success');
+            redirect('/index.html');
+        } catch (storageError) {
+            console.warn('Erro de storage no logout:', storageError);
+            // Continuar com logout mesmo com erro de storage
+            try {
+                if (typeof localStorage !== 'undefined' && localStorage) {
+                    localStorage.clear();
+                }
+                if (typeof sessionStorage !== 'undefined' && sessionStorage) {
+                    sessionStorage.clear();
+                }
+            } catch (e) {
+                console.warn('Storage não disponível para limpeza:', e.message);
+            }
+            redirect('/index.html');
         }
-        
-        // Limpar qualquer dado local
-        localStorage.clear();
-        sessionStorage.clear();
-        
-        showToast('Logout realizado com sucesso!', 'success');
-        redirect('/index.html');
         
     } catch (error) {
         // Se for erro de sessão, apenas redirecionar
         if (error.message?.includes('session') || error.message?.includes('Session')) {
-            localStorage.clear();
-            sessionStorage.clear();
+            try {
+                if (typeof localStorage !== 'undefined' && localStorage) {
+                    localStorage.clear();
+                }
+                if (typeof sessionStorage !== 'undefined' && sessionStorage) {
+                    sessionStorage.clear();
+                }
+            } catch (storageError) {
+                console.warn('Storage não disponível para limpeza:', storageError.message);
+            }
             redirect('/index.html');
         } else {
             handleError(error, 'Erro ao fazer logout');
@@ -206,7 +224,7 @@ async function changePassword(newPassword) {
     try {
         showLoading(true);
 
-        const { error } = await supabase.auth.updateUser({
+        const { error } = await window.supabase.auth.updateUser({
             password: newPassword
         });
 
@@ -226,7 +244,7 @@ async function resetPassword(email) {
     try {
         showLoading(true);
 
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await window.supabase.auth.resetPasswordForEmail(email, {
             redirectTo: window.location.origin + '/pages/reset-password.html'
         });
 

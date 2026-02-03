@@ -20,20 +20,16 @@ const PDV = {
      */
     async init() {
         try {
-            this.vendedor = await getCurrentUser();
-            
-            if (!this.vendedor) {
+            // Obter usuário autenticado
+            const { data: { user }, error } = await window.supabase.auth.getUser();
+            if (error || !user) {
                 throw new Error('Usuário não autenticado');
             }
-
+            
+            this.vendedor = user;
+            
             // Verificar/abrir sessão do caixa
             await this.verificarSessaoCaixa();
-            
-            // Iniciar nova venda
-            await this.novaVenda();
-            
-            // Configurar listeners
-            this.configurarEventos();
             
             console.log('✅ PDV inicializado');
             return true;
@@ -49,11 +45,11 @@ const PDV = {
     async verificarSessaoCaixa() {
         try {
             // Buscar sessão aberta do usuário
-            const { data, error } = await supabase
+            const { data, error } = await window.supabase
                 .from('caixa_sessoes')
-                .select('*, caixa:caixas(*)')
-                .eq('usuario_id', this.vendedor.id)
-                .eq('status', 'ABERTO')
+                .select('*, caixas(*)')
+                .eq('operador_id', this.vendedor.id)
+                .is('data_fechamento', null)
                 .single();
 
             if (error && error.code !== 'PGRST116') {
@@ -73,11 +69,11 @@ const PDV = {
      */
     async abrirCaixa(caixaId, valorAbertura) {
         try {
-            const { data, error } = await supabase
+            const { data, error } = await window.supabase
                 .from('caixa_sessoes')
                 .insert([{
                     caixa_id: caixaId,
-                    usuario_id: this.vendedor.id,
+                    operador_id: this.vendedor.id,
                     valor_abertura: valorAbertura,
                     status: 'ABERTO'
                 }])
@@ -112,7 +108,7 @@ const PDV = {
 
             const diferenca = valorInformado - valorSistema;
 
-            const { data, error } = await supabase
+            const { data, error } = await window.supabase
                 .from('caixa_sessoes')
                 .update({
                     status: 'FECHADO',
@@ -147,16 +143,15 @@ const PDV = {
      */
     async novaVenda(clienteId = null) {
         try {
-            const { data, error } = await supabase.rpc('iniciar_venda_pdv', {
+            const { data, error } = await window.supabase.rpc('iniciar_venda_pdv', {
                 p_vendedor_id: this.vendedor.id,
-                p_sessao_caixa_id: this.sessaoCaixa?.id,
                 p_cliente_id: clienteId
             });
 
             if (error) throw error;
 
             // Buscar venda criada
-            const { data: venda } = await supabase
+            const { data: venda } = await window.supabase
                 .from('vendas')
                 .select('*')
                 .eq('id', data)
@@ -178,7 +173,7 @@ const PDV = {
      */
     async buscarProduto(codigo) {
         try {
-            const { data, error } = await supabase.rpc('buscar_produto_codigo_barras', {
+            const { data, error } = await window.supabase.rpc('buscar_produto_codigo_barras', {
                 p_codigo: codigo.trim()
             });
 
@@ -197,45 +192,144 @@ const PDV = {
     },
 
     /**
+     * Buscar produtos por nome
+     */
+    async buscarProdutosPorNome(termo) {
+        try {
+            const { data, error } = await window.supabase.rpc('buscar_produtos_nome', {
+                p_termo: termo.trim()
+            });
+
+            if (error) throw error;
+
+            return data || [];
+        } catch (error) {
+            handleError(error, 'Erro ao buscar produtos');
+            return [];
+        }
+    },
+
+    /**
+     * Busca universal (código ou nome)
+     */
+    async buscarProdutoUniversal(busca) {
+        try {
+            const { data, error } = await window.supabase.rpc('buscar_produto_universal', {
+                p_busca: busca.trim()
+            });
+
+            if (error) throw error;
+
+            return data || [];
+        } catch (error) {
+            console.error('Erro na busca:', error);
+            // Fallback para busca por nome se função universal não existir
+            if (error.message.includes('could not find function') || error.message.includes('buscar_produto_universal')) {
+                return await this.buscarProdutosPorNome(busca);
+            }
+            handleError(error, 'Erro na busca de produtos');
+            return [];
+        }
+    },
+
+    /**
      * Adicionar item à venda
      */
     async adicionarItem(produtoId, quantidade = 1, descontoPercentual = 0) {
         try {
+            console.log('📦 Adicionando item:', { produtoId, quantidade, descontoPercentual });
+            
             if (!this.vendaAtual) {
+                console.log('Sem venda atual, criando nova...');
                 await this.novaVenda();
             }
 
-            const { data, error } = await supabase.rpc('adicionar_item_venda', {
+            console.log('Chamando RPC adicionar_item_venda...');
+            const { data, error } = await window.supabase.rpc('adicionar_item_venda', {
                 p_venda_id: this.vendaAtual.id,
                 p_produto_id: produtoId,
                 p_quantidade: quantidade,
                 p_desconto_percentual: descontoPercentual
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Erro na RPC:', error);
+                throw error;
+            }
+
+            console.log('✅ Item adicionado:', data);
 
             // Recarregar itens e venda
+            console.log('Recarregando itens e venda...');
             await this.carregarItens();
             await this.carregarVenda();
 
             // Feedback sonoro
             this.beep();
+            
+            // Mostrar toast de sucesso
+            showToast('Produto adicionado à venda!', 'success');
 
             return data;
         } catch (error) {
+            console.error('❌ Erro ao adicionar item:', error);
             handleError(error, 'Erro ao adicionar item');
             throw error;
         }
     },
 
     /**
-     * Adicionar item por código de barras
+     * Adicionar produto (aceita código ou objeto produto)
      */
-    async adicionarPorCodigo(codigo, quantidade = 1) {
-        const produto = await this.buscarProduto(codigo);
-        if (produto) {
-            await this.adicionarItem(produto.id, quantidade);
-            return produto;
+    async adicionarPorCodigo(produtoOuCodigo, quantidade = 1) {
+        try {
+            let produto;
+            
+            // Se recebeu um objeto produto, usar diretamente
+            if (typeof produtoOuCodigo === 'object' && produtoOuCodigo.id) {
+                produto = produtoOuCodigo;
+            } else {
+                // Se recebeu uma string, buscar o produto
+                const busca = produtoOuCodigo;
+                
+                // Primeiro tentar busca exata por código de barras
+                produto = await this.buscarProduto(busca);
+                
+                if (!produto) {
+                    // Se não encontrou por código, tentar busca universal
+                    const resultados = await this.buscarProdutoUniversal(busca);
+                    
+                    if (resultados.length === 1) {
+                        // Se só encontrou um produto, adicionar automaticamente
+                        produto = resultados[0];
+                    } else if (resultados.length > 1) {
+                        // Se encontrou múltiplos produtos, mostrar seleção
+                        produto = await this.mostrarSelecaoProdutos(resultados, busca);
+                    }
+                }
+            }
+            
+            if (produto) {
+                await this.adicionarItem(produto.id, quantidade);
+                return produto;
+            } else {
+                showToast(`Nenhum produto encontrado`, 'warning');
+                return null;
+            }
+        } catch (error) {
+            console.error('Erro ao adicionar produto:', error);
+            handleError(error, 'Erro ao buscar produto');
+            return null;
+        }
+    },
+
+    /**
+     * Mostrar seleção de produtos quando há múltiplos resultados
+     */
+    async mostrarSelecaoProdutos(produtos, termoBusca) {
+        // Versão simplificada - apenas retorna o primeiro
+        if (produtos.length > 0) {
+            return produtos[0];
         }
         return null;
     },
@@ -245,7 +339,7 @@ const PDV = {
      */
     async removerItem(itemId) {
         try {
-            const { error } = await supabase
+            const { error } = await window.supabase
                 .from('venda_itens')
                 .update({ cancelado: true })
                 .eq('id', itemId);
@@ -253,7 +347,7 @@ const PDV = {
             if (error) throw error;
 
             // Recalcular totais
-            await supabase.rpc('atualizar_totais_venda', {
+            await window.supabase.rpc('atualizar_totais_venda', {
                 p_venda_id: this.vendaAtual.id
             });
 
@@ -280,7 +374,7 @@ const PDV = {
 
             const novoSubtotal = item.preco_unitario * novaQuantidade * (1 - (item.desconto_percentual / 100));
 
-            const { error } = await supabase
+            const { error } = await window.supabase
                 .from('venda_itens')
                 .update({
                     quantidade: novaQuantidade,
@@ -290,7 +384,7 @@ const PDV = {
 
             if (error) throw error;
 
-            await supabase.rpc('atualizar_totais_venda', {
+            await window.supabase.rpc('atualizar_totais_venda', {
                 p_venda_id: this.vendaAtual.id
             });
 
@@ -330,7 +424,7 @@ const PDV = {
                 }
             }
 
-            const { error } = await supabase
+            const { error } = await window.supabase
                 .from('vendas')
                 .update({
                     desconto_percentual: descontoPercentual,
@@ -353,7 +447,7 @@ const PDV = {
      */
     async selecionarCliente(clienteId) {
         try {
-            const { error } = await supabase
+            const { error } = await window.supabase
                 .from('vendas')
                 .update({ cliente_id: clienteId })
                 .eq('id', this.vendaAtual.id);
@@ -388,7 +482,7 @@ const PDV = {
             }
 
             // Chamar função de finalização
-            const { data, error } = await supabase.rpc('finalizar_venda_pdv', {
+            const { data, error } = await window.supabase.rpc('finalizar_venda_pdv', {
                 p_venda_id: this.vendaAtual.id,
                 p_pagamentos: JSON.stringify(pagamentos),
                 p_tipo_documento: tipoDocumento
@@ -431,7 +525,7 @@ const PDV = {
             // Buscar cliente se houver
             let cliente = null;
             if (this.vendaAtual.cliente_id) {
-                const { data } = await supabase
+                const { data } = await window.supabase
                     .from('clientes')
                     .select('*')
                     .eq('id', this.vendaAtual.cliente_id)
@@ -440,7 +534,7 @@ const PDV = {
             }
 
             // Buscar pagamentos
-            const { data: pagamentos } = await supabase
+            const { data: pagamentos } = await window.supabase
                 .from('venda_pagamentos')
                 .select('*, forma_pagamento:formas_pagamento(*)')
                 .eq('venda_id', this.vendaAtual.id);
@@ -480,7 +574,7 @@ const PDV = {
         try {
             if (!this.vendaAtual) return;
 
-            const { error } = await supabase
+            const { error } = await window.supabase
                 .from('vendas')
                 .update({
                     status: 'CANCELADA',
@@ -603,17 +697,27 @@ const PDV = {
      * Carregar itens da venda atual
      */
     async carregarItens() {
-        if (!this.vendaAtual) return;
+        if (!this.vendaAtual) {
+            console.warn('Nenhuma venda atual para carregar itens');
+            return;
+        }
 
-        const { data, error } = await supabase
-            .from('venda_itens')
-            .select('*, produto:produtos(*)')
-            .eq('venda_id', this.vendaAtual.id)
-            .eq('cancelado', false)
-            .order('sequencial');
+        try {
+            const { data, error } = await window.supabase
+                .from('venda_itens')
+                .select('*, produto:produtos(*)')
+                .eq('venda_id', this.vendaAtual.id)
+                .order('created_at');
 
-        if (!error) {
-            this.itens = data || [];
+            if (error) {
+                console.warn('Erro ao carregar itens:', error);
+                // Continuar mesmo com erro
+            } else if (data) {
+                this.itens = data || [];
+                console.log('✅ Itens carregados:', this.itens.length);
+            }
+        } catch (err) {
+            console.warn('Exceção ao carregar itens:', err);
         }
     },
 
@@ -621,18 +725,30 @@ const PDV = {
      * Carregar dados da venda atual
      */
     async carregarVenda() {
-        if (!this.vendaAtual) return;
-
-        const { data, error } = await supabase
-            .from('vendas')
-            .select('*, cliente:clientes(*)')
-            .eq('id', this.vendaAtual.id)
-            .single();
-
-        if (!error) {
-            this.vendaAtual = data;
-            this.atualizarUI();
+        if (!this.vendaAtual) {
+            console.warn('Nenhuma venda atual para carregar');
+            return;
         }
+
+        try {
+            const { data, error } = await window.supabase
+                .from('vendas')
+                .select('*, cliente:clientes(*)')
+                .eq('id', this.vendaAtual.id)
+                .single();
+
+            if (error) {
+                console.warn('Erro ao carregar venda:', error);
+                // Continuar mesmo com erro
+            } else if (data) {
+                this.vendaAtual = data;
+            }
+        } catch (err) {
+            console.warn('Exceção ao carregar venda:', err);
+        }
+        
+        // Sempre atualizar UI, mesmo se houver erro
+        this.atualizarUI();
     },
 
     /**

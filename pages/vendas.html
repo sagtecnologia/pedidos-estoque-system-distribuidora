@@ -146,12 +146,18 @@
         let currentUser = null;
 
         (async () => {
-            await checkAuth();
-            currentUser = await getCurrentUser();
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
+            try {
+                await checkAuth();
+                currentUser = await getCurrentUser();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+            } catch (error) {
+                console.error('Erro ao inicializar vendas:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
             
             // Definir data padrão (dia atual)
             const hoje = new Date().toISOString().split('T')[0];

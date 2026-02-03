@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Usuário Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-500 to-pink-600 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+        <h1 class="text-3xl font-bold text-gray-900 mb-6 text-center">🔐 Criar Admin</h1>
+        
+        <form id="admin-form" class="space-y-4">
+            <div>
+                <label for="email" class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    value="brunoallencar@hotmail.com"
+                    required 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="admin@email.com"
+                >
+            </div>
+
+            <div>
+                <label for="password" class="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    value="Bb93163087@@"
+                    required 
+                    minlength="6"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Mínimo 6 caracteres"
+                >
+            </div>
+
+            <div>
+                <label for="full_name" class="block text-sm font-medium text-gray-700 mb-2">Nome Completo</label>
+                <input 
+                    type="text" 
+                    id="full_name" 
+                    value="Bruno Allencar"
+                    required 
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Nome completo"
+                >
+            </div>
+
+            <button 
+                type="submit" 
+                class="w-full bg-purple-600 text-white py-3 rounded-lg font-semibold hover:bg-purple-700 transition duration-200"
+            >
+                ✅ Criar Admin
+            </button>
+        </form>
+
+        <div id="result" class="mt-6 hidden p-4 rounded-lg bg-green-50 border border-green-200">
+            <p id="result-text" class="text-green-800"></p>
+        </div>
+
+        <div id="error" class="mt-6 hidden p-4 rounded-lg bg-red-50 border border-red-200">
+            <p id="error-text" class="text-red-800"></p>
+        </div>
+
+        <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg">
+                <div class="spinner mx-auto mb-4"></div>
+                <p class="text-gray-700">Criando admin...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+
+    <script>
+        const form = document.getElementById('admin-form');
+        const resultDiv = document.getElementById('result');
+        const errorDiv = document.getElementById('error');
+        const loadingDiv = document.getElementById('loading');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const fullName = document.getElementById('full_name').value;
+
+            resultDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            loadingDiv.classList.remove('hidden');
+
+            try {
+                // 1. Criar usuário no Supabase Auth
+                const { data: authData, error: authError } = await supabase.auth.signUp({
+                    email,
+                    password
+                });
+
+                if (authError) throw authError;
+
+                const userId = authData.user.id;
+
+                // 2. Inserir na tabela users com role = ADMIN
+                const { error: insertError } = await supabase
+                    .from('users')
+                    .upsert([{
+                        id: userId,
+                        email,
+                        full_name: fullName,
+                        role: 'ADMIN',
+                        active: true
+                    }], { onConflict: 'id' });
+
+                if (insertError) throw insertError;
+
+                // 3. Confirmar email automaticamente via RPC (se houver função)
+                try {
+                    await supabase.rpc('confirm_user_email', { user_id: userId });
+                } catch (rpcError) {
+                    console.log('Não foi possível confirmar email via RPC:', rpcError);
+                    // Continuar mesmo se falhar
+                }
+
+                // Sucesso!
+                loadingDiv.classList.add('hidden');
+                resultDiv.classList.remove('hidden');
+                document.getElementById('result-text').innerHTML = `
+                    <strong>✅ Admin criado com sucesso!</strong><br>
+                    Email: ${email}<br>
+                    Função: ADMIN<br>
+                    Status: Ativo<br><br>
+                    <span class="text-sm">Você pode fazer login agora!</span>
+                `;
+                form.reset();
+
+            } catch (error) {
+                loadingDiv.classList.add('hidden');
+                errorDiv.classList.remove('hidden');
+                console.error('Erro:', error);
+                document.getElementById('error-text').innerHTML = `
+                    <strong>❌ Erro ao criar admin</strong><br>
+                    ${error.message || 'Erro desconhecido'}
+                `;
+            }
+        });
+    </script>
+
+    <style>
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>

@@ -296,14 +296,20 @@
         };
 
         (async () => {
-            await checkAuth();
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
-            
-            await carregarMarcasFiltro();
-            await carregarDados();
+            try {
+                await checkAuth();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                
+                await carregarMarcasFiltro();
+                await carregarDados();
+            } catch (error) {
+                console.error('Erro ao inicializar estoque:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
         })();
 
         async function carregarMarcasFiltro() {

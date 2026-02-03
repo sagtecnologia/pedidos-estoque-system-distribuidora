@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Simples</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div class="p-8">
+        <h1 class="text-3xl font-bold">Teste - Página Simples</h1>
+        <p>Esta é uma página de teste para verificar se o problema é do servidor ou do arquivo.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/utils.js"></script>
+    <script>
+        console.log('Página carregada com sucesso');
+        
+        // Teste simples de storage
+        try {
+            console.log('Testando acesso ao supabase...');
+            if (window.supabase) {
+                console.log('✅ Supabase carregado');
+            } else {
+                console.log('❌ Supabase não carregado');
+            }
+        } catch (error) {
+            console.error('Erro no teste:', error);
+        }
+    </script>
+</body>
+</html>

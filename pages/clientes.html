@@ -166,12 +166,18 @@
 
         // Inicializar
         (async () => {
-            await checkAuth();
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
-            await loadClientes();
+            try {
+                await checkAuth();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                await loadClientes();
+            } catch (error) {
+                console.error('Erro ao inicializar clientes:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
             
             // Aplicar máscaras
             applyMask('cliente-cpf-cnpj', 'cpf-cnpj');

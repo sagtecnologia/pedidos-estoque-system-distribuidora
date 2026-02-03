@@ -154,18 +154,24 @@
         let editingId = null;
 
         (async () => {
-            if (!await hasRole('ADMIN')) {
-                showToast('Acesso negado', 'error');
-                redirect('/pages/dashboard.html');
-                return;
+            try {
+                if (!await hasRole('ADMIN')) {
+                    showToast('Acesso negado', 'error');
+                    redirect('/pages/dashboard.html');
+                    return;
+                }
+                
+                await checkAuth();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                await loadUsuarios();
+            } catch (error) {
+                console.error('Erro ao inicializar usuários:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
             }
-            
-            await checkAuth();
-            document.getElementById('navbar').innerHTML = createNavbar();
-            document.getElementById('sidebar-container').innerHTML = createSidebar();
-            await initNavbar();
-            await initSidebar();
-            await loadUsuarios();
             
             // Aplicar máscaras
             applyMask('novo-usuario-whatsapp', 'whatsapp');

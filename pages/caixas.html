@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciamento de Caixas - Sistema de Compras</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex justify-between items-center mb-8">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">
+                        <i class="fas fa-cash-register mr-3 text-blue-600"></i>Gerenciamento de Caixas
+                    </h2>
+                    <p class="text-gray-600 mt-1">Gerencie caixas e sessões de atendimento</p>
+                </div>
+                <button onclick="abrirModalCaixa()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
+                    + Novo Caixa
+                </button>
+            </div>
+
+            <!-- Status dos Caixas -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="status-caixas">
+                <!-- Status cards serão inseridos aqui -->
+            </div>
+
+            <!-- Abas -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="flex space-x-8">
+                        <button onclick="trocarAba('caixas')" 
+                                id="aba-caixas" 
+                                class="py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                            <i class="fas fa-cash-register mr-2"></i>Cadastro de Caixas
+                        </button>
+                        <button onclick="trocarAba('sessoes')" 
+                                id="aba-sessoes" 
+                                class="py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                            <i class="fas fa-clock mr-2"></i>Sessões de Caixa
+                        </button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Conteúdo Caixas -->
+            <div id="conteudo-caixas" class="bg-white rounded-lg shadow overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Terminal</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="caixas-tbody" class="bg-white divide-y divide-gray-200">
+                            <tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Conteúdo Sessões -->
+            <div id="conteudo-sessoes" class="hidden">
+                <div class="bg-white rounded-lg shadow p-4 mb-6">
+                    <div class="flex space-x-4">
+                        <button onclick="abrirCaixa()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                            <i class="fas fa-play mr-2"></i>Abrir Caixa
+                        </button>
+                        <button onclick="fecharCaixa()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition">
+                            <i class="fas fa-stop mr-2"></i>Fechar Caixa
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Caixa</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Operador</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Abertura</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fechamento</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessoes-tbody" class="bg-white divide-y divide-gray-200">
+                                <tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    </div>
+
+    <!-- Modal Caixa -->
+    <div id="modal-caixa" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+            <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="px-6 py-4 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900" id="modal-titulo">Novo Caixa</h3>
+                </div>
+                <form id="form-caixa" class="px-6 py-4">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Número*</label>
+                            <input type="number" id="caixa-numero" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Nome*</label>
+                            <input type="text" id="caixa-nome" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Terminal</label>
+                            <input type="text" id="caixa-terminal" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Impressora NFCe</label>
+                            <input type="text" id="caixa-impressora-nfce" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Impressora Cupom</label>
+                            <input type="text" id="caixa-impressora-cupom" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                </form>
+                <div class="px-6 py-4 border-t flex justify-end space-x-2">
+                    <button onclick="fecharModalCaixa()" class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button onclick="salvarCaixa()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Salvar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Abrir Caixa -->
+    <div id="modal-abrir-caixa" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75"></div>
+            <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full">
+                <div class="px-6 py-4 border-b">
+                    <h3 class="text-lg font-semibold text-gray-900">Abrir Caixa</h3>
+                </div>
+                <form id="form-abrir-caixa" class="px-6 py-4">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Caixa*</label>
+                            <select id="select-caixa" required class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                                <option value="">Selecione um caixa</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Valor de Abertura</label>
+                            <input type="number" id="valor-abertura" step="0.01" value="0.00" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        </div>
+                    </div>
+                </form>
+                <div class="px-6 py-4 border-t flex justify-end space-x-2">
+                    <button onclick="fecharModalAbrirCaixa()" class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                    <button onclick="confirmarAbrirCaixa()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        Abrir Caixa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../components/modal.js"></script>
+
+    <script>
+        let editingCaixaId = null;
+
+        // =====================================================
+        // INICIALIZAÇÃO
+        // =====================================================
+        
+        (async () => {
+            try {
+                await checkAuth();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                
+                await loadCaixas();
+                await loadSessoes();
+                await atualizarStatusCaixas();
+            } catch (error) {
+                console.error('Erro ao inicializar:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
+        })();
+
+        // =====================================================
+        // ABAS
+        // =====================================================
+        
+        function trocarAba(aba) {
+            // Remover classes ativas
+            document.getElementById('aba-caixas').className = "py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300";
+            document.getElementById('aba-sessoes').className = "py-2 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300";
+            
+            // Ocultar conteúdos
+            document.getElementById('conteudo-caixas').classList.add('hidden');
+            document.getElementById('conteudo-sessoes').classList.add('hidden');
+            
+            // Ativar aba selecionada
+            if (aba === 'caixas') {
+                document.getElementById('aba-caixas').className = "py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600";
+                document.getElementById('conteudo-caixas').classList.remove('hidden');
+            } else {
+                document.getElementById('aba-sessoes').className = "py-2 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600";
+                document.getElementById('conteudo-sessoes').classList.remove('hidden');
+            }
+        }
+
+        // =====================================================
+        // CAIXAS
+        // =====================================================
+        
+        async function loadCaixas() {
+            try {
+                const { data: caixas, error } = await window.supabase
+                    .from('caixas')
+                    .select('*')
+                    .order('numero');
+
+                if (error) throw error;
+
+                const tbody = document.getElementById('caixas-tbody');
+                if (caixas.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nenhum caixa cadastrado</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = caixas.map(c => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm text-gray-900 font-mono">${c.numero}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${c.nome}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${c.terminal || '-'}</td>
+                        <td class="px-6 py-4 text-sm">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${c.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                ${c.active ? 'Ativo' : 'Inativo'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm space-x-2">
+                            <button onclick="editarCaixa('${c.id}')" class="text-blue-600 hover:text-blue-800">Editar</button>
+                            <button onclick="toggleCaixa('${c.id}', ${!c.active})" class="text-${c.active ? 'red' : 'green'}-600 hover:text-${c.active ? 'red' : 'green'}-800">
+                                ${c.active ? 'Desativar' : 'Ativar'}
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Atualizar select de caixas
+                const selectCaixa = document.getElementById('select-caixa');
+                selectCaixa.innerHTML = '<option value="">Selecione um caixa</option>' + 
+                    caixas.filter(c => c.active).map(c => `<option value="${c.id}">${c.numero} - ${c.nome}</option>`).join('');
+
+            } catch (error) {
+                console.error('Erro ao carregar caixas:', error);
+                showToast('Erro ao carregar caixas', 'error');
+            }
+        }
+
+        async function abrirModalCaixa() {
+            editingCaixaId = null;
+            document.getElementById('modal-titulo').textContent = 'Novo Caixa';
+            document.getElementById('form-caixa').reset();
+            
+            // Sugerir próximo número disponível
+            try {
+                const { data: caixas } = await window.supabase
+                    .from('caixas')
+                    .select('numero')
+                    .order('numero');
+                
+                let proximoNumero = 1;
+                if (caixas && caixas.length > 0) {
+                    const numerosUsados = caixas.map(c => c.numero).sort((a, b) => a - b);
+                    
+                    // Encontrar o próximo número disponível
+                    for (let i = 1; i <= numerosUsados.length + 1; i++) {
+                        if (!numerosUsados.includes(i)) {
+                            proximoNumero = i;
+                            break;
+                        }
+                    }
+                }
+                
+                document.getElementById('caixa-numero').value = proximoNumero;
+            } catch (error) {
+                console.error('Erro ao buscar próximo número:', error);
+                document.getElementById('caixa-numero').value = '';
+            }
+            
+            document.getElementById('modal-caixa').classList.remove('hidden');
+        }
+
+        function fecharModalCaixa() {
+            document.getElementById('modal-caixa').classList.add('hidden');
+        }
+
+        async function editarCaixa(id) {
+            try {
+                const { data: caixa, error } = await window.supabase
+                    .from('caixas')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+
+                if (error) throw error;
+
+                editingCaixaId = id;
+                document.getElementById('modal-titulo').textContent = 'Editar Caixa';
+                document.getElementById('caixa-numero').value = caixa.numero;
+                document.getElementById('caixa-nome').value = caixa.nome;
+                document.getElementById('caixa-terminal').value = caixa.terminal || '';
+                document.getElementById('caixa-impressora-nfce').value = caixa.impressora_nfce || '';
+                document.getElementById('caixa-impressora-cupom').value = caixa.impressora_cupom || '';
+                document.getElementById('modal-caixa').classList.remove('hidden');
+            } catch (error) {
+                console.error('Erro ao carregar caixa:', error);
+                showToast('Erro ao carregar dados do caixa', 'error');
+            }
+        }
+
+        async function salvarCaixa() {
+            try {
+                const numero = parseInt(document.getElementById('caixa-numero').value);
+                
+                // Verificar se o número já existe (apenas para novos caixas)
+                if (!editingCaixaId) {
+                    const { data: existingCaixa } = await window.supabase
+                        .from('caixas')
+                        .select('id')
+                        .eq('numero', numero)
+                        .single();
+                        
+                    if (existingCaixa) {
+                        showToast('Este número de caixa já existe', 'error');
+                        return;
+                    }
+                }
+                
+                const caixa = {
+                    numero: numero,
+                    nome: document.getElementById('caixa-nome').value,
+                    terminal: document.getElementById('caixa-terminal').value || null,
+                    impressora_nfce: document.getElementById('caixa-impressora-nfce').value || null,
+                    impressora_cupom: document.getElementById('caixa-impressora-cupom').value || null
+                };
+
+                let error;
+                if (editingCaixaId) {
+                    const result = await window.supabase
+                        .from('caixas')
+                        .update(caixa)
+                        .eq('id', editingCaixaId);
+                    error = result.error;
+                } else {
+                    const result = await window.supabase
+                        .from('caixas')
+                        .insert([caixa]);
+                    error = result.error;
+                }
+
+                if (error) throw error;
+
+                showToast(editingCaixaId ? 'Caixa atualizado' : 'Caixa criado', 'success');
+                fecharModalCaixa();
+                await loadCaixas();
+                
+            } catch (error) {
+                console.error('Erro ao salvar caixa:', error);
+                if (error.code === '23505') {
+                    showToast('Este número de caixa já existe', 'error');
+                } else {
+                    showToast('Erro ao salvar caixa', 'error');
+                }
+            }
+        }
+
+        async function toggleCaixa(id, ativo) {
+            try {
+                const { error } = await window.supabase
+                    .from('caixas')
+                    .update({ active: ativo })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                showToast(`Caixa ${ativo ? 'ativado' : 'desativado'}`, 'success');
+                await loadCaixas();
+                
+            } catch (error) {
+                console.error('Erro ao alterar status do caixa:', error);
+                showToast('Erro ao alterar status do caixa', 'error');
+            }
+        }
+
+        // =====================================================
+        // SESSÕES DE CAIXA
+        // =====================================================
+        
+        async function loadSessoes() {
+            try {
+                const { data: sessoes, error } = await window.supabase
+                    .from('caixa_sessoes')
+                    .select(`
+                        *,
+                        caixas(numero, nome),
+                        users(full_name)
+                    `)
+                    .order('data_abertura', { ascending: false })
+                    .limit(50);
+
+                if (error) throw error;
+
+                const tbody = document.getElementById('sessoes-tbody');
+                if (sessoes.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Nenhuma sessão encontrada</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = sessoes.map(s => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4 text-sm text-gray-900">${s.caixas.numero} - ${s.caixas.nome}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900">${s.users.full_name}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${formatDateTime(s.data_abertura)}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${s.data_fechamento ? formatDateTime(s.data_fechamento) : '-'}</td>
+                        <td class="px-6 py-4 text-sm">
+                            <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full ${s.data_fechamento ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}">
+                                ${s.data_fechamento ? 'Fechado' : 'Aberto'}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm space-x-2">
+                            ${!s.data_fechamento ? `<button onclick="fecharSessao('${s.id}')" class="text-red-600 hover:text-red-800">Fechar</button>` : ''}
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (error) {
+                console.error('Erro ao carregar sessões:', error);
+                showToast('Erro ao carregar sessões', 'error');
+            }
+        }
+
+        async function atualizarStatusCaixas() {
+            try {
+                const { data: sessoes, error } = await window.supabase
+                    .from('caixa_sessoes')
+                    .select(`
+                        *,
+                        caixas(numero, nome)
+                    `)
+                    .is('data_fechamento', null);
+
+                if (error) throw error;
+
+                const statusContainer = document.getElementById('status-caixas');
+                
+                if (sessoes.length === 0) {
+                    statusContainer.innerHTML = `
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>
+                                <span class="text-yellow-800 font-medium">Nenhum caixa aberto</span>
+                            </div>
+                            <p class="text-yellow-600 text-sm mt-1">Abra um caixa para começar as vendas</p>
+                        </div>
+                    `;
+                } else {
+                    statusContainer.innerHTML = sessoes.map(s => `
+                        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div class="flex items-center">
+                                <i class="fas fa-cash-register text-green-500 mr-2"></i>
+                                <span class="text-green-800 font-medium">Caixa ${s.caixas.numero} - ${s.caixas.nome}</span>
+                            </div>
+                            <p class="text-green-600 text-sm mt-1">Aberto desde ${formatDateTime(s.data_abertura)}</p>
+                        </div>
+                    `).join('');
+                }
+
+            } catch (error) {
+                console.error('Erro ao atualizar status:', error);
+            }
+        }
+
+        function abrirCaixa() {
+            document.getElementById('modal-abrir-caixa').classList.remove('hidden');
+        }
+
+        function fecharModalAbrirCaixa() {
+            document.getElementById('modal-abrir-caixa').classList.add('hidden');
+        }
+
+        async function confirmarAbrirCaixa() {
+            try {
+                const caixaId = document.getElementById('select-caixa').value;
+                const valorAbertura = parseFloat(document.getElementById('valor-abertura').value) || 0;
+                
+                if (!caixaId) {
+                    showToast('Selecione um caixa', 'error');
+                    return;
+                }
+
+                const user = await window.supabase.auth.getUser();
+                if (!user.data.user) {
+                    showToast('Usuário não autenticado', 'error');
+                    return;
+                }
+                
+                const { error } = await window.supabase
+                    .from('caixa_sessoes')
+                    .insert([{
+                        caixa_id: caixaId,
+                        operador_id: user.data.user.id,
+                        valor_abertura: valorAbertura
+                    }]);
+
+                if (error) throw error;
+
+                showToast('Caixa aberto com sucesso', 'success');
+                fecharModalAbrirCaixa();
+                document.getElementById('form-abrir-caixa').reset();
+                await loadSessoes();
+                await atualizarStatusCaixas();
+                
+            } catch (error) {
+                console.error('Erro ao abrir caixa:', error);
+                showToast('Erro ao abrir caixa', 'error');
+            }
+        }
+
+        async function fecharCaixa() {
+            try {
+                // Buscar sessões abertas
+                const { data: sessoesAbertas, error: errorSessoes } = await window.supabase
+                    .from('caixa_sessoes')
+                    .select('*, caixas(numero, nome)')
+                    .is('data_fechamento', null);
+
+                if (errorSessoes) throw errorSessoes;
+
+                if (sessoesAbertas.length === 0) {
+                    showToast('Não há caixas abertos', 'warning');
+                    return;
+                }
+
+                // Se há apenas um caixa aberto, fechar automaticamente
+                if (sessoesAbertas.length === 1) {
+                    await fecharSessao(sessoesAbertas[0].id);
+                    return;
+                }
+
+                // Se há múltiplos caixas, mostrar seleção (implementar depois se necessário)
+                showToast('Múltiplos caixas abertos. Use a ação individual', 'info');
+                
+            } catch (error) {
+                console.error('Erro ao fechar caixa:', error);
+                showToast('Erro ao fechar caixa', 'error');
+            }
+        }
+
+        async function fecharSessao(sessaoId) {
+            try {
+                const confirma = confirm('Confirma o fechamento deste caixa?');
+                if (!confirma) return;
+
+                const { error } = await window.supabase
+                    .from('caixa_sessoes')
+                    .update({ data_fechamento: new Date().toISOString() })
+                    .eq('id', sessaoId);
+
+                if (error) throw error;
+
+                showToast('Caixa fechado com sucesso', 'success');
+                await loadSessoes();
+                await atualizarStatusCaixas();
+                
+            } catch (error) {
+                console.error('Erro ao fechar sessão:', error);
+                showToast('Erro ao fechar sessão', 'error');
+            }
+        }
+
+        // Teclas de atalho
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F8') {
+                e.preventDefault();
+                abrirCaixa();
+            }
+        });
+    </script>
+</body>
+</html>
