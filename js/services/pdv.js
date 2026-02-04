@@ -949,7 +949,7 @@ class PDVSystem {
     /**
      * Finalizar venda com bloqueio para evitar race condition
      */
-    static async finalizarVenda(formaPagamento, valorPago) {
+    static async finalizarVenda(formaPagamento, valorPago, acrescimoTarifa = 0) {
         try {
             if (this.itensCarrinho.length === 0) {
                 this.exibirErro('Carrinho vazio');
@@ -963,14 +963,19 @@ class PDVSystem {
 
             const usuario = await getCurrentUser();
             const numeroVenda = this.gerarNumeroVenda();
-            const troco = valorPago - this.totaisAtual.total;
+            
+            // Adicionar o acréscimo de tarifa ao total
+            const totalComAcrescimo = this.totaisAtual.total + acrescimoTarifa;
+            const troco = valorPago - totalComAcrescimo;
 
             console.log('🔵 Estado da movimentação:', {
                 movimentacaoAtual: this.movimentacaoAtual,
                 id: this.movimentacaoAtual?.id,
                 caixa_id: this.movimentacaoAtual?.caixa_id,
                 status: this.movimentacaoAtual?.status,
-                tipo: typeof this.movimentacaoAtual
+                tipo: typeof this.movimentacaoAtual,
+                acrescimoTarifa: acrescimoTarifa,
+                totalComAcrescimo: totalComAcrescimo
             });
 
             // Validar que temos os IDs necessários
@@ -998,8 +1003,8 @@ class PDVSystem {
                     sessao_id: this.movimentacaoAtual.id,
                     subtotal: this.totaisAtual.subtotal,
                     desconto_valor: this.totaisAtual.desconto,
-                    acrescimo: this.totaisAtual.acrescimo,
-                    total: this.totaisAtual.total,
+                    acrescimo: this.totaisAtual.acrescimo + acrescimoTarifa,
+                    total: totalComAcrescimo,
                     valor_pago: valorPago,
                     forma_pagamento: formaPagamento,
                     troco: troco,
@@ -1412,6 +1417,15 @@ class PDVSystem {
                 </select>
             </div>
 
+            <div id="secao-acrescimo" class="mb-4 hidden">
+                <label class="block text-sm font-medium mb-2">Acréscimo (Tarifa) - <span class="text-gray-500 text-xs">Opcional</span></label>
+                <div class="flex gap-2">
+                    <input type="number" id="acrescimo-tarifa" class="flex-1 border rounded px-3 py-2" placeholder="0.00" step="0.01" min="0">
+                    <span class="flex items-center text-gray-600 font-medium">R$</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Valor da tarifa de crédito/débito a ser adicionado ao total</p>
+            </div>
+
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-2">Valor Recebido</label>
                 <input type="number" id="valor-pago" class="w-full border rounded px-3 py-2" value="${total.toFixed(2)}" step="0.01" min="0">
@@ -1431,12 +1445,18 @@ class PDVSystem {
         document.body.appendChild(overlay);
 
         // Agora buscar os elementos (já estão no DOM)
+        const formaPagamentoSelect = container.querySelector('#forma-pagamento');
+        const secaoAcrescimo = container.querySelector('#secao-acrescimo');
+        const acrescimoTarifaInput = container.querySelector('#acrescimo-tarifa');
         const valorPagoInput = container.querySelector('#valor-pago');
         const trocoValor = container.querySelector('#troco-valor');
         const btnCancelar = container.querySelector('#btn-cancelar-venda');
         const btnConfirmar = container.querySelector('#btn-confirmar-venda');
 
         console.log('✅ Elementos encontrados:', {
+            formaPagamentoSelect: !!formaPagamentoSelect,
+            secaoAcrescimo: !!secaoAcrescimo,
+            acrescimoTarifaInput: !!acrescimoTarifaInput,
             valorPagoInput: !!valorPagoInput,
             trocoValor: !!trocoValor,
             btnCancelar: !!btnCancelar,
@@ -1450,11 +1470,13 @@ class PDVSystem {
 
         // Função para calcular e atualizar troco
         const atualizarTroco = (e) => {
+            const acrescimo = parseFloat(acrescimoTarifaInput.value) || 0;
+            const totalComAcrescimo = total + acrescimo;
             const valorPago = parseFloat(valorPagoInput.value) || 0;
-            const troco = valorPago - total;
+            const troco = valorPago - totalComAcrescimo;
             trocoValor.textContent = `R$ ${troco.toFixed(2)}`;
             
-            console.log(`💰 Cálculo: R$ ${valorPago.toFixed(2)} - R$ ${total.toFixed(2)} = R$ ${troco.toFixed(2)}`);
+            console.log(`💰 Cálculo: R$ ${valorPago.toFixed(2)} - (R$ ${total.toFixed(2)} + R$ ${acrescimo.toFixed(2)}) = R$ ${troco.toFixed(2)}`);
             
             // Mudar cor conforme o troco
             if (troco < -0.01) {
@@ -1466,6 +1488,21 @@ class PDVSystem {
             }
         };
 
+        // Listener para mudança de forma de pagamento
+        formaPagamentoSelect.addEventListener('change', (e) => {
+            const forma = e.target.value;
+            const isCartao = forma === 'CARTAO_CREDITO' || forma === 'CARTAO_DEBITO';
+            
+            if (isCartao) {
+                secaoAcrescimo.classList.remove('hidden');
+            } else {
+                secaoAcrescimo.classList.add('hidden');
+                acrescimoTarifaInput.value = '0';
+            }
+            
+            atualizarTroco();
+        });
+
         // Inicializar troco
         atualizarTroco();
 
@@ -1473,6 +1510,9 @@ class PDVSystem {
         valorPagoInput.addEventListener('change', atualizarTroco);
         valorPagoInput.addEventListener('keyup', atualizarTroco);
         valorPagoInput.addEventListener('input', atualizarTroco);
+        acrescimoTarifaInput.addEventListener('change', atualizarTroco);
+        acrescimoTarifaInput.addEventListener('keyup', atualizarTroco);
+        acrescimoTarifaInput.addEventListener('input', atualizarTroco);
 
         // Cancelar venda - usar { once: true } para evitar múltiplos listeners
         btnCancelar.addEventListener('click', () => {
@@ -1488,8 +1528,9 @@ class PDVSystem {
             
             const forma = container.querySelector('#forma-pagamento')?.value;
             const valorPago = parseFloat(container.querySelector('#valor-pago')?.value);
+            const acrescimo = parseFloat(container.querySelector('#acrescimo-tarifa')?.value) || 0;
 
-            console.log('💳 Confirmando pagamento:', { forma, valorPago });
+            console.log('💳 Confirmando pagamento:', { forma, valorPago, acrescimo });
 
             if (!forma) {
                 alert('Selecione uma forma de pagamento!');
@@ -1508,7 +1549,7 @@ class PDVSystem {
             
             // Chamar finalizarVenda (async)
             (async () => {
-                const resultado = await PDVSystem.finalizarVenda(forma, valorPago);
+                const resultado = await PDVSystem.finalizarVenda(forma, valorPago, acrescimo);
                 
                 // Se deu sucesso, fechar overlay e exibir cupom imediatamente
                 if (resultado && resultado.cupom) {
