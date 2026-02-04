@@ -1249,18 +1249,23 @@ class PDVSystem {
         // Busca rápida de produtos com autocomplete
         const inputBusca = document.getElementById('busca-produto');
         if (inputBusca) {
+            // Remover listeners antigos clonando o elemento (importante para scanner de código de barras)
+            const novoInputBusca = inputBusca.cloneNode(true);
+            inputBusca.parentNode.replaceChild(novoInputBusca, inputBusca);
+            const inputBuscaNovo = document.getElementById('busca-produto');
+
             // Criar dropdown de sugestões
             let dropdownSugestoes = document.getElementById('dropdown-sugestoes');
             if (!dropdownSugestoes) {
                 dropdownSugestoes = document.createElement('div');
                 dropdownSugestoes.id = 'dropdown-sugestoes';
                 dropdownSugestoes.className = 'absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 hidden max-w-md';
-                inputBusca.parentElement.style.position = 'relative';
-                inputBusca.parentElement.appendChild(dropdownSugestoes);
+                inputBuscaNovo.parentElement.style.position = 'relative';
+                inputBuscaNovo.parentElement.appendChild(dropdownSugestoes);
             }
 
             // Input para sugestões
-            inputBusca.addEventListener('input', async (e) => {
+            inputBuscaNovo.addEventListener('input', async (e) => {
                 const valor = e.target.value.trim();
                 
                 if (valor.length >= 2) {
@@ -1292,7 +1297,7 @@ class PDVSystem {
             });
 
             // Enter para buscar por código
-            inputBusca.addEventListener('keypress', async (e) => {
+            inputBuscaNovo.addEventListener('keypress', async (e) => {
                 if (e.key === 'Enter') {
                     dropdownSugestoes.classList.add('hidden');
                     const produto = await this.buscarProduto(e.target.value);
@@ -1307,7 +1312,7 @@ class PDVSystem {
 
             // Fechar dropdown ao clicar fora
             document.addEventListener('click', (e) => {
-                if (e.target !== inputBusca) {
+                if (e.target !== inputBuscaNovo) {
                     dropdownSugestoes.classList.add('hidden');
                 }
             });
@@ -1316,7 +1321,11 @@ class PDVSystem {
         // Botão finalizar venda
         const btnFinalizar = document.getElementById('btn-finalizar-venda');
         if (btnFinalizar) {
-            btnFinalizar.addEventListener('click', () => {
+            // Remover listener antigo clonando
+            const novoBtnFinalizar = btnFinalizar.cloneNode(true);
+            btnFinalizar.parentNode.replaceChild(novoBtnFinalizar, btnFinalizar);
+            
+            novoBtnFinalizar.addEventListener('click', () => {
                 this.exibirTelaFinalizacao();
             });
         }
@@ -1640,9 +1649,6 @@ class PDVSystem {
         if (resultadosBusca) {
             resultadosBusca.innerHTML = '';
         }
-        
-        // Reconfigurar eventos após limpar
-        this.setupEventos();
         
         // Focar no campo de busca após um pequeno delay para garantir que tudo carregou
         requestAnimationFrame(() => {
