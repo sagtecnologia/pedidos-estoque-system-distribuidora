@@ -1501,8 +1501,8 @@ class PDVSystem {
                 let descricao = '';
                 
                 if (forma === 'CARTAO_DEBITO') {
-                    taxa = 1.9; // 1,9%
-                    descricao = 'Taxa de débito: 1,9%';
+                    taxa = 1.09; // 1,09%
+                    descricao = 'Taxa de débito: 1,09%';
                 } else if (forma === 'CARTAO_CREDITO') {
                     taxa = 3.16; // 3,16%
                     descricao = 'Taxa de crédito: 3,16%';
