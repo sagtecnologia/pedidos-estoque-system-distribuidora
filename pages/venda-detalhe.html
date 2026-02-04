@@ -937,44 +937,68 @@
         async function loadVenda() {
             try {
                 showLoading(true);
-                venda = await getPedido(vendaId);
-                if (!venda) {
+                
+                // Buscar venda diretamente da tabela vendas
+                const { data: vendaData, error: vendaError } = await supabase
+                    .from('vendas')
+                    .select(`
+                        *,
+                        operador:users!vendas_operador_id_fkey(id, full_name),
+                        cliente:clientes(id, nome)
+                    `)
+                    .eq('id', vendaId)
+                    .single();
+                
+                if (vendaError || !vendaData) {
+                    console.error('Erro ao carregar venda:', vendaError);
                     showToast('Venda não encontrada', 'error');
                     setTimeout(() => window.location.href = '/pages/vendas.html', 2000);
                     return;
                 }
                 
-                itens = await getItensPedido(vendaId);
+                venda = vendaData;
+                
+                // Buscar itens da venda
+                const { data: itensData, error: itensError } = await supabase
+                    .from('vendas_itens')
+                    .select(`
+                        *,
+                        produtos(id, nome, descricao, codigo, codigo_barras, preco_venda, estoque_atual, unidade)
+                    `)
+                    .eq('venda_id', vendaId);
+                
+                if (itensError) {
+                    console.error('Erro ao carregar itens:', itensError);
+                    itens = [];
+                } else {
+                    itens = itensData || [];
+                }
+                
                 renderVenda();
                 await renderItens();
                 renderAcoes();
+            } catch (error) {
+                console.error('Erro ao carregar venda:', error);
+                showToast('Erro ao carregar venda: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
         }
 
         function renderVenda() {
-            document.getElementById('venda-numero').textContent = venda.numero_nf;
-            document.getElementById('venda-status').textContent = getStatusText(venda.status_venda);
+            document.getElementById('venda-numero').textContent = venda.numero || '-';
+            document.getElementById('venda-status').textContent = venda.status || 'FINALIZADA';
             
-            // Calcular total baseado nos itens carregados para garantir precisão
-            const totalCalculado = itens.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+            // Calcular total baseado nos itens carregados
+            const totalCalculado = itens.reduce((sum, item) => sum + (item.total || item.subtotal || 0), 0);
+            const quantidadeTotal = itens.reduce((sum, item) => sum + (item.quantidade || 0), 0);
             
-            // Verificar se o total calculado bate com o total da venda
-            console.log('📊 Verificação de Total:');
-            console.log('- Total calculado (soma dos subtotais):', totalCalculado);
-            console.log('- Total da venda (venda.total):', venda.total);
-            console.log('- Diferença:', Math.abs(totalCalculado - (venda.total || 0)));
+            // Usar o total da venda (é o valor que foi realmente cobrado)
+            document.getElementById('venda-total').textContent = formatCurrency(venda.total || 0);
+            document.getElementById('venda-quantidade-total').textContent = `${quantidadeTotal.toFixed(2)} UN`;
             
-            if (Math.abs(totalCalculado - (venda.total || 0)) > 0.01) {
-                console.warn('⚠️ ATENÇÃO: Divergência detectada entre total calculado e total da venda!');
-            }
-            
-            // Sempre usar o total calculado dos itens (mais confiável)
-            document.getElementById('venda-total').textContent = formatCurrency(totalCalculado);
-            
-            document.getElementById('venda-vendedor').textContent = venda.solicitante?.full_name || '-';
-            document.getElementById('venda-cliente').textContent = venda.cliente?.nome || '-';
+            document.getElementById('venda-vendedor').textContent = venda.operador?.full_name || '-';
+            document.getElementById('venda-cliente').textContent = venda.cliente?.nome || 'Cliente não informado';
             document.getElementById('venda-data').textContent = formatDate(venda.created_at);
             
             // Observações
@@ -1076,7 +1100,9 @@
             }));
             
             tbody.innerHTML = itensComEstoque.map(item => {
-                const produtoNome = item.produto?.nome || 'N/A';
+                const produtoNome = item.produtos?.nome || 'N/A';
+                const produtoDescricao = item.produtos?.descricao || '';
+                const produtoCodigo = item.produtos?.codigo || item.produtos?.codigo_barras || '';
                 const sabor = item.sabor?.sabor ? ` - ${item.sabor.sabor}` : '';
                 const quantidade = parseFloat(item.quantidade);
                 const estoqueAtual = item.estoqueAtual;
@@ -1108,10 +1134,11 @@
                     <tr class="border-t">
                         <td class="px-4 py-3">
                             <div class="font-medium">${produtoNome}</div>
+                            ${produtoDescricao ? `<div class="text-sm text-gray-600">${produtoDescricao}</div>` : ''}
                             ${sabor ? `<div class="text-xs text-gray-500">${sabor}</div>` : ''}
-                            <div class="text-xs text-gray-500">${item.produto?.codigo || ''}</div>
+                            ${produtoCodigo ? `<div class="text-xs text-gray-500">Cód: ${produtoCodigo}</div>` : ''}
                         </td>
-                        <td class="px-4 py-3">${item.quantidade} ${item.produto?.unidade || ''}</td>
+                        <td class="px-4 py-3">${item.quantidade} ${item.produtos?.unidade || ''}</td>
                         <td class="px-4 py-3 ${estoqueClass}" style="display: ${mostrarEstoque ? '' : 'none'}">
                             <div class="flex items-center gap-1">
                                 <span>${estoqueIcon}</span>

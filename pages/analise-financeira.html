@@ -430,16 +430,28 @@
                     selectMarca.innerHTML += `<option value="${marca}">${marca}</option>`;
                 });
 
-                // Carregar vendas finalizadas
-                const { data: vendasData } = await supabase
-                    .from('vendas')
+                // Carregar vendas finalizadas (pedidos do tipo VENDA com status FINALIZADO)
+                const { data: vendasData, error: erroVendas } = await supabase
+                    .from('pedidos')
                     .select(`
                         *,
-                        vendas_itens(*, produto:produtos(id, nome, codigo, marca, preco_custo, categoria_id))
+                        itens:pedido_itens(
+                            *,
+                            produto:produtos(id, nome, codigo, marca, preco_compra, preco_venda, preco_custo, categoria_id)
+                        )
                     `)
-                    .eq('status_venda', 'FINALIZADA')
+                    .eq('tipo_pedido', 'VENDA')
+                    .eq('status', 'FINALIZADO')
                     .order('created_at', { ascending: false });
-                vendas = vendasData || [];
+
+                if (erroVendas) {
+                    console.error('Erro ao carregar vendas:', erroVendas);
+                    showToast('Erro ao carregar vendas: ' + erroVendas.message, 'error');
+                    vendas = [];
+                } else {
+                    vendas = vendasData || [];
+                    console.log('✅ Vendas carregadas:', vendas.length);
+                }
 
                 // Carregar contas a pagar (pagas no período)
                 const { data: cpData } = await supabase

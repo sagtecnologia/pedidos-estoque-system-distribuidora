@@ -385,7 +385,7 @@
                     .from('contas_receber')
                     .select(`
                         *,
-                        cliente:clientes(nome)
+                        cliente:clientes(id, nome, razao_social, cpf_cnpj)
                     `)
                     .order('data_vencimento', { ascending: true });
 
@@ -448,7 +448,7 @@
 
             tbody.innerHTML = contas.map(conta => {
                 const clienteNome = conta.cliente ? 
-                    (conta.cliente.razao_social || conta.cliente.nome) : 'Não informado';
+                    (conta.cliente.razao_social || conta.cliente.nome || 'Não informado') : 'Não informado';
                 
                 const vencimento = new Date(conta.data_vencimento + 'T00:00:00');
                 const hoje = new Date();
@@ -499,7 +499,7 @@
                         <td class="px-4 py-3 text-sm text-gray-600">${conta.numero_documento || '-'}</td>
                         <td class="px-4 py-3">
                             <div class="text-sm font-medium text-gray-900">${conta.descricao}</div>
-                            <div class="text-xs text-gray-500">${conta.parcela_atual}/${conta.total_parcelas} parcela(s)</div>
+                            <div class="text-xs text-gray-500">${conta.parcela_atual || 1}/${conta.total_parcelas || 1} parcela(s)</div>
                         </td>
                         <td class="px-4 py-3 text-sm text-gray-600">${clienteNome}</td>
                         <td class="px-4 py-3">
@@ -601,8 +601,8 @@
             document.getElementById('valorDesconto').value = formatarMoedaValor(conta.valor_desconto || 0);
             document.getElementById('dataEmissao').value = conta.data_emissao || '';
             document.getElementById('dataVencimento').value = conta.data_vencimento;
-            document.getElementById('parcelaAtual').value = conta.parcela_atual;
-            document.getElementById('totalParcelas').value = conta.total_parcelas;
+            document.getElementById('parcelaAtual').value = conta.parcela_atual || 1;
+            document.getElementById('totalParcelas').value = conta.total_parcelas || 1;
             document.getElementById('formaRecebimento').value = conta.forma_recebimento || '';
             document.getElementById('observacoes').value = conta.observacoes || '';
             
@@ -622,11 +622,17 @@
                 valor_desconto: parseMoeda(document.getElementById('valorDesconto').value),
                 data_emissao: document.getElementById('dataEmissao').value || null,
                 data_vencimento: document.getElementById('dataVencimento').value,
-                parcela_atual: parseInt(document.getElementById('parcelaAtual').value),
-                total_parcelas: parseInt(document.getElementById('totalParcelas').value),
+                parcela_atual: parseInt(document.getElementById('parcelaAtual').value) || 1,
+                total_parcelas: parseInt(document.getElementById('totalParcelas').value) || 1,
                 forma_recebimento: document.getElementById('formaRecebimento').value || null,
                 observacoes: document.getElementById('observacoes').value || null
             };
+            
+            // Adicionar status e valor_recebido apenas para novas contas
+            if (!id) {
+                dados.status = 'PENDENTE';
+                dados.valor_recebido = 0;
+            }
 
             try {
                 let result;
@@ -652,7 +658,7 @@
             if (!conta) return;
 
             const saldo = conta.valor_original - (conta.valor_recebido || 0) + (conta.valor_juros || 0) - (conta.valor_desconto || 0);
-            const clienteNome = conta.cliente ? (conta.cliente.razao_social || conta.cliente.nome) : 'Não informado';
+            const clienteNome = conta.cliente ? (conta.cliente.razao_social || conta.cliente.nome || 'Não informado') : 'Não informado';
 
             document.getElementById('recebimentoContaId').value = conta.id;
             document.getElementById('recebimentoDocumento').textContent = conta.numero_documento || conta.descricao;

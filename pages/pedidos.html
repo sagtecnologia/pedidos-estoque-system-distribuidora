@@ -936,67 +936,117 @@
                     }
                 }
 
-                // 3. Criar pedido de compra
-                const numero = `PC${Date.now().toString().slice(-8)}`;
+                // 3. Criar pedido de compra usando tabela "pedidos" com tipo_pedido='COMPRA'
+                const numero = `COMP-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
                 const user = await getCurrentUser();
                 
-                // Gerar UUID no cliente usando crypto.getRandomValues
-                const pedidoId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                    const r = Math.random() * 16 | 0;
-                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                    return v.toString(16);
-                });
+                // Gerar UUID no cliente
+                const pedidoId = crypto.randomUUID ? crypto.randomUUID() : 
+                    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
+                
+                console.log('📦 Criando pedido de compra:', { pedidoId, numero, fornecedorId });
+                
+                const dadosPedido = {
+                    id: pedidoId,
+                    numero: numero,
+                    tipo_pedido: 'COMPRA',
+                    fornecedor_id: fornecedorId,
+                    solicitante_id: user.id,
+                    status: 'FINALIZADO', // Pedido já recebido (veio de NF-e)
+                    total: dadosXMLImportado.total_nf || dadosXMLImportado.total_produtos || 0,
+                    observacoes: `Importado via XML NF-e ${dadosXMLImportado.numero_nf || 'S/N'} - Chave: ${dadosXMLImportado.chave || 'N/A'}`
+                };
                 
                 const { data: pedido, error: errPedido } = await supabase
-                    .from('pedidos_compra')
-                    .insert([{
-                        id: pedidoId, // Passar ID explicitamente
-                        numero: numero,
-                        fornecedor_id: fornecedorId,
-                        usuario_id: user.id,
-                        nf_numero: dadosXMLImportado.numero_nf,
-                        nf_serie: dadosXMLImportado.serie,
-                        nf_chave: dadosXMLImportado.chave,
-                        data_pedido: dadosXMLImportado.data_emissao || new Date().toISOString().split('T')[0],
-                        subtotal: dadosXMLImportado.total_produtos,
-                        desconto: dadosXMLImportado.total_desconto,
-                        frete: dadosXMLImportado.total_frete,
-                        total: dadosXMLImportado.total_nf,
-                        status: 'APROVADO',
-                        observacoes: `Importado via XML NFe ${dadosXMLImportado.numero_nf}`
-                    }])
+                    .from('pedidos')
+                    .insert([dadosPedido])
                     .select()
                     .single();
 
                 if (errPedido) {
-                    console.error('Erro ao criar pedido:', errPedido);
-                    throw errPedido;
+                    console.error('❌ Erro ao criar pedido:', errPedido);
+                    throw new Error(`Erro ao criar pedido: ${errPedido.message}`);
                 }
                 
-                // 4. Adicionar itens ao pedido
+                console.log('✅ Pedido criado:', pedido);
+                
+                // 4. Adicionar itens ao pedido usando tabela "pedido_itens"
                 if (itensParaPedido.length > 0) {
                     const itensComPedido = itensParaPedido.map(item => ({
-                        ...item,
-                        pedido_compra_id: pedido.id || pedidoId // Usar pedido.id se disponível, caso contrário usar o que foi passado
+                        pedido_id: pedido.id,
+                        produto_id: item.produto_id,
+                        quantidade: item.quantidade,
+                        preco_unitario: item.preco_unitario
                     }));
 
+                    console.log('📝 Inserindo itens do pedido:', itensComPedido.length);
+
                     const { error: errItens } = await supabase
-                        .from('pedido_compra_itens')
+                        .from('pedido_itens')
                         .insert(itensComPedido);
                     
                     if (errItens) {
-                        console.error('Erro ao adicionar itens:', errItens);
-                        throw errItens;
+                        console.error('❌ Erro ao adicionar itens:', errItens);
+                        throw new Error(`Erro ao adicionar itens: ${errItens.message}`);
                     }
+                    
+                    console.log('✅ Itens adicionados com sucesso');
                 }
 
-                showToast(`Pedido importado com sucesso! ${itensParaPedido.length} produtos processados.`, 'success');
+                // 5. Registrar log de importação
+                const { error: errLog } = await supabase
+                    .from('importacao_xml_log')
+                    .insert([{
+                        arquivo_nome: dadosXMLImportado.arquivo_nome || 'xml-upload.xml',
+                        chave_nfe: dadosXMLImportado.chave,
+                        numero_nfe: dadosXMLImportado.numero_nf,
+                        fornecedor_id: fornecedorId,
+                        fornecedor_cnpj: dadosXMLImportado.fornecedor?.cnpj,
+                        fornecedor_nome: dadosXMLImportado.fornecedor?.razao_social || dadosXMLImportado.fornecedor?.nome_fantasia,
+                        pedido_id: pedido.id,
+                        total_produtos: itensParaPedido.length,
+                        valor_total: dadosXMLImportado.total_nf || 0,
+                        status: 'SUCESSO',
+                        created_by: user.id
+                    }]);
+                
+                if (errLog) {
+                    console.warn('⚠️ Erro ao registrar log (não crítico):', errLog);
+                }
+
+                showToast(`✅ Pedido importado com sucesso!\n📦 ${itensParaPedido.length} produtos processados\n💰 Total: R$ ${(dadosXMLImportado.total_nf || 0).toFixed(2)}`, 'success');
                 closeModal('modal-importar-xml');
                 await loadPedidos();
                 
             } catch (error) {
-                console.error('Erro ao importar XML:', error);
-                showToast('Erro ao importar XML: ' + error.message, 'error');
+                console.error('❌ Erro ao importar XML:', error);
+                
+                // Tentar registrar log de erro
+                try {
+                    const user = await getCurrentUser();
+                    await supabase
+                        .from('importacao_xml_log')
+                        .insert([{
+                            arquivo_nome: dadosXMLImportado?.arquivo_nome || 'xml-upload.xml',
+                            chave_nfe: dadosXMLImportado?.chave,
+                            numero_nfe: dadosXMLImportado?.numero_nf,
+                            fornecedor_cnpj: dadosXMLImportado?.fornecedor?.cnpj,
+                            fornecedor_nome: dadosXMLImportado?.fornecedor?.razao_social,
+                            total_produtos: dadosXMLImportado?.itens?.length || 0,
+                            valor_total: dadosXMLImportado?.total_nf || 0,
+                            status: 'ERRO',
+                            erro_mensagem: error.message,
+                            created_by: user.id
+                        }]);
+                } catch (logErr) {
+                    console.warn('Erro ao registrar log de erro:', logErr);
+                }
+                
+                showToast('❌ Erro ao importar XML: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }

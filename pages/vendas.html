@@ -319,9 +319,16 @@
                         ${formatDate(venda.created_at)}
                     </td>
                     <td class="px-6 py-4 text-sm">
-                        <a href="/pages/venda-detalhe.html?id=${venda.id}" class="text-blue-600 hover:text-blue-800">
-                            Ver Detalhes
-                        </a>
+                        <div class="flex gap-2">
+                            <a href="/pages/venda-detalhe.html?id=${venda.id}" class="text-blue-600 hover:text-blue-800" title="Ver detalhes">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            ${venda.status === 'FINALIZADA' ? `
+                                <button onclick="gerarNotaFiscal('${venda.id}')" class="text-green-600 hover:text-green-800" title="Gerar NFC-e">
+                                    <i class="fas fa-receipt"></i>
+                                </button>
+                            ` : ''}
+                        </div>
                     </td>
                 </tr>
             `;
@@ -368,6 +375,58 @@
                     window.location.href = `/pages/venda-detalhe.html?id=${venda.id}`;
                 }
             } finally {
+                showLoading(false);
+            }
+        });
+
+        // Gerar Nota Fiscal (NFC-e)
+        async function gerarNotaFiscal(vendaId) {
+            try {
+                // Buscar dados da venda
+                const { data: venda, error: erroVenda } = await supabase
+                    .from('vendas')
+                    .select('*, vendas_itens(*, produtos(*)), clientes(*)')
+                    .eq('id', vendaId)
+                    .single();
+
+                if (erroVenda || !venda) {
+                    alert('Erro ao carregar dados da venda');
+                    return;
+                }
+
+                // Verificar configurações da empresa
+                const { data: config, error: erroConfig } = await supabase
+                    .from('empresa_config')
+                    .select('*')
+                    .single();
+
+                if (erroConfig || !config) {
+                    alert('Configure os dados da empresa antes de emitir NFC-e.');
+                    return;
+                }
+
+                // Verificar certificado digital
+                if (!config.certificado_digital || !config.senha_certificado) {
+                    alert('Certificado digital não configurado. Acesse Configurações da Empresa.');
+                    return;
+                }
+
+                // Verificar CSC
+                if (!config.csc_id || !config.csc_token) {
+                    alert('CSC não configurado. Acesse Configurações da Empresa.');
+                    return;
+                }
+
+                // Estrutura pronta - Aguardando integração
+                alert(`Emissão de NFC-e em desenvolvimento.\n\nVenda: ${venda.numero}\nCliente: ${venda.clientes?.nome || 'N/A'}\nTotal: R$ ${venda.total.toFixed(2)}\n\nEstrutura pronta:\n✓ Certificado configurado\n✓ CSC configurado\n✓ Dados da venda carregados\n\nPróximo passo: Integrar com API SEFAZ`);
+            } catch (error) {
+                console.error('Erro ao gerar nota fiscal:', error);
+                alert('Erro ao preparar nota fiscal: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>
                 showLoading(false);
             }
         });

@@ -1084,53 +1084,102 @@
             const erros = [];
             
             const nome = document.getElementById('produto-nome')?.value?.trim();
-            if (!nome) erros.push('Nome do produto (aba: Dados Básicos)');
+            if (!nome) erros.push({ campo: 'Nome do produto', aba: 'Dados Básicos' });
             
             const codigo = document.getElementById('produto-codigo')?.value?.trim();
-            if (!codigo) erros.push('Código do produto (aba: Dados Básicos)');
+            if (!codigo) erros.push({ campo: 'Código do produto', aba: 'Dados Básicos' });
             
             const precoVendaInput = document.getElementById('produto-preco-venda')?.value?.trim();
             const precoVenda = parseFloat(precoVendaInput) || 0;
-            if (!precoVendaInput || precoVenda <= 0) erros.push('Preço de venda > 0 (aba: Preços)');
+            if (!precoVendaInput || precoVenda <= 0) erros.push({ campo: 'Preço de venda maior que zero', aba: 'Preços' });
             
-            // Se há erros, mostra modal
+            // Validar campos de categorização
+            const categoriaId = document.getElementById('produto-categoria')?.value;
+            if (!categoriaId) erros.push({ campo: 'Categoria', aba: 'Dados Básicos' });
+            
+            const unidade = document.getElementById('produto-unidade')?.value?.trim();
+            if (!unidade) erros.push({ campo: 'Unidade de medida', aba: 'Dados Básicos' });
+            
+            // Se há erros, mostra modal com destaque das abas
             if (erros.length > 0) {
+                const abasComErro = [...new Set(erros.map(e => e.aba))];
+                
                 const modal = document.createElement('div');
-                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
                 modal.innerHTML = `
-                    <div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4">
+                    <div class="bg-white rounded-lg shadow-2xl max-w-lg w-full">
                         <div class="bg-red-600 text-white p-4 rounded-t-lg">
-                            <h3 class="text-lg font-bold flex items-center gap-2">
-                                <i class="fas fa-exclamation-circle"></i>
-                                Campos Obrigatórios Faltando
+                            <h3 class="text-xl font-bold flex items-center gap-2">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Campos Obrigatórios Não Preenchidos
                             </h3>
                         </div>
                         <div class="p-6">
-                            <p class="text-gray-700 mb-4">Preencha os seguintes campos:</p>
-                            <ul class="space-y-2">
-                                ${erros.map((err, i) => `
-                                    <li class="flex items-start gap-2">
-                                        <span class="text-red-600 font-bold">${i+1}.</span>
-                                        <span class="text-gray-700">${err}</span>
-                                    </li>
-                                `).join('')}
-                            </ul>
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+                                <p class="text-sm text-yellow-800">
+                                    <i class="fas fa-info-circle mr-2"></i>
+                                    <strong>Atenção:</strong> Alguns campos obrigatórios estão em abas diferentes. Verifique todas as abas destacadas abaixo.
+                                </p>
+                            </div>
+                            
+                            <p class="text-gray-700 font-semibold mb-3">Você precisa preencher:</p>
+                            
+                            ${abasComErro.map(aba => `
+                                <div class="mb-4 p-3 bg-gray-50 rounded-lg border-l-4 border-red-500">
+                                    <div class="font-bold text-red-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-folder-open"></i>
+                                        Aba: ${aba}
+                                    </div>
+                                    <ul class="space-y-1 ml-6">
+                                        ${erros.filter(e => e.aba === aba).map((err, i) => `
+                                            <li class="text-sm text-gray-700 flex items-start gap-2">
+                                                <i class="fas fa-chevron-right text-red-500 mt-1"></i>
+                                                <span>${err.campo}</span>
+                                            </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            `).join('')}
                         </div>
                         <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex justify-end">
                             <button 
                                 onclick="this.closest('.fixed').remove()"
-                                class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                                class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors"
                             >
-                                Entendi
+                                <i class="fas fa-check mr-2"></i>Entendi, vou corrigir
                             </button>
                         </div>
                     </div>
                 `;
                 document.body.appendChild(modal);
                 
-                // Clica na primeira aba
-                const btnAba = document.querySelector('[data-tab="tab-basico"]');
+                // Destacar abas com erro
+                document.querySelectorAll('[data-tab]').forEach(btn => {
+                    const tabName = btn.getAttribute('data-tab');
+                    const abaConfig = {
+                        'tab-basico': 'Dados Básicos',
+                        'tab-precos': 'Preços',
+                        'tab-estoque': 'Estoque',
+                        'tab-fiscal': 'Dados Fiscais'
+                    };
+                    
+                    if (abasComErro.includes(abaConfig[tabName])) {
+                        btn.classList.add('bg-red-100', 'text-red-700', 'font-bold');
+                        btn.style.animation = 'pulse 2s infinite';
+                    }
+                });
+                
+                // Ir para primeira aba com erro
+                const primeiraAbaErro = erros[0].aba;
+                const mapAba = {
+                    'Dados Básicos': 'tab-basico',
+                    'Preços': 'tab-precos',
+                    'Estoque': 'tab-estoque',
+                    'Dados Fiscais': 'tab-fiscal'
+                };
+                const btnAba = document.querySelector(`[data-tab="${mapAba[primeiraAbaErro]}"]`);
                 if (btnAba) btnAba.click();
+                
                 return;
             }
             

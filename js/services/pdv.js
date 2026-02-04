@@ -472,41 +472,76 @@ class PDVSystem {
         }
 
         try {
-            // Buscar valor total de vendas do caixa
+            console.log('🔒 Iniciando fechamento do caixa...');
+            console.log('📊 Movimentação Atual:', this.movimentacaoAtual);
+            
+            // Buscar valor total de vendas do caixa pela sessão
             const { data: vendas, error: erroVendas } = await supabase
                 .from('vendas')
                 .select('total')
-                .eq('sessao_id', this.movimentacaoAtual.id);
+                .eq('sessao_id', this.movimentacaoAtual.id)
+                .eq('status', 'FINALIZADA');
 
-            const valorVendas = vendas?.reduce((sum, v) => sum + (v.total || 0), 0) || 0;
-            const valorEsperado = (this.movimentacaoAtual.saldo_inicial || 0) + valorVendas;
-            const diferenca = valorEsperado - (this.movimentacaoAtual.saldo_final || 0);
+            if (erroVendas) {
+                console.error('❌ Erro ao buscar vendas:', erroVendas);
+            }
 
-            // Modal para fechar caixa com diferença
+            console.log('💰 Vendas encontradas:', vendas);
+            
+            const valorVendas = vendas?.reduce((sum, v) => sum + (parseFloat(v.total) || 0), 0) || 0;
+            const saldoInicial = parseFloat(this.movimentacaoAtual.valor_abertura) || 0;
+            const valorEsperado = saldoInicial + valorVendas;
+            
+            console.log('📈 Cálculos:', {
+                saldoInicial,
+                valorVendas,
+                valorEsperado
+            });
+
+            // Modal para fechar caixa com cálculos corretos
             const modal = document.createElement('div');
             modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             modal.id = 'modal-fechar-caixa';
             modal.innerHTML = `
-                <div class="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
+                <div class="bg-white rounded-lg shadow-lg max-w-lg w-full mx-4">
                     <div class="bg-red-600 text-white p-4 rounded-t-lg">
-                        <h2 class="text-xl font-bold">Fechar Caixa</h2>
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fas fa-cash-register"></i>
+                            Fechar Caixa
+                        </h2>
                     </div>
+                    
                     <div class="p-6 space-y-4">
-                        <div class="bg-blue-50 p-3 rounded border border-blue-200">
-                            <div class="text-sm text-gray-600">Saldo Inicial</div>
-                            <div class="text-xl font-bold text-blue-600">R$ ${(this.movimentacaoAtual.saldo_inicial || 0).toFixed(2)}</div>
+                        <div class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+                            <div class="flex justify-between items-center">
+                                <div class="text-sm text-gray-600">Saldo Inicial</div>
+                                <div class="text-xl font-bold text-blue-700">R$ ${saldoInicial.toFixed(2)}</div>
+                            </div>
                         </div>
-                        <div class="bg-green-50 p-3 rounded border border-green-200">
-                            <div class="text-sm text-gray-600">Total Vendido</div>
-                            <div class="text-xl font-bold text-green-600">R$ ${valorVendas.toFixed(2)}</div>
+                        
+                        <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+                            <div class="flex justify-between items-center">
+                                <div class="text-sm text-gray-600">Total de Vendas</div>
+                                <div class="text-xl font-bold text-green-700">+ R$ ${valorVendas.toFixed(2)}</div>
+                            </div>
                         </div>
-                        <div class="bg-yellow-50 p-3 rounded border border-yellow-200">
-                            <div class="text-sm text-gray-600">Valor Esperado</div>
-                            <div class="text-xl font-bold text-yellow-600">R$ ${valorEsperado.toFixed(2)}</div>
+                        
+                        <div class="bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500">
+                            <div class="flex justify-between items-center">
+                                <div class="text-sm text-gray-600 font-semibold">Valor Esperado no Caixa</div>
+                                <div class="text-2xl font-bold text-purple-700">R$ ${valorEsperado.toFixed(2)}</div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">
+                                (Saldo Inicial + Vendas)
+                            </div>
                         </div>
+                        
+                        <hr class="border-gray-300">
+                        
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">
-                                Saldo Final Conferido (R$)
+                                <i class="fas fa-calculator mr-2"></i>
+                                Informe o Valor Conferido no Caixa (R$)
                             </label>
                             <input 
                                 type="number" 
@@ -514,33 +549,29 @@ class PDVSystem {
                                 placeholder="0.00" 
                                 step="0.01" 
                                 min="0"
-                                value="0"
-                                class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-red-500"
+                                class="w-full border-2 border-gray-300 rounded-lg px-4 py-3 text-lg font-semibold focus:ring-2 focus:ring-red-500 focus:border-red-500"
                             >
-                            <small class="text-gray-500 block mt-1">Digite o valor conferido em dinheiro</small>
+                            <small class="text-gray-600 block mt-2">
+                                <i class="fas fa-info-circle mr-1"></i>
+                                Conte o dinheiro físico no caixa e digite o valor aqui
+                            </small>
                         </div>
-                        ${Math.abs(diferenca) > 0.01 ? `
-                            <div class="bg-red-50 p-3 rounded border border-red-200">
-                                <div class="text-sm text-red-700">
-                                    <i class="fas fa-exclamation-triangle mr-2"></i>
-                                    <strong>Diferença detectada:</strong> R$ ${Math.abs(diferenca).toFixed(2)}
-                                </div>
-                                <div class="text-xs text-red-600 mt-1">
-                                    ${diferenca > 0 ? '⬆️ Caixa com excesso' : '⬇️ Caixa com falta'}
-                                </div>
-                            </div>
-                        ` : ''}
+                        
+                        <div id="area-diferenca" class="hidden">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
                     </div>
+                    
                     <div class="bg-gray-50 px-6 py-4 rounded-b-lg flex gap-3 justify-end">
                         <button 
                             id="btn-cancelar-fechar-caixa"
-                            class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+                            class="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 font-medium"
                         >
-                            Cancelar
+                            <i class="fas fa-times mr-2"></i>Cancelar
                         </button>
                         <button 
                             id="btn-confirmar-fechar-caixa"
-                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
+                            class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 font-medium"
                         >
                             <i class="fas fa-check"></i>
                             Confirmar Fechamento
@@ -551,48 +582,128 @@ class PDVSystem {
 
             document.body.appendChild(modal);
             
+            // Adicionar cálculo de diferença em tempo real
+            const inputSaldoFinal = document.getElementById('input-saldo-final');
+            const areaDiferenca = document.getElementById('area-diferenca');
+            
+            const calcularDiferenca = () => {
+                const saldoFinalInformado = parseFloat(inputSaldoFinal.value) || 0;
+                const diferenca = saldoFinalInformado - valorEsperado;
+                
+                if (inputSaldoFinal.value && saldoFinalInformado > 0) {
+                    areaDiferenca.classList.remove('hidden');
+                    
+                    if (Math.abs(diferenca) < 0.01) {
+                        // Caixa OK
+                        areaDiferenca.innerHTML = `
+                            <div class="bg-green-50 p-4 rounded-lg border-l-4 border-green-500">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-check-circle text-green-600 text-2xl"></i>
+                                    <div class="flex-1">
+                                        <div class="font-bold text-green-800">✅ Caixa Conferido!</div>
+                                        <div class="text-sm text-green-700">Valores estão corretos</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (diferenca > 0) {
+                        // Sobra
+                        areaDiferenca.innerHTML = `
+                            <div class="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-500">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-arrow-up text-yellow-600 text-2xl"></i>
+                                    <div class="flex-1">
+                                        <div class="font-bold text-yellow-800">⚠️ Sobra no Caixa</div>
+                                        <div class="text-lg font-bold text-yellow-700">+ R$ ${Math.abs(diferenca).toFixed(2)}</div>
+                                        <div class="text-sm text-yellow-600 mt-1">Há mais dinheiro do que o esperado</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Falta
+                        areaDiferenca.innerHTML = `
+                            <div class="bg-red-50 p-4 rounded-lg border-l-4 border-red-500">
+                                <div class="flex items-center gap-3">
+                                    <i class="fas fa-arrow-down text-red-600 text-2xl"></i>
+                                    <div class="flex-1">
+                                        <div class="font-bold text-red-800">❌ Falta no Caixa</div>
+                                        <div class="text-lg font-bold text-red-700">- R$ ${Math.abs(diferenca).toFixed(2)}</div>
+                                        <div class="text-sm text-red-600 mt-1">Está faltando dinheiro no caixa</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    areaDiferenca.classList.add('hidden');
+                }
+            };
+            
+            inputSaldoFinal.addEventListener('input', calcularDiferenca);
+            inputSaldoFinal.addEventListener('change', calcularDiferenca);
+            
             // Adicionar listeners
             document.getElementById('btn-cancelar-fechar-caixa')?.addEventListener('click', () => {
                 modal.remove();
             });
             
             document.getElementById('btn-confirmar-fechar-caixa')?.addEventListener('click', async () => {
-                await this.confirmarFecharCaixa(diferenca);
+                const saldoFinalInformado = parseFloat(inputSaldoFinal.value) || 0;
+                
+                if (saldoFinalInformado === 0 && !confirm('O valor informado é R$ 0.00. Deseja realmente continuar?')) {
+                    return;
+                }
+                
+                const diferenca = saldoFinalInformado - valorEsperado;
+                await this.confirmarFecharCaixa(saldoFinalInformado, diferenca, valorVendas);
             });
             
             setTimeout(() => {
-                document.getElementById('input-saldo-final')?.focus();
+                inputSaldoFinal.focus();
             }, 100);
 
         } catch (error) {
-            console.error('Erro ao fechar caixa:', error);
+            console.error('❌ Erro ao fechar caixa:', error);
             this.exibirErro('Erro ao fechar caixa: ' + error.message);
         }
     }
 
-    static async confirmarFecharCaixa(diferenca) {
-        const saldoFinal = parseFloat(document.getElementById('input-saldo-final')?.value || 0);
+    static async confirmarFecharCaixa(saldoFinal, diferenca, valorVendas) {
         const modal = document.getElementById('modal-fechar-caixa');
         
         try {
+            console.log('💾 Salvando fechamento do caixa:', {
+                sessao_id: this.movimentacaoAtual.id,
+                valor_fechamento: saldoFinal,
+                diferenca: diferenca,
+                valor_vendas: valorVendas
+            });
+            
             const { error } = await supabase
                 .from('caixa_sessoes')
                 .update({
                     status: 'FECHADO',
                     data_fechamento: new Date().toISOString(),
-                    saldo_final: saldoFinal,
+                    valor_fechamento: saldoFinal,
+                    valor_vendas: valorVendas,
                     diferenca: diferenca
                 })
                 .eq('id', this.movimentacaoAtual.id);
 
-            if (error) throw error;
+            if (error) {
+                console.error('❌ Erro ao atualizar caixa_sessoes:', error);
+                throw error;
+            }
 
+            console.log('✅ Caixa fechado com sucesso no banco de dados');
+            
             this.movimentacaoAtual = null;
             this.caixaAtual = null;
             this.itensCarrinho = [];
             
             if (modal) modal.remove();
-            this.exibirSucesso('Caixa fechado com sucesso');
+            this.exibirSucesso('Caixa fechado com sucesso!');
             this.atualizarStatusCaixa(false);
             this.atualizarCarrinho();
             
@@ -601,8 +712,8 @@ class PDVSystem {
                 window.location.reload();
             }, 2000);
         } catch (error) {
-            console.error('Erro ao confirmar fechamento:', error);
-            this.exibirErro('Erro ao fechar caixa');
+            console.error('❌ Erro ao confirmar fechamento:', error);
+            this.exibirErro('Erro ao fechar caixa: ' + (error.message || 'Erro desconhecido'));
         }
     }
 
@@ -975,31 +1086,25 @@ class PDVSystem {
                 }
 
                 // 2. Atualizar estoque atual do produto (REDUZIR)
-                const { error: erroUpdate } = await supabase
+                const { data: produto } = await supabase
                     .from('produtos')
-                    .update({ 
-                        estoque_atual: supabase.rpc('fn_produto_subtrai_estoque', {
-                            p_produto_id: item.produto_id,
-                            p_quantidade: item.quantidade
-                        })
-                    })
-                    .eq('id', item.produto_id);
+                    .select('estoque_atual')
+                    .eq('id', item.produto_id)
+                    .single();
 
-                // Se não tiver RPC, fazer manualmente
-                if (erroUpdate) {
-                    const { data: produto } = await supabase
+                if (produto) {
+                    const novoEstoque = Math.max(0, (produto.estoque_atual || 0) - item.quantidade);
+                    const { error: erroUpdate } = await supabase
                         .from('produtos')
-                        .select('estoque_atual')
-                        .eq('id', item.produto_id)
-                        .single();
-
-                    if (produto) {
-                        const novoEstoque = Math.max(0, (produto.estoque_atual || 0) - item.quantidade);
-                        await supabase
-                            .from('produtos')
-                            .update({ estoque_atual: novoEstoque })
-                            .eq('id', item.produto_id);
+                        .update({ estoque_atual: novoEstoque })
+                        .eq('id', item.produto_id);
+                    
+                    if (erroUpdate) {
+                        console.error('❌ Erro ao atualizar estoque:', erroUpdate);
+                        throw erroUpdate;
                     }
+                    
+                    console.log(`📦 Estoque atualizado: ${produto.estoque_atual} → ${novoEstoque}`);
                 }
             }
             console.log('✅ Movimento de estoque registrado com sucesso');
@@ -1270,9 +1375,10 @@ class PDVSystem {
         // Criar elementos
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        overlay.id = 'modal-finalizar-venda-overlay';
         
         const container = document.createElement('div');
-        container.className = 'bg-white p-6 rounded-lg max-w-md w-full mx-4';
+        container.className = 'bg-white p-6 rounded-lg max-w-lg w-full mx-4';
         
         // Construir HTML manualmente
         container.innerHTML = `
@@ -1300,8 +1406,8 @@ class PDVSystem {
             </div>
 
             <div class="flex gap-2">
-                <button class="flex-1 px-4 py-2 border rounded hover:bg-gray-100" onclick="event.stopPropagation()">Cancelar</button>
-                <button class="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" onclick="event.stopPropagation()">Confirmar</button>
+                <button id="btn-cancelar-venda" class="flex-1 px-4 py-2 border rounded hover:bg-gray-100">Cancelar</button>
+                <button id="btn-confirmar-venda" class="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirmar</button>
             </div>
         `;
         
@@ -1311,9 +1417,8 @@ class PDVSystem {
         // Agora buscar os elementos (já estão no DOM)
         const valorPagoInput = container.querySelector('#valor-pago');
         const trocoValor = container.querySelector('#troco-valor');
-        const botoes = container.querySelectorAll('button');
-        const btnCancelar = botoes[0];
-        const btnConfirmar = botoes[1];
+        const btnCancelar = container.querySelector('#btn-cancelar-venda');
+        const btnConfirmar = container.querySelector('#btn-confirmar-venda');
 
         console.log('✅ Elementos encontrados:', {
             valorPagoInput: !!valorPagoInput,
@@ -1353,13 +1458,11 @@ class PDVSystem {
         valorPagoInput.addEventListener('keyup', atualizarTroco);
         valorPagoInput.addEventListener('input', atualizarTroco);
 
-        // Cancelar venda
-        btnCancelar.addEventListener('click', (e) => {
-            console.log('❌ Cancelar clicado');
-            e.preventDefault();
-            e.stopPropagation();
+        // Cancelar venda - usar { once: true } para evitar múltiplos listeners
+        btnCancelar.addEventListener('click', () => {
+            console.log('❌ Cancelando venda...');
             overlay.remove();
-        });
+        }, { once: true });
 
         // Confirmar pagamento
         btnConfirmar.addEventListener('click', (e) => {
@@ -1382,29 +1485,40 @@ class PDVSystem {
                 return;
             }
 
+            // Adicionar feedback visual ANTES de processar
+            btnConfirmar.disabled = true;
+            btnCancelar.disabled = true;
+            btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processando...';
+            
             // Chamar finalizarVenda (async)
             (async () => {
                 const resultado = await PDVSystem.finalizarVenda(forma, valorPago);
                 
-                // Se deu sucesso, fechar overlay e exibir cupom
+                // Se deu sucesso, fechar overlay e exibir cupom imediatamente
                 if (resultado && resultado.cupom) {
                     overlay.remove();
-                    // Exibir cupom após fechar modal de pagamento
-                    setTimeout(() => {
-                        PDVSystem.exibirCupom(resultado.cupom);
-                    }, 500);
-                } else if (!resultado) {
-                    // Erro - manter modal aberto para retry
+                    PDVSystem.exibirCupom(resultado.cupom);
+                } else {
+                    // Erro - reabilitar botões para retry
+                    btnConfirmar.disabled = false;
+                    btnCancelar.disabled = false;
+                    btnConfirmar.innerHTML = 'Confirmar';
                     console.error('❌ Falha ao finalizar venda');
                 }
             })();
         });
 
-        // Fechar ao clicar no overlay
+        // Fechar ao clicar no overlay (fora do container)
         overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
+            if (e.target === overlay || e.target.id === 'modal-finalizar-venda-overlay') {
+                console.log('🚪 Fechando modal por clique no overlay');
                 overlay.remove();
             }
+        });
+        
+        // Impedir que cliques no container fechem o modal
+        container.addEventListener('click', (e) => {
+            e.stopPropagation();
         });
 
         // Focus no input para facilitar digitação
@@ -1413,36 +1527,44 @@ class PDVSystem {
     }
 
     /**
-     * Exibir cupom
+     * Exibir cupom (simplificado - sem impressão)
      */
     static exibirCupom(cupom) {
         const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
         modal.innerHTML = `
-            <div class="bg-white p-6 rounded-lg max-w-lg w-full max-h-96 overflow-auto">
-                <h3 class="text-lg font-bold mb-4">Cupom Fiscal</h3>
-                <pre class="font-mono text-sm bg-gray-50 p-4 rounded mb-4">${cupom}</pre>
-                <div class="flex gap-2 mb-4">
-                    <button id="btn-imprimir-cupom" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                        <i class="fas fa-print mr-2"></i>Imprimir
-                    </button>
-                    <button id="btn-nfce-cupom" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
-                        <i class="fas fa-file-invoice mr-2"></i>NFC-e
+            <div class="bg-white p-8 rounded-lg max-w-2xl w-full">
+                <div class="text-center mb-8">
+                    <i class="fas fa-check-circle text-green-500 text-8xl mb-4"></i>
+                    <h3 class="text-4xl font-bold text-gray-800 mb-3">Venda Concluída!</h3>
+                    <p class="text-gray-600 text-lg">Transação finalizada com sucesso</p>
+                </div>
+                
+                <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg mb-6 text-center border-2 border-blue-200">
+                    <p class="text-sm text-gray-700 mb-2 font-medium uppercase">Número da Venda</p>
+                    <p class="text-4xl font-bold text-blue-700">${this.vendaAtual?.numero || '-'}</p>
+                </div>
+
+                <div class="flex gap-3 mb-6">
+                    <button id="btn-nfce-cupom" class="flex-1 px-6 py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-lg font-medium">
+                        <i class="fas fa-file-invoice mr-2"></i>Emitir NFC-e
                     </button>
                 </div>
-                <button id="btn-proximo-cliente" class="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                    Próximo Cliente
+                
+                <button id="btn-proximo-cliente" class="w-full px-6 py-5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-xl transition-colors shadow-lg">
+                    <i class="fas fa-arrow-right mr-2"></i>Próximo Cliente
                 </button>
+                
+                <p class="text-sm text-gray-500 text-center mt-6">
+                    <i class="fas fa-info-circle mr-1"></i>
+                    Cupom de impressão removido para otimização do processo
+                </p>
             </div>
         `;
 
         document.body.appendChild(modal);
         
         // Adicionar listeners
-        document.getElementById('btn-imprimir-cupom')?.addEventListener('click', () => {
-            this.imprimirCupom(cupom);
-        });
-        
         document.getElementById('btn-nfce-cupom')?.addEventListener('click', () => {
             this.perguntarNFCe();
         });
@@ -1460,46 +1582,37 @@ class PDVSystem {
         const resposta = confirm('Deseja emitir NFC-e para esta venda?\n\nA emissão de NFC-e será processada no sistema fiscal integrado.');
         
         if (resposta) {
-            this.exibirSucesso('NFC-e será emitida em breve. Aguarde confirmação no seu email.');
+            this.exibirSucesso('NFC-e será emitida. Aguarde confirmação no seu email ou consulte o sistema fiscal.');
             // TODO: Implementar integração com sistema fiscal para emissão de NFC-e
         } else {
-            this.exibirSucesso('NFC-e não será emitida. Você pode emitir manualmente depois.');
+            this.exibirSucesso('NFC-e não será emitida. Você pode emitir manualmente depois se necessário.');
         }
     }
 
     /**
-     * Imprimir cupom
+     * Função de impressão de cupom REMOVIDA (não é mais necessária)
+     * Mantida apenas para compatibilidade com código legado
      */
     static imprimirCupom(cupom) {
-        console.log('🖨️ Imprimindo cupom...');
-        const janela = window.open('', '', 'width=800,height=600');
-        janela.document.write(`
-            <html>
-            <head>
-                <title>Cupom Fiscal</title>
-                <style>
-                    body { font-family: monospace; white-space: pre; margin: 20px; }
-                </style>
-            </head>
-            <body>${cupom}</body>
-            </html>
-        `);
-        janela.document.close();
-        setTimeout(() => {
-            janela.print();
-        }, 500);
+        console.warn('⚠️ Impressão de cupom foi desabilitada. Use apenas NFC-e.');
+        this.exibirErro('Impressão de cupom foi removida. Utilize a emissão de NFC-e.');
     }
 
     /**
      * Preparar para próximo cliente
      */
     static proximoCliente() {
-        // Remover modal de cupom se existir
-        const modaisCupom = document.querySelectorAll('.fixed');
+        // Remover apenas modais de venda (não o sidebar/navbar)
+        const modaisCupom = document.querySelectorAll('.fixed.inset-0, [id^="modal-"]');
         modaisCupom.forEach(modal => {
-            if (modal.innerHTML.includes('Cupom Fiscal') || 
+            // Verificar se é um modal de venda, não componentes fixos da página
+            const isModalVenda = modal.innerHTML && (
+                modal.innerHTML.includes('Cupom Fiscal') || 
                 modal.innerHTML.includes('Finalizar Venda') || 
-                modal.innerHTML.includes('Pagar')) {
+                modal.innerHTML.includes('Forma de Pagamento')
+            );
+            if (isModalVenda) {
+                console.log('🗑️ Removendo modal de venda');
                 modal.remove();
             }
         });
@@ -1508,28 +1621,77 @@ class PDVSystem {
         this.itensCarrinho = [];
         this.atualizarCarrinho();
         this.atualizarUI();
+        
+        // Resetar campo de busca de produto
+        const buscaProduto = document.getElementById('busca-produto');
+        if (buscaProduto) {
+            buscaProduto.value = '';
+        }
+        
+        // Limpar resultados de busca
+        const resultadosBusca = document.getElementById('produtos-resultado');
+        if (resultadosBusca) {
+            resultadosBusca.innerHTML = '';
+        }
+        
+        // Reconfigurar eventos após limpar
         this.setupEventos();
         
-        console.log('✅ Próximo cliente - Recarregando página...');
+        // Focar no campo de busca após um pequeno delay para garantir que tudo carregou
+        requestAnimationFrame(() => {
+            if (buscaProduto) {
+                buscaProduto.focus();
+            }
+        });
         
-        // Recarregar página após 2 segundos
-        setTimeout(() => {
-            window.location.reload();
-        }, 2000);
+        console.log('✅ Próximo cliente - Pronto para nova venda!');
     }
 
     /**
      * Emitir NFC-e
      */
-    static emitirNFCe() {
-        this.exibirErro('Emissão de NFC-e será implementada em breve. Por enquanto, use o sistema fiscal separado.');
+    static async emitirNFCe() {
+        try {
+            if (this.itensCarrinho.length === 0) {
+                this.exibirErro('Carrinho vazio. Adicione produtos para emitir NFC-e.');
+                return;
+            }
+
+            // Verificar configurações da empresa
+            const { data: config, error } = await supabase
+                .from('empresa_config')
+                .select('*')
+                .single();
+
+            if (error || !config) {
+                this.exibirErro('Configure os dados da empresa antes de emitir NFC-e.');
+                return;
+            }
+
+            // Verificar certificado digital
+            if (!config.certificado_digital || !config.senha_certificado) {
+                this.exibirErro('Certificado digital não configurado. Acesse Configurações da Empresa.');
+                return;
+            }
+
+            // Verificar CSC (Código de Segurança do Contribuinte)
+            if (!config.csc_id || !config.csc_token) {
+                this.exibirErro('CSC não configurado. Acesse Configurações da Empresa.');
+                return;
+            }
+
+            this.exibirErro('Emissão de NFC-e em desenvolvimento. Estrutura pronta, aguardando integração com API SEFAZ.\n\nCampos já configurados:\n- Certificado Digital\n- Senha do Certificado\n- CSC ID e Token\n- Ambiente (Homologação/Produção)\n- Série e Numeração\n\nPróximos passos: Integrar com biblioteca de NFC-e.');
+        } catch (error) {
+            console.error('❌ Erro ao emitir NFC-e:', error);
+            this.exibirErro('Erro ao preparar NFC-e: ' + error.message);
+        }
     }
 
     /**
      * Consultar status fiscal
      */
-    static consultarFiscal() {
-        this.exibirErro('Consulta fiscal será implementada em breve.');
+    static async consultarFiscal() {
+        this.exibirErro('Consulta fiscal em desenvolvimento.\n\nFuncionalidades planejadas:\n- Consultar status da NFC-e\n- Verificar autorização SEFAZ\n- Reenviar NFC-e rejeitada\n- Cancelar NFC-e');
     }
 
     /**

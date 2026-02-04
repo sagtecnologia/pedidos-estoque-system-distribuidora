@@ -424,24 +424,23 @@
                 
                 // Carregar vendas finalizadas com itens
                 const { data: pedidos, error } = await supabase
-                    .from('vendas')
+                    .from('pedidos')
                     .select(`
                         *,
                         cliente:clientes(nome),
-                        operador:users!vendas_operador_id_fkey(full_name)
+                        operador:users!pedidos_solicitante_id_fkey(full_name),
+                        pedido_itens(*)
                     `)
-                    .eq('status_venda', 'FINALIZADA')
+                    .eq('tipo_pedido', 'VENDA')
+                    .eq('status', 'FINALIZADO')
                     .order('created_at', { ascending: false });
                 
                 if (error) throw error;
                 
-                // Buscar itens de cada pedido
-                vendasFinalizadas = await Promise.all(pedidos.map(async p => {
-                    const { data: itens } = await supabase
-                        .from('vendas_itens')
-                        .select('*')
-                        .eq('venda_id', p.id);
-                    return { ...p, itens };
+                // Mapear para formato esperado
+                vendasFinalizadas = pedidos.map(p => ({
+                    ...p,
+                    itens: p.pedido_itens || []
                 }));
                 
                 calcularResumo();
