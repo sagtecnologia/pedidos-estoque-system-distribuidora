@@ -1187,7 +1187,6 @@
             const data = {
                 nome: nome,
                 codigo: codigo,
-                sku: codigo, // SKU usa o mesmo valor do código
                 categoria_id: document.getElementById('produto-categoria')?.value || null,
                 unidade: document.getElementById('produto-unidade')?.value || 'UN',
                 descricao: document.getElementById('produto-descricao')?.value || null,
@@ -1199,6 +1198,10 @@
                 preco_custo: parseFloat(document.getElementById('produto-preco-compra')?.value) || 0,
                 preco_venda: precoVenda
             };
+            
+            // SKU - NÃO enviar automaticamente, apenas se preencher especificamente
+            // Para evitar conflitos com código duplicado
+            // (deixar NULL para múltiplos produtos sem SKU)
             
             // Campos opcionais - sempre enviar codigo_barras mesmo se vazio
             const codigoBarras = document.getElementById('produto-codigo-barras')?.value?.trim();
@@ -1542,16 +1545,7 @@
             setTimeout(setupCharacterLimitListeners, 500);
             setTimeout(setupCodigoBarrasListener, 500);
             
-            // Adicionar listener ao formulário de produtos
-            const formProduto = document.getElementById('form-produto');
-            if (formProduto) {
-                formProduto.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                    saveProduto();
-                });
-            }
-            
-            // Adicionar listeners para as abas
+            // Listeners para as abas
             const tabBtns = document.querySelectorAll('.tab-btn');
             tabBtns.forEach(btn => {
                 btn.addEventListener('click', function(e) {

@@ -74,9 +74,9 @@ async function getProduto(id) {
 // Criar produto
 async function createProduto(produto) {
     try {
-        // Gerar código automático se não existir
-        if (!produto.sku) {
-            produto.sku = await generateProductCode(produto.marca_id);
+        // Se SKU está vazio, não enviar (permite NULL no banco)
+        if (!produto.sku || produto.sku.trim() === '') {
+            delete produto.sku;
         }
         
         const { data, error } = await window.supabase
