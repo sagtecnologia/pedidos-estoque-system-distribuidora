@@ -1337,6 +1337,167 @@
             document.getElementById('form-produto').reset();
         }
 
+        // ======== FUNÇÕES PARA LEITOR DE CÓDIGO DE BARRAS ========
+        function validarCodigoBarras(codigo) {
+            // Remove espaços em branco
+            codigo = codigo.trim();
+            
+            // Valida formato básico (numérico)
+            if (!/^\d+$/.test(codigo)) {
+                showToast('⚠️ Código de barras deve conter apenas números', 'warning');
+                return false;
+            }
+            
+            // Valida comprimento (EAN-8, EAN-12, EAN-13, UPC)
+            const comprimentos = [8, 12, 13, 14];
+            if (!comprimentos.includes(codigo.length)) {
+                showToast(`⚠️ Código inválido. Use EAN-8 (8), EAN-12 (12), EAN-13 (13) ou UPC (14) dígitos`, 'warning');
+                return false;
+            }
+            
+            return true;
+        }
+
+        async function verificarDuplicataCodigoBarras(codigo, produtoAtualId = null) {
+            if (!codigo) return null;
+            
+            try {
+                let query = window.supabase
+                    .from('produtos')
+                    .select('id, nome, codigo_barras, active')
+                    .eq('codigo_barras', codigo.trim())
+                    .eq('active', true);
+                
+                if (produtoAtualId) {
+                    query = query.neq('id', produtoAtualId);
+                }
+                
+                const { data, error } = await query;
+                
+                if (error) throw error;
+                
+                return data && data.length > 0 ? data[0] : null;
+            } catch (error) {
+                console.error('Erro ao verificar duplicata:', error);
+                return null;
+            }
+        }
+
+        function exibirFeedbackCodigoBarras(elemento, status) {
+            // Remove classes anteriores
+            elemento.classList.remove('border-green-500', 'border-red-500', 'border-yellow-500', 'bg-green-50', 'bg-red-50', 'bg-yellow-50');
+            
+            if (status === 'valido') {
+                elemento.classList.add('border-green-500', 'border-2', 'bg-green-50');
+                elemento.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+            } else if (status === 'duplicado') {
+                elemento.classList.add('border-yellow-500', 'border-2', 'bg-yellow-50');
+                elemento.style.boxShadow = '0 0 0 3px rgba(234, 179, 8, 0.1)';
+            } else if (status === 'invalido') {
+                elemento.classList.add('border-red-500', 'border-2', 'bg-red-50');
+                elemento.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.1)';
+            } else {
+                elemento.classList.add('border-gray-300', 'border');
+                elemento.style.boxShadow = 'none';
+            }
+        }
+
+        async function processarCodigoBarras(evento) {
+            const elemento = evento.target;
+            const codigoBarras = elemento.value.trim();
+            
+            // Se vazio, apenas remove feedback
+            if (!codigoBarras) {
+                exibirFeedbackCodigoBarras(elemento, 'limpo');
+                return;
+            }
+            
+            // Valida formato
+            if (!validarCodigoBarras(codigoBarras)) {
+                exibirFeedbackCodigoBarras(elemento, 'invalido');
+                return;
+            }
+            
+            // Verifica duplicata
+            const produtoAtualId = document.getElementById('produto-id').value || null;
+            const duplicada = await verificarDuplicataCodigoBarras(codigoBarras, produtoAtualId);
+            
+            if (duplicada) {
+                showToast(`⚠️ Código de barras já existe no produto: "${duplicada.nome}"`, 'warning');
+                exibirFeedbackCodigoBarras(elemento, 'duplicado');
+            } else {
+                showToast(`✅ Código de barras válido!`, 'success');
+                exibirFeedbackCodigoBarras(elemento, 'valido');
+            }
+        }
+
+        function setupCodigoBarrasListener() {
+            const inputCodigoBarras = document.getElementById('produto-codigo-barras');
+            if (inputCodigoBarras) {
+                // Remove listeners antigos para evitar duplicação
+                inputCodigoBarras.removeEventListener('change', processarCodigoBarras);
+                inputCodigoBarras.removeEventListener('blur', processarCodigoBarras);
+                inputCodigoBarras.removeEventListener('keypress', handleCodigoBarrasEnter);
+                
+                // Listener quando o campo perde foco
+                inputCodigoBarras.addEventListener('blur', processarCodigoBarras);
+                
+                // Listener no Enter (comum em leitores de código de barras)
+                inputCodigoBarras.addEventListener('keypress', handleCodigoBarrasEnter);
+                
+                // Listener em tempo real com debounce
+                let debounceTimer;
+                inputCodigoBarras.addEventListener('input', function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => {
+                        if (this.value.length >= 8) { // Começa a validar com 8+ dígitos
+                            processarCodigoBarras({ target: this });
+                        }
+                    }, 500);
+                });
+            }
+        }
+
+        function handleCodigoBarrasEnter(evento) {
+            // Se Enter foi pressionado
+            if (evento.key === 'Enter') {
+                evento.preventDefault();
+                processarCodigoBarras(evento);
+                
+                // Toca som de sucesso (opcional)
+                tocarSomLeitura();
+                
+                // Move para o próximo campo (nome do produto)
+                setTimeout(() => {
+                    document.getElementById('produto-nome')?.focus();
+                }, 300);
+            }
+        }
+
+        function tocarSomLeitura() {
+            // Cria um som de beep simples usando Web Audio API
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                
+                oscillator.frequency.value = 800; // Frequência em Hz
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.1);
+            } catch (error) {
+                // Silent fail - alguns navegadores podem bloquear áudio
+                console.log('Som de leitura não disponível');
+            }
+        }
+
         // ======== VALIDAÇÃO DE LIMITE DE CARACTERES ========
         function setupCharacterLimitListeners() {
             const fieldsWithLimits = [
@@ -1372,6 +1533,7 @@
         // Inicializar listeners quando o modal for aberto
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(setupCharacterLimitListeners, 500);
+            setTimeout(setupCodigoBarrasListener, 500);
             
             // Adicionar listener ao formulário de produtos
             const formProduto = document.getElementById('form-produto');
@@ -1391,6 +1553,19 @@
                     switchTab(tabId);
                 });
             });
+            
+            // Re-configurar listener de código de barras quando modal for aberto
+            const modalProduto = document.getElementById('modal-produto');
+            if (modalProduto) {
+                const observer = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (!modalProduto.classList.contains('hidden')) {
+                            setupCodigoBarrasListener();
+                        }
+                    });
+                });
+                observer.observe(modalProduto, { attributes: true, attributeFilter: ['class'] });
+            }
         });
     </script>
 </body>
