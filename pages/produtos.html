@@ -1200,9 +1200,9 @@
                 preco_venda: precoVenda
             };
             
-            // Campos opcionais - só adiciona se tiverem valor
+            // Campos opcionais - sempre enviar codigo_barras mesmo se vazio
             const codigoBarras = document.getElementById('produto-codigo-barras')?.value?.trim();
-            if (codigoBarras) data.codigo_barras = codigoBarras;
+            data.codigo_barras = codigoBarras || null; // Envia null se vazio
             
             const marcaId = document.getElementById('produto-marca')?.value;
             if (marcaId) data.marca_id = marcaId;
@@ -1305,7 +1305,7 @@
         async function deleteProduto(id) {
             const { error } = await window.supabase
                 .from('produtos')
-                .update({ active: false })
+                .update({ ativo: false })
                 .eq('id', id);
             
             if (error) throw error;
@@ -1335,6 +1335,13 @@
             document.getElementById('produto-id').value = '';
             document.getElementById('modal-title').textContent = 'Novo Produto';
             document.getElementById('form-produto').reset();
+            // Limpar feedback visual do código de barras
+            const codigoBarrasInput = document.getElementById('produto-codigo-barras');
+            if (codigoBarrasInput) {
+                codigoBarrasInput.classList.remove('border-green-500', 'border-red-500', 'border-yellow-500', 'border-2', 'bg-green-50', 'bg-red-50', 'bg-yellow-50');
+                codigoBarrasInput.classList.add('border', 'border-gray-300');
+                codigoBarrasInput.style.boxShadow = 'none';
+            }
         }
 
         // ======== FUNÇÕES PARA LEITOR DE CÓDIGO DE BARRAS ========
@@ -1364,9 +1371,9 @@
             try {
                 let query = window.supabase
                     .from('produtos')
-                    .select('id, nome, codigo_barras, active')
+                    .select('id, nome, codigo_barras, ativo')
                     .eq('codigo_barras', codigo.trim())
-                    .eq('active', true);
+                    .eq('ativo', true);
                 
                 if (produtoAtualId) {
                     query = query.neq('id', produtoAtualId);
