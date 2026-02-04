@@ -1019,20 +1019,27 @@ class PDVSystem {
 
             // Inserir itens
             for (const item of this.itensCarrinho) {
+                // Preparar dados do item sem campos que não existem na tabela
+                const itemData = {
+                    venda_id: vendaId,
+                    produto_id: item.produto_id,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.preco_unitario,
+                    desconto_percentual: item.desconto_percentual || 0,
+                    desconto_valor: item.desconto || 0,
+                    subtotal: item.subtotal
+                };
+                
+                console.log('📦 Inserindo item:', itemData);
+                
                 const { error: erroItem } = await supabase
                     .from('venda_itens')
-                    .insert({
-                        venda_id: vendaId,
-                        produto_id: item.produto_id,
-                        quantidade: item.quantidade,
-                        unidade_medida: item.unidade_medida,
-                        preco_unitario: item.preco_unitario,
-                        subtotal: item.subtotal,
-                        desconto: item.desconto,
-                        total: item.subtotal - item.desconto
-                    });
+                    .insert(itemData);
 
-                if (erroItem) throw erroItem;
+                if (erroItem) {
+                    console.error('❌ Erro ao inserir item:', erroItem);
+                    throw erroItem;
+                }
             }
 
             // Registrar movimento de estoque

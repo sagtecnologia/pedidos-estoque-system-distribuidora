@@ -211,12 +211,7 @@
             try {
                 let query = supabase
                     .from('vendas')
-                    .select(`
-                        *,
-                        cliente:clientes(nome),
-                        operador:users!vendas_operador_id_fkey(full_name),
-                        venda_itens(quantidade)
-                    `);
+                    .select('*');
                 
                 if (status) {
                     query = query.eq('status', status);
@@ -242,11 +237,41 @@
                     query = query.lte('created_at', dataFimObj.toISOString());
                 }
                 
-                const { data, error } = await query.order('created_at', { ascending: false });
+                const { data: vendas, error } = await query.order('created_at', { ascending: false });
                 
                 if (error) throw error;
                 
-                renderVendas(data || []);
+                // Carregar relacionamentos separadamente para cada venda
+                for (let venda of vendas || []) {
+                    // Carregar cliente
+                    if (venda.cliente_id) {
+                        const { data: cliente } = await supabase
+                            .from('clientes')
+                            .select('nome')
+                            .eq('id', venda.cliente_id)
+                            .single();
+                        venda.cliente = cliente;
+                    }
+                    
+                    // Carregar operador (usando vendedor_id que é o correto no schema)
+                    if (venda.vendedor_id) {
+                        const { data: operador } = await supabase
+                            .from('users')
+                            .select('full_name')
+                            .eq('id', venda.vendedor_id)
+                            .single();
+                        venda.operador = operador;
+                    }
+                    
+                    // Carregar itens para contar quantidade
+                    const { data: itens } = await supabase
+                        .from('venda_itens')
+                        .select('quantidade')
+                        .eq('venda_id', venda.id);
+                    venda.venda_itens = itens || [];
+                }
+                
+                renderVendas(vendas || []);
             } catch (error) {
                 handleError(error, 'Erro ao carregar vendas');
             } finally {

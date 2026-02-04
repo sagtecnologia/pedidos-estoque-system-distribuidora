@@ -958,20 +958,43 @@
                 
                 venda = vendaData;
                 
+                console.log('🔍 Carregando itens da venda (versão corrigida)...');
+                
                 // Buscar itens da venda
                 const { data: itensData, error: itensError } = await supabase
                     .from('venda_itens')
-                    .select(`
-                        *,
-                        produtos(id, nome, descricao, codigo, codigo_barras, preco_venda, estoque_atual, unidade)
-                    `)
+                    .select('*')
                     .eq('venda_id', vendaId);
                 
+                console.log('📦 Itens carregados:', itensData?.length || 0);
+                
                 if (itensError) {
-                    console.error('Erro ao carregar itens:', itensError);
+                    console.error('❌ Erro ao carregar itens:', itensError);
                     itens = [];
                 } else {
                     itens = itensData || [];
+                    
+                    console.log('🔄 Carregando produtos para cada item...');
+                    
+                    // Buscar produtos para cada item separadamente
+                    for (let item of itens) {
+                        if (item.produto_id) {
+                            const { data: produto, error: prodError } = await supabase
+                                .from('produtos')
+                                .select('id, nome, descricao, codigo, codigo_barras, preco_venda, estoque_atual, unidade')
+                                .eq('id', item.produto_id)
+                                .single();
+                            
+                            if (prodError) {
+                                console.error('❌ Erro ao buscar produto:', item.produto_id, prodError);
+                            } else {
+                                item.produtos = produto;
+                                console.log('✅ Produto carregado:', produto?.nome);
+                            }
+                        }
+                    }
+                    
+                    console.log('✅ Todos os produtos carregados!');
                 }
                 
                 renderVenda();
