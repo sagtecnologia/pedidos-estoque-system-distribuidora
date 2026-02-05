@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentos Fiscais - Sistema Distribuidora</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Cabeçalho -->
+            <div class="mb-8 flex justify-between items-center">
+                <div>
+                    <h2 class="text-4xl font-bold text-gray-900">
+                        <i class="fas fa-file-invoice mr-3 text-blue-600"></i>Documentos Fiscais
+                    </h2>
+                    <p class="text-gray-600 mt-2">Gerenciamento de NFC-e e NF-e emitidas</p>
+                </div>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <h3 class="text-lg font-bold mb-4 flex items-center">
+                    <i class="fas fa-filter mr-2 text-gray-600"></i>Filtros
+                </h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tipo</label>
+                        <select id="filtro-tipo" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Todos</option>
+                            <option value="NFCE">NFC-e</option>
+                            <option value="NFE">NF-e</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                        <select id="filtro-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                            <option value="">Todos</option>
+                            <option value="100">Autorizado (100)</option>
+                            <option value="135">Cancelado (135)</option>
+                            <option value="rejeitado">Rejeitado</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Inicial</label>
+                        <input type="date" id="filtro-data-inicial" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Final</label>
+                        <input type="date" id="filtro-data-final" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+
+                <div class="mt-4 flex gap-3">
+                    <button onclick="aplicarFiltros()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        <i class="fas fa-search mr-2"></i>Buscar
+                    </button>
+                    <button onclick="limparFiltros()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                        <i class="fas fa-eraser mr-2"></i>Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total de Notas</p>
+                            <p id="total-notas" class="text-3xl font-bold text-gray-900">0</p>
+                        </div>
+                        <i class="fas fa-file-alt text-4xl text-blue-500"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Autorizadas</p>
+                            <p id="total-autorizadas" class="text-3xl font-bold text-green-600">0</p>
+                        </div>
+                        <i class="fas fa-check-circle text-4xl text-green-500"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Canceladas</p>
+                            <p id="total-canceladas" class="text-3xl font-bold text-red-600">0</p>
+                        </div>
+                        <i class="fas fa-ban text-4xl text-red-500"></i>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Valor Total</p>
+                            <p id="valor-total" class="text-2xl font-bold text-blue-600">R$ 0,00</p>
+                        </div>
+                        <i class="fas fa-dollar-sign text-4xl text-blue-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela de Documentos -->
+            <div class="bg-white rounded-lg shadow-md overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número/Série</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chave de Acesso</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Emissão</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-documentos" class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                                    <i class="fas fa-spinner fa-spin mr-2"></i>Carregando...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Detalhes -->
+    <div id="modal-detalhes" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-2xl font-bold text-gray-900">
+                    <i class="fas fa-file-invoice mr-2 text-blue-600"></i>Detalhes do Documento
+                </h3>
+                <button onclick="fecharModal()" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+
+            <div id="conteudo-detalhes" class="space-y-4">
+                <!-- Conteúdo será preenchido dinamicamente -->
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button onclick="fecharModal()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/services/focus-nfe.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+
+    <script>
+        let documentos = [];
+        let documentosFiltrados = [];
+
+        // ========================================
+        // INICIALIZAÇÃO
+        // ========================================
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Verificar autenticação
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                window.location.href = '../index.html';
+                return;
+            }
+
+            // Renderizar sidebar
+            if (typeof createSidebar === 'function') {
+                const sidebarContainer = document.getElementById('sidebar-container');
+                if (sidebarContainer) {
+                    sidebarContainer.innerHTML = createSidebar();
+                }
+            }
+
+            await carregarDocumentos();
+        });
+
+        // ========================================
+        // CARREGAR DOCUMENTOS
+        // ========================================
+        
+        async function carregarDocumentos() {
+            try {
+                const { data, error } = await supabase
+                    .from('documentos_fiscais')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                documentos = data || [];
+                documentosFiltrados = documentos;
+                
+                atualizarResumo();
+                renderizarTabela();
+
+            } catch (error) {
+                console.error('Erro ao carregar documentos:', error);
+                showToastSafe('Erro ao carregar documentos fiscais', 'error');
+            }
+        }
+
+        // ========================================
+        // FILTROS
+        // ========================================
+        
+        function aplicarFiltros() {
+            const tipo = document.getElementById('filtro-tipo').value;
+            const status = document.getElementById('filtro-status').value;
+            const dataInicial = document.getElementById('filtro-data-inicial').value;
+            const dataFinal = document.getElementById('filtro-data-final').value;
+
+            documentosFiltrados = documentos.filter(doc => {
+                // Filtro tipo
+                if (tipo && doc.tipo_documento !== tipo) return false;
+
+                // Filtro status
+                if (status === 'rejeitado') {
+                    if (doc.status_sefaz === '100' || doc.status_sefaz === '135') return false;
+                } else if (status && doc.status_sefaz !== status) {
+                    return false;
+                }
+
+                // Filtro data inicial
+                if (dataInicial) {
+                    const dataDoc = new Date(doc.data_emissao).toISOString().split('T')[0];
+                    if (dataDoc < dataInicial) return false;
+                }
+
+                // Filtro data final
+                if (dataFinal) {
+                    const dataDoc = new Date(doc.data_emissao).toISOString().split('T')[0];
+                    if (dataDoc > dataFinal) return false;
+                }
+
+                return true;
+            });
+
+            atualizarResumo();
+            renderizarTabela();
+        }
+
+        function limparFiltros() {
+            document.getElementById('filtro-tipo').value = '';
+            document.getElementById('filtro-status').value = '';
+            document.getElementById('filtro-data-inicial').value = '';
+            document.getElementById('filtro-data-final').value = '';
+            
+            documentosFiltrados = documentos;
+            atualizarResumo();
+            renderizarTabela();
+        }
+
+        // ========================================
+        // RESUMO
+        // ========================================
+        
+        function atualizarResumo() {
+            const total = documentosFiltrados.length;
+            const autorizadas = documentosFiltrados.filter(d => d.status_sefaz === '100').length;
+            const canceladas = documentosFiltrados.filter(d => d.status_sefaz === '135').length;
+            const valorTotal = documentosFiltrados.reduce((sum, d) => sum + parseFloat(d.valor_total || 0), 0);
+
+            document.getElementById('total-notas').textContent = total;
+            document.getElementById('total-autorizadas').textContent = autorizadas;
+            document.getElementById('total-canceladas').textContent = canceladas;
+            document.getElementById('valor-total').textContent = formatarMoeda(valorTotal);
+        }
+
+        // ========================================
+        // RENDERIZAR TABELA
+        // ========================================
+        
+        function renderizarTabela() {
+            const tbody = document.getElementById('tbody-documentos');
+            
+            if (documentosFiltrados.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-2"></i>
+                            <p>Nenhum documento fiscal encontrado</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = documentosFiltrados.map(doc => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs font-semibold rounded-full ${
+                            doc.tipo_documento === 'NFCE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                        }">
+                            ${doc.tipo_documento}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${doc.numero_documento || '-'}</div>
+                        <div class="text-xs text-gray-500">Série: ${doc.serie || '-'}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="text-xs font-mono text-gray-600">
+                            ${doc.chave_acesso ? doc.chave_acesso.substring(3, 20) + '...' : 'Sem chave'}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm text-gray-900">${formatarData(doc.data_emissao)}</div>
+                        <div class="text-xs text-gray-500">${formatarHora(doc.data_emissao)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="text-sm font-medium text-gray-900">${formatarMoeda(doc.valor_total)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${getStatusBadge(doc.status_sefaz)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <button onclick="verDetalhes('${doc.id}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Ver Detalhes">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        ${doc.chave_acesso && doc.status_sefaz === '100' ? `
+                            <button onclick="baixarXML('${doc.id}')" class="text-green-600 hover:text-green-900 mr-3" title="Baixar XML">
+                                <i class="fas fa-download"></i>
+                            </button>
+                            <button onclick="imprimirDANFE('${doc.id}')" class="text-purple-600 hover:text-purple-900 mr-3" title="Imprimir DANFE">
+                                <i class="fas fa-print"></i>
+                            </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // ========================================
+        // STATUS BADGE
+        // ========================================
+        
+        function getStatusBadge(status) {
+            if (status === '100') {
+                return '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-check-circle mr-1"></i>Autorizado</span>';
+            } else if (status === '135') {
+                return '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-ban mr-1"></i>Cancelado</span>';
+            } else {
+                return `<span class="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800"><i class="fas fa-exclamation-triangle mr-1"></i>Status ${status}</span>`;
+            }
+        }
+
+        // ========================================
+        // MODAL DETALHES
+        // ========================================
+        
+        function verDetalhes(docId) {
+            const doc = documentos.find(d => d.id === docId);
+            if (!doc) return;
+
+            const conteudo = document.getElementById('conteudo-detalhes');
+            
+            conteudo.innerHTML = `
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="col-span-2 bg-gray-50 p-4 rounded-lg">
+                        <h4 class="font-bold text-lg mb-2">${doc.tipo_documento} ${doc.numero_documento}/${doc.serie}</h4>
+                        <p class="text-sm text-gray-600">${doc.natureza_operacao || 'Sem descrição'}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Chave de Acesso</label>
+                        <p class="text-sm font-mono bg-gray-100 p-2 rounded break-all">${doc.chave_acesso || 'Sem chave'}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Protocolo</label>
+                        <p class="text-sm font-mono bg-gray-100 p-2 rounded">${doc.protocolo_autorizacao || 'Sem protocolo'}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Status SEFAZ</label>
+                        <p class="text-sm">${getStatusBadge(doc.status_sefaz)} ${doc.status_sefaz}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Valor Total</label>
+                        <p class="text-lg font-bold text-blue-600">${formatarMoeda(doc.valor_total)}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Emissão</label>
+                        <p class="text-sm">${formatarDataHora(doc.data_emissao)}</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Data Autorização</label>
+                        <p class="text-sm">${doc.data_autorizacao ? formatarDataHora(doc.data_autorizacao) : 'Não autorizado'}</p>
+                    </div>
+
+                    ${doc.mensagem_sefaz ? `
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Mensagem SEFAZ</label>
+                        <p class="text-sm bg-yellow-50 p-3 rounded border border-yellow-200">${doc.mensagem_sefaz}</p>
+                    </div>
+                    ` : ''}
+
+                    <div class="col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Tentativas de Emissão</label>
+                        <p class="text-sm">${doc.tentativas_emissao || 0} tentativa(s)</p>
+                        ${doc.ultima_tentativa ? `<p class="text-xs text-gray-500">Última: ${formatarDataHora(doc.ultima_tentativa)}</p>` : ''}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('modal-detalhes').classList.remove('hidden');
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-detalhes').classList.add('hidden');
+        }
+
+        // ========================================
+        // AÇÕES
+        // ========================================
+        
+        async function baixarXML(docId) {
+            try {
+                const doc = documentos.find(d => d.id === docId);
+                if (!doc || !doc.chave_acesso) {
+                    showToastSafe('Documento sem chave de acesso', 'error');
+                    return;
+                }
+                if (doc.status_sefaz !== '100') {
+                    showToastSafe('Só é possível baixar XML de notas autorizadas!', 'error');
+                    return;
+                }
+                showToastSafe('Baixando XML...', 'info');
+                const ref = doc.chave_acesso;
+                const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                try {
+                    await FocusNFe.baixarXML(ref, tipo);
+                    showToastSafe('XML baixado com sucesso!', 'success');
+                } catch (err) {
+                    if (err && err.message && err.message.includes('não encontrada')) {
+                        showToastSafe('Nota fiscal não encontrada na SEFAZ/Focus NFe.', 'error');
+                    } else {
+                        showToastSafe('Erro ao baixar XML: ' + (err.message || err), 'error');
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao baixar XML:', error);
+                showToastSafe('Erro ao baixar XML: ' + error.message, 'error');
+            }
+        }
+
+        async function imprimirDANFE(docId) {
+            try {
+                const doc = documentos.find(d => d.id === docId);
+                if (!doc || !doc.chave_acesso) {
+                    showToastSafe('Documento sem chave de acesso', 'error');
+                    return;
+                }
+                if (doc.status_sefaz !== '100') {
+                    showToastSafe('Só é possível imprimir DANFE de notas autorizadas!', 'error');
+                    return;
+                }
+                showToastSafe('Gerando DANFE...', 'info');
+                const ref = doc.chave_acesso;
+                const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                try {
+                    // Baixar PDF e abrir em nova aba
+                    const url = await FocusNFe.baixarDANFE(ref, tipo);
+                    window.open(url, '_blank');
+                    showToastSafe('DANFE gerado!', 'success');
+                } catch (err) {
+                    showToastSafe('Erro ao gerar DANFE: ' + (err.message || err), 'error');
+                }
+            } catch (error) {
+                console.error('Erro ao gerar DANFE:', error);
+                showToastSafe('Erro ao gerar DANFE: ' + error.message, 'error');
+            }
+        }
+
+        // ========================================
+        // UTILITÁRIOS
+        // ========================================
+        
+        function formatarMoeda(valor) {
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(valor || 0);
+        }
+
+        function formatarData(data) {
+            if (!data) return '-';
+            return new Date(data).toLocaleDateString('pt-BR');
+        }
+
+        function formatarHora(data) {
+            if (!data) return '-';
+            return new Date(data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function formatarDataHora(data) {
+            if (!data) return '-';
+            return new Date(data).toLocaleString('pt-BR');
+        }
+
+        function showToastSafe(message, type = 'info') {
+            // Reutilizar toast do sistema (se existir e não for esta função)
+            if (window.showToast && window.showToast !== showToastSafe) {
+                window.showToast(message, type);
+            } else {
+                alert(message);
+            }
+        }
+    </script>
+</body>
+</html>

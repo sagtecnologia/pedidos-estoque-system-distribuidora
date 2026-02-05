@@ -136,6 +136,7 @@
     <script src="../js/session-manager.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/services/focus-nfe.js"></script>
     <script src="../js/services/pedidos.js"></script>
     <script src="../js/services/clientes.js"></script>
     <script src="../components/navbar.js"></script>
@@ -434,6 +435,8 @@
         // Gerar Nota Fiscal (NFC-e)
         async function gerarNotaFiscal(vendaId) {
             try {
+                showLoading(true);
+                
                 // Buscar dados da venda
                 const { data: venda, error: erroVenda } = await supabase
                     .from('vendas')
@@ -446,63 +449,89 @@
                     return;
                 }
 
-                // Buscar itens com produtos
-                const { data: itens } = await supabase
+                // Buscar itens
+                const { data: itens, error: erroItens } = await supabase
                     .from('venda_itens')
+                    .select('*, produtos(*)')
+                    .eq('venda_id', vendaId);
+
+                if (erroItens || !itens || itens.length === 0) {
+                    alert('Erro ao carregar itens da venda');
+                    return;
+                }
+
+
+                // Buscar pagamentos
+                const { data: pagamentos, error: erroPag } = await supabase
+                    .from('pagamentos')
                     .select('*')
                     .eq('venda_id', vendaId);
-                
-                // Carregar produtos para cada item
-                for (let item of itens || []) {
-                    if (item.produto_id) {
-                        const { data: produto } = await supabase
-                            .from('produtos')
-                            .select('*')
-                            .eq('id', item.produto_id)
-                            .single();
-                        item.produtos = produto;
-                    }
-                }
-                venda.venda_itens = itens || [];
 
-                // Buscar cliente
+                if (erroPag || !pagamentos || pagamentos.length === 0) {
+                    alert('Erro ao carregar formas de pagamento');
+                    return;
+                }
+
+                // Buscar cliente (opcional)
+                let cliente = null;
                 if (venda.cliente_id) {
-                    const { data: cliente } = await supabase
+                    const { data: clienteData } = await supabase
                         .from('clientes')
                         .select('*')
                         .eq('id', venda.cliente_id)
                         .single();
-                    venda.clientes = cliente;
+                    cliente = clienteData;
                 }
 
-                // Verificar configurações da empresa
-                const { data: config, error: erroConfig } = await supabase
-                    .from('empresa_config')
-                    .select('*')
-                    .single();
+                console.log('📦 Venda:', venda);
+                console.log('📋 Itens:', itens);
+                console.log('💰 Pagamentos:', pagamentos);
 
-                if (erroConfig || !config) {
-                    alert('Configure os dados da empresa antes de emitir NFC-e.');
-                    return;
+                // Emitir NFC-e via Focus NFe (NÃO precisa de certificado digital)
+                const resultado = await FocusNFe.emitirNFCe(venda, itens, pagamentos, cliente);
+
+                console.log('📤 Resultado da emissão:', resultado);
+
+                // Verificar sucesso
+                if (resultado.success || resultado.status === 'autorizado') {
+                    // Atualizar status da venda
+                    await supabase
+                        .from('vendas')
+                        .update({
+                            status_fiscal: 'EMITIDA_NFCE',
+                            numero_nfce: resultado.numero,
+                            chave_acesso_nfce: resultado.chave_nfe,
+                            protocolo_nfce: resultado.protocolo
+                        })
+                        .eq('id', vendaId);
+
+                    alert(`✅ NFC-e emitida com sucesso!
+
+Número: ${resultado.numero}
+Série: ${resultado.serie}
+Chave: ${resultado.chave_nfe}
+Protocolo: ${resultado.protocolo}
+
+Deseja baixar o DANFE (PDF)?`);
+
+                    // Baixar DANFE automaticamente
+                    if (confirm('Baixar DANFE agora?')) {
+                        await resultado.baixarDANFE();
+                    }
+
+                    // Recarregar lista
+                    carregarVendas();
+                } else {
+                    // Erro na emissão
+                    const mensagem = resultado.mensagem_sefaz || resultado.mensagem || 'Erro desconhecido';
+                    throw new Error('Rejeição: ' + mensagem);
                 }
 
-                // Verificar certificado digital
-                if (!config.certificado_digital || !config.senha_certificado) {
-                    alert('Certificado digital não configurado. Acesse Configurações da Empresa.');
-                    return;
-                }
-
-                // Verificar CSC
-                if (!config.csc_id || !config.csc_token) {
-                    alert('CSC não configurado. Acesse Configurações da Empresa.');
-                    return;
-                }
-
-                // Estrutura pronta - Aguardando integração
-                alert(`Emissão de NFC-e em desenvolvimento.\n\nVenda: ${venda.numero}\nCliente: ${venda.clientes?.nome || 'N/A'}\nTotal: R$ ${venda.total.toFixed(2)}\n\nEstrutura pronta:\n✓ Certificado configurado\n✓ CSC configurado\n✓ Dados da venda carregados\n\nPróximo passo: Integrar com API SEFAZ`);
             } catch (error) {
-                console.error('Erro ao gerar nota fiscal:', error);
-                alert('Erro ao preparar nota fiscal: ' + error.message);
+                console.error('❌ Erro na emissão:', error);
+                alert('❌ Erro na emissão: ' + error.message);
+            } finally {
+                showLoading(false);
             }
         }
     </script>

@@ -277,12 +277,42 @@
                     </p>
                 </div>
                 
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-                    <p class="text-sm text-yellow-800">
-                        <i class="fas fa-exclamation-triangle mr-2"></i>
-                        <strong>Nota:</strong> A consulta por chave de acesso requer integração com a SEFAZ ou com serviço de consulta NFe (Focus NFe). 
-                        Certifique-se de que as credenciais estão configuradas.
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                    <p class="text-sm text-green-800">
+                        <i class="fas fa-check-circle mr-2"></i>
+                        <strong>Integração Ativa:</strong> Sistema integrado com Focus NFe para consulta automática de NFe na SEFAZ. 
+                        Insira a chave e clique em "Consultar NFe" para importar os dados automaticamente!
                     </p>
+                </div>
+
+                <!-- Resultado da Consulta -->
+                <div id="resultado-consulta" class="hidden mt-4 space-y-4">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="font-bold text-blue-900 mb-2">
+                            <i class="fas fa-file-invoice mr-2"></i>Dados da NFe Consultada
+                        </h4>
+                        <div id="nfe-dados" class="grid grid-cols-2 gap-3 text-sm">
+                            <!-- Preenchido dinamicamente -->
+                        </div>
+                    </div>
+
+                    <div class="bg-white border border-gray-300 rounded-lg p-4">
+                        <h4 class="font-bold text-gray-900 mb-3">
+                            <i class="fas fa-box mr-2"></i>Produtos da Nota (<span id="total-itens">0</span> itens)
+                        </h4>
+                        <div id="nfe-itens" class="max-h-60 overflow-y-auto space-y-2">
+                            <!-- Preenchido dinamicamente -->
+                        </div>
+                    </div>
+
+                    <div class="flex gap-3">
+                        <button type="button" onclick="baixarXMLTerceiro()" class="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                            <i class="fas fa-download mr-2"></i>Baixar XML
+                        </button>
+                        <button type="button" onclick="criarPedidoDaNFe()" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                            <i class="fas fa-shopping-cart mr-2"></i>Criar Pedido e Dar Entrada
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50">
@@ -337,6 +367,7 @@
     <script src="../js/session-manager.js"></script>
     <script src="../js/utils.js"></script>
     <script src="../js/auth.js"></script>
+    <script src="../js/services/focus-nfe.js"></script>
     <script src="../js/services/pedidos.js"></script>
     <script src="../js/services/fornecedores.js"></script>
     <script src="../js/services/produtos.js"></script>
@@ -825,7 +856,7 @@
                 const { data: pedidoExistente } = await supabase
                     .from('pedidos_compra')
                     .select('id, numero, status')
-                    .eq('chave_nfe', dadosXMLImportado.chave)
+                    .eq('nf_chave', dadosXMLImportado.chave)
                     .maybeSingle();
                 
                 if (pedidoExistente) {
@@ -1039,8 +1070,8 @@
                     usuario_id: user.id,
                     status: 'PENDENTE',
                     total: dadosXMLImportado.total_nf || dadosXMLImportado.total_produtos || 0,
-                    chave_nfe: dadosXMLImportado.chave,
-                    numero_nf: dadosXMLImportado.numero_nf,
+                    nf_chave: dadosXMLImportado.chave,
+                    nf_numero: dadosXMLImportado.numero_nf,
                     observacoes: `Importado via XML NF-e ${dadosXMLImportado.numero_nf || 'S/N'} - Chave: ${dadosXMLImportado.chave || 'N/A'}`
                 };
                 
@@ -1097,7 +1128,7 @@
                     .from('importacao_xml_log')
                     .insert([{
                         arquivo_nome: dadosXMLImportado.arquivo_nome || 'xml-upload.xml',
-                        chave_nfe: dadosXMLImportado.chave,
+                        nf_chave: dadosXMLImportado.chave,
                         numero_nfe: dadosXMLImportado.numero_nf,
                         fornecedor_id: fornecedorId,
                         fornecedor_cnpj: dadosXMLImportado.fornecedor?.cnpj,
@@ -1127,7 +1158,7 @@
                         .from('importacao_xml_log')
                         .insert([{
                             arquivo_nome: dadosXMLImportado?.arquivo_nome || 'xml-upload.xml',
-                            chave_nfe: dadosXMLImportado?.chave,
+                            nf_chave: dadosXMLImportado?.chave,
                             numero_nfe: dadosXMLImportado?.numero_nf,
                             fornecedor_cnpj: dadosXMLImportado?.fornecedor?.cnpj,
                             fornecedor_nome: dadosXMLImportado?.fornecedor?.razao_social,
@@ -1236,35 +1267,306 @@
             return ufs[codigo] || codigo;
         }
 
+        let nfeConsultada = null; // Armazena dados da NFe consultada
+
         async function consultarPorChave() {
-            const chave = document.getElementById('input-chave-nfe').value;
+            const chave = document.getElementById('input-chave-nfe').value.replace(/\D/g, '');
             
             if (chave.length !== 44) {
-                showToast('Chave de acesso inválida', 'error');
+                showToast('Chave de acesso inválida. Deve ter 44 dígitos.', 'error');
                 return;
             }
 
-            showLoading(true);
+            const btnConsultar = document.getElementById('btn-consultar-chave');
+            btnConsultar.disabled = true;
+            btnConsultar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Consultando...';
             
             try {
-                // Tentar consultar via Focus NFe ou outro serviço
-                // Por enquanto, apenas mostrar mensagem informativa
+                showToast('Consultando NFe na SEFAZ via Focus NFe...', 'info');
                 
-                showToast('Funcionalidade de consulta SEFAZ em desenvolvimento. Por favor, use a importação por XML.', 'info');
+                // Consultar via Focus NFe (sem precisar de certificado no navegador!)
+                const resultado = await FocusNFe.consultarNFeTerceiro(chave);
                 
-                // Quando implementado:
-                // const response = await consultarNFeSefaz(chave);
-                // dadosXMLImportado = processarRespostaSefaz(response);
-                // closeModal('modal-importar-chave');
-                // abrirModalImportarXML();
-                // exibirPreviewXML();
+                console.log('📦 NFe consultada:', resultado);
+
+                if (!resultado.success) {
+                    throw new Error(resultado.mensagem || 'Erro ao consultar NFe');
+                }
+
+                nfeConsultada = resultado;
+
+                // Exibir dados da NFe
+                exibirDadosNFe(resultado);
+                
+                showToast('NFe consultada com sucesso!', 'success');
                 
             } catch (error) {
                 console.error('Erro ao consultar chave:', error);
                 showToast('Erro ao consultar NFe: ' + error.message, 'error');
+                document.getElementById('resultado-consulta').classList.add('hidden');
+            } finally {
+                btnConsultar.disabled = false;
+                btnConsultar.innerHTML = '<i class="fas fa-search mr-2"></i>Consultar NFe';
+            }
+        }
+
+        function exibirDadosNFe(nfe) {
+            const divDados = document.getElementById('nfe-dados');
+            const divItens = document.getElementById('nfe-itens');
+            const divResultado = document.getElementById('resultado-consulta');
+
+            // Extrair dados principais
+            const emitente = nfe.emitente || nfe.emit || {};
+            const destinatario = nfe.destinatario || nfe.dest || {};
+            const total = nfe.total || nfe.ICMSTot || {};
+            const itens = nfe.itens || nfe.det || [];
+
+            // Exibir dados principais
+            divDados.innerHTML = `
+                <div class="col-span-2 font-bold text-blue-900 border-b pb-2">Emitente</div>
+                <div><strong>Razão Social:</strong> ${emitente.razao_social || emitente.xNome || '-'}</div>
+                <div><strong>CNPJ:</strong> ${formatarCNPJ(emitente.cnpj || emitente.CNPJ || '-')}</div>
+                
+                <div class="col-span-2 font-bold text-blue-900 border-b pb-2 mt-2">Nota Fiscal</div>
+                <div><strong>Número:</strong> ${nfe.numero || nfe.nNF || '-'}</div>
+                <div><strong>Série:</strong> ${nfe.serie || nfe.serie || '-'}</div>
+                <div><strong>Data Emissão:</strong> ${formatarData(nfe.data_emissao || nfe.dhEmi)}</div>
+                <div><strong>Natureza:</strong> ${nfe.natureza_operacao || nfe.natOp || '-'}</div>
+                
+                <div class="col-span-2 font-bold text-blue-900 border-b pb-2 mt-2">Valores</div>
+                <div><strong>Total Produtos:</strong> R$ ${formatarValor(total.valor_produtos || total.vProd || 0)}</div>
+                <div><strong>Total NFe:</strong> <span class="text-lg font-bold text-green-600">R$ ${formatarValor(total.valor_nfe || total.vNF || 0)}</span></div>
+            `;
+
+            // Exibir itens
+            document.getElementById('total-itens').textContent = itens.length;
+            
+            divItens.innerHTML = itens.map((item, i) => {
+                const prod = item.produto || item.prod || {};
+                return `
+                    <div class="flex items-center justify-between bg-gray-50 p-3 rounded border border-gray-200">
+                        <div class="flex-1">
+                            <div class="font-medium text-gray-900">${prod.descricao || prod.xProd || 'Sem descrição'}</div>
+                            <div class="text-xs text-gray-500">
+                                Código: ${prod.codigo || prod.cProd || '-'} | 
+                                EAN: ${prod.codigo_barras || prod.cEAN || '-'} |
+                                Qtd: ${formatarQuantidade(prod.quantidade_comercial || prod.qCom || 0)} ${prod.unidade_comercial || prod.uCom || 'UN'}
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-gray-900">R$ ${formatarValor(prod.valor_unitario_comercial || prod.vUnCom || 0)}</div>
+                            <div class="text-xs text-gray-500">Total: R$ ${formatarValor(prod.valor_bruto || prod.vProd || 0)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            divResultado.classList.remove('hidden');
+        }
+
+        async function baixarXMLTerceiro() {
+            if (!nfeConsultada) {
+                showToast('Nenhuma NFe consultada', 'error');
+                return;
+            }
+
+            try {
+                showToast('Baixando XML...', 'info');
+                
+                const xml = await FocusNFe.baixarXMLTerceiro(nfeConsultada.chave);
+                
+                // Criar blob e fazer download
+                const blob = new Blob([xml], { type: 'application/xml' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `NFe-${nfeConsultada.chave}.xml`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                showToast('XML baixado com sucesso!', 'success');
+
+            } catch (error) {
+                console.error('Erro ao baixar XML:', error);
+                showToast('Erro ao baixar XML: ' + error.message, 'error');
+            }
+        }
+
+        async function criarPedidoDaNFe() {
+            if (!nfeConsultada) {
+                showToast('Nenhuma NFe consultada', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                showToast('Criando pedido e dando entrada no estoque...', 'info');
+
+                const emitente = nfeConsultada.emitente || nfeConsultada.emit || {};
+                const itens = nfeConsultada.itens || nfeConsultada.det || [];
+                const total = nfeConsultada.total || nfeConsultada.ICMSTot || {};
+
+                // 1. Buscar ou criar fornecedor
+                const cnpjEmitente = (emitente.cnpj || emitente.CNPJ || '').replace(/\D/g, '');
+                let fornecedor = await buscarOuCriarFornecedor({
+                    nome: emitente.razao_social || emitente.xNome || 'Fornecedor Importado',
+                    cnpj: cnpjEmitente,
+                    telefone: emitente.telefone || emitente.fone || '',
+                    email: emitente.email || ''
+                });
+
+                // 2. Criar pedido de compra
+                const { data: pedido, error: pedidoError } = await supabase
+                    .from('pedidos_compra')
+                    .insert([{
+                        fornecedor_id: fornecedor.id,
+                        data_pedido: new Date().toISOString(),
+                        data_entrega_prevista: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        status: 'RECEBIDO',
+                        valor_total: parseFloat(total.valor_nfe || total.vNF || 0),
+                            nf_chave: nfeConsultada.chave,
+                            observacoes: `Importado da NFe ${nfeConsultada.numero || nfeConsultada.nNF} - Chave: ${nfeConsultada.chave}`
+                    }])
+                    .select()
+                    .single();
+
+                if (pedidoError) throw pedidoError;
+
+                // 3. Processar itens e dar entrada no estoque
+                let itensProcessados = 0;
+                let itensCriados = 0;
+
+                for (const item of itens) {
+                    const prod = item.produto || item.prod || {};
+                    
+                    // Buscar ou criar produto
+                    let produto = await buscarOuCriarProduto({
+                        codigo_barras: prod.codigo_barras || prod.cEAN || prod.codigo || prod.cProd || '',
+                        nome: prod.descricao || prod.xProd || 'Produto Importado',
+                        preco_custo: parseFloat(prod.valor_unitario_comercial || prod.vUnCom || 0),
+                        preco_venda: parseFloat(prod.valor_unitario_comercial || prod.vUnCom || 0) * 1.3, // Markup 30%
+                        unidade: prod.unidade_comercial || prod.uCom || 'UN',
+                        ncm: prod.ncm || prod.NCM || ''
+                    });
+
+                    // Adicionar item ao pedido
+                    await supabase.from('pedido_itens').insert([{
+                        pedido_id: pedido.id,
+                        produto_id: produto.id,
+                        quantidade: parseFloat(prod.quantidade_comercial || prod.qCom || 0),
+                        preco_unitario: parseFloat(prod.valor_unitario_comercial || prod.vUnCom || 0),
+                        subtotal: parseFloat(prod.valor_bruto || prod.vProd || 0)
+                    }]);
+
+                    // Dar entrada no estoque
+                    await supabase.from('movimentacoes_estoque').insert([{
+                        produto_id: produto.id,
+                        tipo_movimentacao: 'ENTRADA',
+                        quantidade: parseFloat(prod.quantidade_comercial || prod.qCom || 0),
+                        motivo: `Entrada NFe ${nfeConsultada.numero || nfeConsultada.nNF} - Pedido #${pedido.id}`,
+                        pedido_id: pedido.id
+                    }]);
+
+                    itensProcessados++;
+                }
+
+                showToast(`✅ Pedido criado! ${itensProcessados} produtos processados e entrada no estoque realizada!`, 'success');
+                
+                // Fechar modal e recarregar
+                closeModal('modal-importar-chave');
+                await carregarPedidos();
+
+                // Limpar dados
+                nfeConsultada = null;
+                document.getElementById('input-chave-nfe').value = '';
+                document.getElementById('resultado-consulta').classList.add('hidden');
+
+            } catch (error) {
+                console.error('Erro ao criar pedido:', error);
+                showToast('Erro ao criar pedido: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
+        }
+
+        async function buscarOuCriarFornecedor(dados) {
+            // Buscar por CNPJ
+            const { data: existente } = await supabase
+                .from('fornecedores')
+                .select('*')
+                .eq('cnpj', dados.cnpj)
+                .single();
+
+            if (existente) return existente;
+
+            // Criar novo
+            const { data: novo, error } = await supabase
+                .from('fornecedores')
+                .insert([{
+                    nome: dados.nome,
+                    cnpj: dados.cnpj,
+                    telefone: dados.telefone,
+                    email: dados.email,
+                    ativo: true
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return novo;
+        }
+
+        async function buscarOuCriarProduto(dados) {
+            // Buscar por código de barras ou nome
+            let query = supabase.from('produtos').select('*');
+            
+            if (dados.codigo_barras) {
+                query = query.eq('codigo_barras', dados.codigo_barras);
+            } else {
+                query = query.ilike('nome', `%${dados.nome}%`);
+            }
+
+            const { data: existente } = await query.maybeSingle();
+
+            if (existente) return existente;
+
+            // Criar novo
+            const { data: novo, error } = await supabase
+                .from('produtos')
+                .insert([{
+                    nome: dados.nome,
+                    codigo_barras: dados.codigo_barras,
+                    preco_custo: dados.preco_custo,
+                    preco_venda: dados.preco_venda,
+                    unidade: dados.unidade,
+                    ncm: dados.ncm,
+                    ativo: true,
+                    estoque_atual: 0
+                }])
+                .select()
+                .single();
+
+            if (error) throw error;
+            return novo;
+        }
+
+        function formatarCNPJ(cnpj) {
+            if (!cnpj) return '-';
+            const num = cnpj.replace(/\D/g, '');
+            return num.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+        }
+
+        function formatarValor(valor) {
+            return parseFloat(valor || 0).toFixed(2).replace('.', ',');
+        }
+
+        function formatarQuantidade(qtd) {
+            return parseFloat(qtd || 0).toFixed(2).replace('.', ',');
+        }
+
+        function formatarData(data) {
+            if (!data) return '-';
+            return new Date(data).toLocaleDateString('pt-BR');
         }
 
         // ========================================

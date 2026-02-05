@@ -270,8 +270,8 @@
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Ambiente *</label>
-                            <select id="nfe_ambiente" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Ambiente Focus NFe *</label>
+                            <select id="focusnfe_ambiente" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
                                 <option value="2">2 - Homologação (Testes)</option>
                                 <option value="1">1 - Produção</option>
                             </select>
@@ -287,7 +287,10 @@
                         <div class="md:col-span-2">
                             <label class="block text-sm font-medium text-gray-700 mb-2">Token de API Focus NFe *</label>
                             <div class="flex gap-2">
-                                <input type="password" id="nfe_token" placeholder="Seu token da API Focus NFe" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                <input type="password" id="focusnfe_token" placeholder="Seu token da API Focus NFe" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                <button type="button" onclick="togglePasswordVisibility('focusnfe_token')" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                                    <i class="fas fa-eye" id="focusnfe_token-icon"></i>
+                                </button>
                                 <button type="button" onclick="testarConexaoNFe()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
                                     <i class="fas fa-plug mr-2"></i>Testar
                                 </button>
@@ -313,6 +316,31 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Próximo Número NF-e</label>
                             <input type="number" id="nfe_numero" value="1" min="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <!-- Configurações CSC (NFC-e) -->
+                    <div class="mt-6 pt-4 border-t">
+                        <h4 class="text-md font-semibold text-gray-800 mb-3">🔑 CSC - Código de Segurança do Contribuinte (NFC-e)</h4>
+                        <p class="text-sm text-gray-600 mb-3">Obrigatório para emissão de NFC-e. Obtido no portal da SEFAZ.</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">CSC ID (Token ID)</label>
+                                <input type="text" id="csc_id" placeholder="000001" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                <p class="text-xs text-gray-500 mt-1">ID do token CSC (geralmente 000001)</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">CSC Token (Código)</label>
+                                <div class="flex gap-2">
+                                    <input type="password" id="csc_token" placeholder="Código CSC da SEFAZ" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                    <button type="button" onclick="togglePasswordVisibility('csc_token')" class="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                                        <i class="fas fa-eye" id="csc_token-icon"></i>
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-1">Token CSC fornecido pela SEFAZ</p>
+                            </div>
                         </div>
                     </div>
 
@@ -362,9 +390,24 @@
                     <p class="text-sm text-gray-600 mb-4">Opções para o Ponto de Venda</p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <div class="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <input type="checkbox" id="pdv_emitir_nfce_automatico" class="w-5 h-5 text-teal-600 rounded">
+                                <label for="pdv_emitir_nfce_automatico" class="text-sm font-semibold text-blue-900">
+                                    <i class="fas fa-file-invoice mr-2"></i>Emitir NFC-e automaticamente ao finalizar venda no PDV
+                                </label>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 ml-1">Se marcado, a NFC-e será emitida automaticamente após finalizar a venda</p>
+                        </div>
+
                         <div class="flex items-center gap-3">
-                            <input type="checkbox" id="pdv_emitir_nfce" class="w-4 h-4 text-teal-600 rounded">
-                            <label for="pdv_emitir_nfce" class="text-sm font-medium text-gray-700">Emitir NFC-e automaticamente nas vendas</label>
+                            <input type="checkbox" id="habilitar_nfce" class="w-4 h-4 text-teal-600 rounded">
+                            <label for="habilitar_nfce" class="text-sm font-medium text-gray-700">Habilitar módulo de NFC-e</label>
+                        </div>
+
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" id="habilitar_cupom_fiscal" class="w-4 h-4 text-teal-600 rounded">
+                            <label for="habilitar_cupom_fiscal" class="text-sm font-medium text-gray-700">Habilitar impressão de cupom fiscal</label>
                         </div>
 
                         <div class="flex items-center gap-3">
@@ -390,6 +433,47 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Mensagem no Cupom</label>
                             <input type="text" id="pdv_mensagem_cupom" placeholder="Obrigado pela preferência!" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                        </div>
+                    </div>
+
+                    <!-- Alertas e Avisos -->
+                    <div class="mt-6 pt-4 border-t">
+                        <h4 class="text-md font-semibold text-gray-800 mb-3">⚠️ Alertas e Notificações</h4>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" id="alerta_estoque_minimo" class="w-4 h-4 text-teal-600 rounded">
+                                <label for="alerta_estoque_minimo" class="text-sm font-medium text-gray-700">Alertar quando estoque atingir mínimo</label>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Dias para alertar validade de produtos</label>
+                                <input type="number" id="dias_alerta_validade" value="30" min="1" max="365" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                <p class="text-xs text-gray-500 mt-1">Alertar quando faltar X dias para vencer</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personalização Visual -->
+                    <div class="mt-6 pt-4 border-t">
+                        <h4 class="text-md font-semibold text-gray-800 mb-3">🎨 Personalização Visual</h4>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Cor Primária (Hex)</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="cor_primaria_picker" class="h-10 w-16 border border-gray-300 rounded cursor-pointer">
+                                    <input type="text" id="cor_primaria" placeholder="#0D9488" maxlength="7" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Cor Secundária (Hex)</label>
+                                <div class="flex gap-2">
+                                    <input type="color" id="cor_secundaria_picker" class="h-10 w-16 border border-gray-300 rounded cursor-pointer">
+                                    <input type="text" id="cor_secundaria" placeholder="#06B6D4" maxlength="7" class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -535,18 +619,34 @@
                 endereco_numero: document.getElementById('endereco_numero').value?.trim() || null,
                 bairro: document.getElementById('bairro').value?.trim() || null,
                 logradouro: document.getElementById('logradouro').value?.trim() || null,
-                nfe_ambiente: document.getElementById('nfe_ambiente').value || '2',
-                nfe_token: document.getElementById('nfe_token').value?.trim() || null,
+                // Focus NFe
+                focusnfe_token: document.getElementById('focusnfe_token').value?.trim() || null,
+                focusnfe_ambiente: parseInt(document.getElementById('focusnfe_ambiente').value) || 2,
                 nfce_serie: parseInt(document.getElementById('nfce_serie').value) || 1,
                 nfe_serie: parseInt(document.getElementById('nfe_serie').value) || 1,
                 nfce_numero: parseInt(document.getElementById('nfce_numero').value) || 1,
                 nfe_numero: parseInt(document.getElementById('nfe_numero').value) || 1,
-                certificado_senha: document.getElementById('certificado_senha').value?.trim() || null,
+                // CSC - NFC-e
+                csc_id: document.getElementById('csc_id').value?.trim() || null,
+                csc_token: document.getElementById('csc_token').value?.trim() || null,
+                // Certificado (campos que existem no banco)
+                senha_certificado: document.getElementById('certificado_senha').value?.trim() || null,
+                // PDV
+                pdv_emitir_nfce_automatico: document.getElementById('pdv_emitir_nfce_automatico').checked,
+                habilitar_nfce: document.getElementById('habilitar_nfce').checked,
+                habilitar_cupom_fiscal: document.getElementById('habilitar_cupom_fiscal').checked,
                 pdv_imprimir_cupom: document.getElementById('pdv_imprimir_cupom').checked,
                 pdv_permitir_venda_zerado: document.getElementById('pdv_permitir_venda_zerado').checked,
                 pdv_desconto_maximo: document.getElementById('pdv_desconto_maximo').checked,
                 pdv_desconto_limite: parseFloat(document.getElementById('pdv_desconto_limite').value) || 10,
                 pdv_mensagem_cupom: document.getElementById('pdv_mensagem_cupom').value?.trim() || null,
+                // Alertas
+                alerta_estoque_minimo: document.getElementById('alerta_estoque_minimo').checked,
+                dias_alerta_validade: parseInt(document.getElementById('dias_alerta_validade').value) || 30,
+                // Cores
+                cor_primaria: document.getElementById('cor_primaria').value?.trim() || null,
+                cor_secundaria: document.getElementById('cor_secundaria').value?.trim() || null,
+                // WhatsApp
                 whatsapp_api_provider: document.getElementById('whatsapp_api_provider').value || null,
                 whatsapp_numero_origem: document.getElementById('whatsapp_numero_origem').value?.trim() || null,
                 whatsapp_api_url: document.getElementById('whatsapp_api_url').value?.trim() || null,
@@ -671,13 +771,20 @@
                     document.getElementById('endereco_numero').value = config.endereco_numero || '';
                     document.getElementById('bairro').value = config.bairro || '';
                     document.getElementById('logradouro').value = config.logradouro || '';
-                    document.getElementById('nfe_ambiente').value = config.nfe_ambiente || '2';
-                    document.getElementById('nfe_token').value = config.nfe_token || '';
+                    // Focus NFe
+                    document.getElementById('focusnfe_token').value = config.focusnfe_token || '';
+                    document.getElementById('focusnfe_ambiente').value = config.focusnfe_ambiente || 2;
                     document.getElementById('nfce_serie').value = config.nfce_serie || 1;
                     document.getElementById('nfe_serie').value = config.nfe_serie || 1;
                     document.getElementById('nfce_numero').value = config.nfce_numero || 1;
                     document.getElementById('nfe_numero').value = config.nfe_numero || 1;
-                    document.getElementById('pdv_emitir_nfce').checked = config.pdv_emitir_nfce || false;
+                    // CSC
+                    document.getElementById('csc_id').value = config.csc_id || '';
+                    document.getElementById('csc_token').value = config.csc_token || '';
+                    // PDV
+                    document.getElementById('pdv_emitir_nfce_automatico').checked = config.pdv_emitir_nfce_automatico || false;
+                    document.getElementById('habilitar_nfce').checked = config.habilitar_nfce || false;
+                    document.getElementById('habilitar_cupom_fiscal').checked = config.habilitar_cupom_fiscal || false;
                     document.getElementById('pdv_imprimir_cupom').checked = config.pdv_imprimir_cupom !== false;
                     document.getElementById('pdv_permitir_venda_zerado').checked = config.pdv_permitir_venda_zerado || false;
                     document.getElementById('pdv_desconto_maximo').checked = config.pdv_desconto_maximo || false;
@@ -688,10 +795,24 @@
                     document.getElementById('whatsapp_api_url').value = config.whatsapp_api_url || '';
                     document.getElementById('whatsapp_api_key').value = config.whatsapp_api_key || '';
                     document.getElementById('whatsapp_instance_id').value = config.whatsapp_instance_id || '';
-                    document.getElementById('certificado_senha').value = config.certificado_senha || '';
+                    // Certificado
+                    document.getElementById('certificado_senha').value = config.senha_certificado || '';
+                    // Alertas
+                    document.getElementById('alerta_estoque_minimo').checked = config.alerta_estoque_minimo || false;
+                    document.getElementById('dias_alerta_validade').value = config.dias_alerta_validade || 30;
+                    // Cores
+                    document.getElementById('cor_primaria').value = config.cor_primaria || '#0D9488';
+                    document.getElementById('cor_primaria_picker').value = config.cor_primaria || '#0D9488';
+                    document.getElementById('cor_secundaria').value = config.cor_secundaria || '#06B6D4';
+                    document.getElementById('cor_secundaria_picker').value = config.cor_secundaria || '#06B6D4';
                     
                     // Exibir informações do certificado se existir
-                    if (config.certificado_base64) {
+                    console.log('Verificando certificado:', {
+                        temCertificado: !!config.certificado_digital,
+                        validade: config.certificado_validade
+                    });
+                    
+                    if (config.certificado_digital) {
                         const validadeInfo = config.certificado_validade 
                             ? ` - Validade: ${new Date(config.certificado_validade).toLocaleDateString('pt-BR')}` 
                             : '';
@@ -800,8 +921,8 @@
         }
 
         async function testarConexaoNFe() {
-            const token = document.getElementById('nfe_token').value;
-            const ambiente = document.getElementById('nfe_ambiente').value;
+            const token = document.getElementById('focusnfe_token').value;
+            const ambiente = document.getElementById('focusnfe_ambiente').value;
             
             if (!token) {
                 showToast('Informe o token da API Focus NFe', 'error');
@@ -812,7 +933,7 @@
                 showLoading(true);
                 
                 // Endpoint Focus NFe para teste: consultar empresa
-                const baseUrl = ambiente === '1' 
+                const baseUrl = ambiente === '1' || ambiente === 1 
                     ? 'https://api.focusnfe.com.br' 
                     : 'https://homologacao.focusnfe.com.br';
                 
@@ -847,8 +968,8 @@
         async function enviarCertificado() {
             const fileInput = document.getElementById('certificado_input');
             const senha = document.getElementById('certificado_senha').value;
-            const token = document.getElementById('nfe_token').value;
-            const ambiente = document.getElementById('nfe_ambiente').value;
+            const token = document.getElementById('focusnfe_token').value;
+            const ambiente = document.getElementById('focusnfe_ambiente').value;
 
             if (!fileInput.files || !fileInput.files[0]) {
                 showToast('Selecione o arquivo do certificado (.pfx)', 'error');
@@ -900,12 +1021,20 @@
                             if (response.ok) {
                                 // Salvar informações do certificado no banco
                                 const configData = {
-                                    certificado_base64: base64,
-                                    certificado_senha: senha,
+                                    certificado_digital: base64,
+                                    senha_certificado: senha,
                                     certificado_validade: result.validade || null
                                 };
                                 
-                                await updateEmpresaConfig(configData);
+                                console.log('Salvando certificado no banco:', {
+                                    temCertificado: !!base64,
+                                    tamanhoCertificado: base64?.length,
+                                    temSenha: !!senha,
+                                    validade: result.validade
+                                });
+                                
+                                const savedConfig = await updateEmpresaConfig(configData);
+                                console.log('Certificado salvo com sucesso:', savedConfig);
                                 
                                 const validadeInfo = result.validade 
                                     ? ` - Validade: ${new Date(result.validade).toLocaleDateString('pt-BR')}` 
@@ -930,21 +1059,30 @@
                                 
                                 showToast('✓ Certificado enviado e configurado com sucesso!', 'success');
                             } else {
-                                throw new Error(result.mensagem || result.erro || 'Erro ao enviar certificado');
+                                const errorMsg = result.mensagem || result.erro || 'Erro ao enviar certificado';
+                                console.error('Erro da Focus NFe:', result);
+                                throw new Error(errorMsg);
                             }
                             
                             resolve();
                         } catch (err) {
+                            console.error('Erro ao processar certificado:', err);
                             reject(err);
                         }
                     };
                     
-                    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+                    reader.onerror = () => {
+                        console.error('Erro ao ler arquivo');
+                        reject(new Error('Erro ao ler arquivo'));
+                    };
                 });
                 
             } catch (error) {
                 console.error('Erro ao enviar certificado:', error);
-                showToast('Erro ao enviar certificado: ' + error.message, 'error');
+                const errorMsg = error.message.includes('CORS') || error.message.includes('Failed to fetch')
+                    ? 'Erro de CORS - Use uma extensão CORS Unblock ou configure via backend'
+                    : error.message;
+                showToast('Erro ao enviar certificado: ' + errorMsg, 'error');
             } finally {
                 showLoading(false);
             }
@@ -956,8 +1094,8 @@
             try {
                 showLoading(true);
                 const configData = {
-                    certificado_base64: null,
-                    certificado_senha: null,
+                    certificado_digital: null,
+                    senha_certificado: null,
                     certificado_validade: null
                 };
                 
@@ -975,6 +1113,52 @@
                 showLoading(false);
             }
         }
+
+        // Função para alternar visibilidade de senhas
+        function togglePasswordVisibility(fieldId) {
+            const field = document.getElementById(fieldId);
+            const icon = document.getElementById(fieldId + '-icon');
+            
+            if (field.type === 'password') {
+                field.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                field.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+
+        // Sincronizar color pickers com inputs de texto
+        document.addEventListener('DOMContentLoaded', () => {
+            const corPrimariaPicker = document.getElementById('cor_primaria_picker');
+            const corPrimariaInput = document.getElementById('cor_primaria');
+            const corSecundariaPicker = document.getElementById('cor_secundaria_picker');
+            const corSecundariaInput = document.getElementById('cor_secundaria');
+
+            if (corPrimariaPicker && corPrimariaInput) {
+                corPrimariaPicker.addEventListener('input', (e) => {
+                    corPrimariaInput.value = e.target.value;
+                });
+                corPrimariaInput.addEventListener('input', (e) => {
+                    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                        corPrimariaPicker.value = e.target.value;
+                    }
+                });
+            }
+
+            if (corSecundariaPicker && corSecundariaInput) {
+                corSecundariaPicker.addEventListener('input', (e) => {
+                    corSecundariaInput.value = e.target.value;
+                });
+                corSecundariaInput.addEventListener('input', (e) => {
+                    if (/^#[0-9A-F]{6}$/i.test(e.target.value)) {
+                        corSecundariaPicker.value = e.target.value;
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>

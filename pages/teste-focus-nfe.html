@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Focus NFe - Integração Fiscal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .spinner { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .log-entry { padding: 8px 12px; border-left: 3px solid; margin-bottom: 6px; border-radius: 4px; }
+        .log-info { background: #E0F2FE; border-color: #0284C7; color: #0C4A6E; }
+        .log-success { background: #DCFCE7; border-color: #16A34A; color: #14532D; }
+        .log-error { background: #FEE2E2; border-color: #DC2626; color: #7F1D1D; }
+        .log-warning { background: #FEF3C7; border-color: #F59E0B; color: #78350F; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Cabeçalho -->
+            <div class="mb-8">
+                <h2 class="text-4xl font-bold text-gray-900">
+                    <i class="fas fa-vial mr-3 text-blue-600"></i>Teste de Integração Focus NFe
+                </h2>
+                <p class="text-gray-600 mt-2">Teste e valide a conexão com a API Focus NFe</p>
+            </div>
+
+            <!-- Status da Configuração -->
+            <div id="config-status" class="mb-6 p-6 bg-white rounded-lg shadow-md">
+                <h3 class="text-xl font-bold mb-4 flex items-center">
+                    <i class="fas fa-cog mr-2 text-gray-600"></i>Status da Configuração
+                </h3>
+                
+                <!-- Banner Edge Functions -->
+                <div class="mb-4 p-4 bg-green-50 border border-green-300 rounded-lg">
+                    <div class="flex items-start">
+                        <i class="fas fa-check-circle text-green-600 text-xl mr-3 mt-1"></i>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-green-800 mb-1">✅ CORS Resolvido via Edge Functions</h4>
+                            <p class="text-sm text-green-700">
+                                Sistema configurado para usar <strong>Supabase Edge Functions</strong>. 
+                                Todas as requisições são feitas do lado do servidor, eliminando 
+                                <strong>100% dos problemas de CORS</strong>.
+                            </p>
+                            <p class="text-xs text-green-600 mt-2">
+                                ⚡ Não é necessário extensão CORS | 🔒 Token seguro no servidor | 🚀 Pronto para produção
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="config-info" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <div class="text-sm text-gray-500 mb-1">Ambiente</div>
+                        <div id="ambiente-info" class="font-semibold text-gray-900">Carregando...</div>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <div class="text-sm text-gray-500 mb-1">Token Configurado</div>
+                        <div id="token-info" class="font-semibold text-gray-900">Carregando...</div>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <div class="text-sm text-gray-500 mb-1">Certificado Digital</div>
+                        <div id="cert-info" class="font-semibold text-gray-900">Carregando...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Painel de Testes -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <!-- Coluna Esquerda: Testes -->
+                <div class="space-y-6">
+                    <!-- NOVO: Teste 0 - Verificar Configuração Local -->
+                    <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-md p-6 text-white">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-check-circle mr-2"></i>Teste 0: Verificar Configuração (SEM Internet)
+                        </h3>
+                        <p class="text-sm mb-4 opacity-90">Verifica se todos os campos obrigatórios estão preenchidos</p>
+                        <button onclick="verificarConfiguracao()" class="w-full px-4 py-3 bg-white text-indigo-700 rounded-lg hover:bg-gray-100 font-semibold">
+                            <i class="fas fa-clipboard-check mr-2"></i>Verificar Configuração
+                        </button>
+                    </div>
+
+                    <!-- Teste 1: Conexão -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-plug mr-2 text-green-600"></i>Teste 1: Conexão com API
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">Verifica se o token está válido e a API está respondendo</p>
+                        <button onclick="testarConexao()" class="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+                            <i class="fas fa-bolt mr-2"></i>Executar Teste de Conexão
+                        </button>
+                    </div>
+
+                    <!-- Teste 2: Consultar Empresa -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-building mr-2 text-blue-600"></i>Teste 2: Dados da Empresa
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">Exibe os dados cadastrais configurados no sistema</p>
+                        <button onclick="consultarEmpresa()" class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold">
+                            <i class="fas fa-info-circle mr-2"></i>Ver Dados Cadastrados
+                        </button>
+                    </div>
+
+                    <!-- Teste 3: Verificar Certificado -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-certificate mr-2 text-yellow-600"></i>Teste 3: Certificado Digital
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">Verifica a validade do certificado A1</p>
+                        <button onclick="verificarCertificado()" class="w-full px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 font-semibold">
+                            <i class="fas fa-shield-alt mr-2"></i>Verificar Certificado
+                        </button>
+                    </div>
+
+                    <!-- Teste 4: Emitir NFC-e de Teste -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-receipt mr-2 text-purple-600"></i>Teste 4: Emitir NFC-e de Teste
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">
+                            <strong class="text-red-600">Atenção:</strong> Apenas em ambiente de homologação!
+                        </p>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Selecionar Venda</label>
+                            <select id="venda-select" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                                <option value="">Carregando vendas...</option>
+                            </select>
+                        </div>
+                        <button onclick="emitirNFCeTeste()" class="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold">
+                            <i class="fas fa-paper-plane mr-2"></i>Emitir NFC-e da Venda Selecionada
+                        </button>
+                    </div>
+
+                    <!-- Teste 5: Consultar Notas -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-list mr-2 text-indigo-600"></i>Teste 5: Listar Notas Emitidas
+                        </h3>
+                        <p class="text-sm text-gray-600 mb-4">Lista as últimas notas emitidas</p>
+                        <button onclick="listarNotas()" class="w-full px-4 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold">
+                            <i class="fas fa-list-ul mr-2"></i>Listar Notas
+                        </button>
+                    </div>
+
+                    <!-- Botão: Executar Todos os Testes -->
+                    <div class="bg-gradient-to-r from-teal-600 to-cyan-600 rounded-lg shadow-md p-6 text-white">
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-tasks mr-2"></i>Executar Todos os Testes
+                        </h3>
+                        <p class="text-sm mb-4 opacity-90">Executa todos os testes de uma vez (exceto emissão de nota)</p>
+                        <button onclick="executarTodosTestes()" class="w-full px-4 py-3 bg-white text-teal-700 rounded-lg hover:bg-gray-100 font-semibold">
+                            <i class="fas fa-play mr-2"></i>Executar Todos
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Coluna Direita: Log -->
+                <div class="bg-white rounded-lg shadow-md p-6 h-fit sticky top-20">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold flex items-center">
+                            <i class="fas fa-terminal mr-2 text-gray-600"></i>Log de Testes
+                        </h3>
+                        <button onclick="limparLog()" class="text-sm text-red-600 hover:text-red-800">
+                            <i class="fas fa-trash mr-1"></i>Limpar
+                        </button>
+                    </div>
+                    <div id="log-container" class="h-[600px] overflow-y-auto bg-gray-50 rounded-lg p-4 border border-gray-200">
+                        <div class="text-sm text-gray-500 text-center py-8">
+                            <i class="fas fa-info-circle text-3xl mb-2"></i>
+                            <p>Execute um teste para ver os resultados aqui</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Informações sobre CORS -->
+            <div class="bg-green-50 border-l-4 border-green-400 p-6 rounded-lg shadow-md mb-6">
+                <div class="flex items-start">
+                    <i class="fas fa-check-circle text-green-600 text-2xl mr-4 mt-1"></i>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-green-900 mb-2">✅ CORS Resolvido - Edge Functions Configuradas!</h3>
+                        <div class="text-sm text-green-800 space-y-2">
+                            <p><strong>Boa notícia:</strong> O sistema está configurado para usar Edge Functions do Supabase!</p>
+                            <p><strong>✅ Vantagens:</strong></p>
+                            <ul class="list-disc ml-6 space-y-1">
+                                <li><strong>Sem CORS</strong> - Funciona direto, sem extensão</li>
+                                <li><strong>Token Seguro</strong> - Fica no backend, não no navegador</li>
+                                <li><strong>Pronto para Produção</strong> - Basta trocar o ambiente</li>
+                            </ul>
+                            <div class="bg-white p-3 rounded border border-green-300 my-2">
+                                <p class="font-semibold mb-2">📋 Para funcionar, você precisa:</p>
+                                <ol class="list-decimal ml-6 space-y-1">
+                                    <li>Fazer deploy da Edge Function (veja: <strong>DEPLOY_RAPIDO_PROXY.md</strong>)</li>
+                                    <li>Cadastrar o token em <strong>Configurações da Empresa</strong></li>
+                                    <li>Testar aqui nesta página!</li>
+                                </ol>
+                            </div>
+                            <p class="mt-3 text-xs opacity-75">
+                                <strong>Nota:</strong> Se ainda não fez o deploy, os testes vão falhar. 
+                                Execute: <code class="bg-green-100 px-2 py-1 rounded">supabase functions deploy proxy-focus-nfe</code>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/rbac.js"></script>
+    <script src="../js/services/empresa.js"></script>
+    <script src="../js/services/focus-nfe.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    
+    <script>
+        let empresaConfig = null;
+
+        // ========== INICIALIZAÇÃO ==========
+        (async () => {
+            await checkAuth();
+            
+            if (!(await RBACSystem.protegerPagina(['ADMIN', 'GERENTE']))) {
+                return;
+            }
+
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+            await carregarConfiguracao();
+            await carregarVendas(); // Carregar vendas disponíveis
+        })();
+
+        // ========== FUNÇÕES DE LOG ==========
+        function addLog(mensagem, tipo = 'info') {
+            const container = document.getElementById('log-container');
+            const timestamp = new Date().toLocaleTimeString('pt-BR');
+            
+            const icones = {
+                info: 'fa-info-circle',
+                success: 'fa-check-circle',
+                error: 'fa-times-circle',
+                warning: 'fa-exclamation-triangle'
+            };
+
+            const log = document.createElement('div');
+            log.className = `log-entry log-${tipo}`;
+            log.innerHTML = `
+                <div class="flex items-start">
+                    <i class="fas ${icones[tipo]} mr-2 mt-1"></i>
+                    <div class="flex-1">
+                        <div class="text-xs opacity-75 mb-1">${timestamp}</div>
+                        <div class="text-sm">${mensagem}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Remover mensagem placeholder se existir
+            const placeholder = container.querySelector('.text-center');
+            if (placeholder) placeholder.remove();
+            
+            container.insertBefore(log, container.firstChild);
+            container.scrollTop = 0;
+        }
+
+        function limparLog() {
+            const container = document.getElementById('log-container');
+            container.innerHTML = `
+                <div class="text-sm text-gray-500 text-center py-8">
+                    <i class="fas fa-info-circle text-3xl mb-2"></i>
+                    <p>Execute um teste para ver os resultados aqui</p>
+                </div>
+            `;
+        }
+
+        // ========== CARREGAR CONFIGURAÇÃO ==========
+        async function carregarConfiguracao() {
+            try {
+                empresaConfig = await getEmpresaConfig();
+                
+                if (!empresaConfig) {
+                    document.getElementById('ambiente-info').innerHTML = '<span class="text-red-600">❌ Não configurado</span>';
+                    document.getElementById('token-info').innerHTML = '<span class="text-red-600">❌ Não configurado</span>';
+                    document.getElementById('cert-info').innerHTML = '<span class="text-red-600">❌ Não configurado</span>';
+                    addLog('⚠️ Configuração da empresa não encontrada. Configure em Configurações > Empresa.', 'error');
+                    return;
+                }
+
+                // Ambiente
+                const ambiente = empresaConfig.focusnfe_ambiente === 1 ? 
+                    '<span class="text-green-600">✓ Produção</span>' : 
+                    '<span class="text-yellow-600">⚠ Homologação</span>';
+                document.getElementById('ambiente-info').innerHTML = ambiente;
+
+                // Token
+                const hasToken = empresaConfig.focusnfe_token && empresaConfig.focusnfe_token.length > 0;
+                document.getElementById('token-info').innerHTML = hasToken ? 
+                    '<span class="text-green-600">✓ Configurado</span>' : 
+                    '<span class="text-red-600">❌ Não configurado</span>';
+
+                // Certificado
+                const hasCert = empresaConfig.certificado_digital || empresaConfig.certificado_validade;
+                if (hasCert) {
+                    const validade = empresaConfig.certificado_validade ? new Date(empresaConfig.certificado_validade) : null;
+                    const hoje = new Date();
+                    const diasRestantes = validade ? Math.ceil((validade - hoje) / (1000 * 60 * 60 * 24)) : null;
+                    
+                    if (diasRestantes && diasRestantes > 30) {
+                        document.getElementById('cert-info').innerHTML = `<span class="text-green-600">✓ Válido (${diasRestantes} dias)</span>`;
+                    } else if (diasRestantes && diasRestantes > 0) {
+                        document.getElementById('cert-info').innerHTML = `<span class="text-yellow-600">⚠ Expira em ${diasRestantes} dias</span>`;
+                    } else if (diasRestantes !== null && diasRestantes <= 0) {
+                        document.getElementById('cert-info').innerHTML = '<span class="text-red-600">❌ Expirado</span>';
+                    } else {
+                        document.getElementById('cert-info').innerHTML = '<span class="text-blue-600">✓ Enviado</span>';
+                    }
+                } else {
+                    document.getElementById('cert-info').innerHTML = '<span class="text-gray-600">— Não enviado</span>';
+                }
+
+                addLog('✅ Configuração carregada com sucesso', 'success');
+                
+            } catch (error) {
+                console.error('Erro ao carregar configuração:', error);
+                addLog('❌ Erro ao carregar configuração: ' + error.message, 'error');
+            }
+        }
+
+        // ========== NOVO: TESTE 0 - VERIFICAR CONFIGURAÇÃO ==========
+        function verificarConfiguracao() {
+            addLog('🔍 Verificando configuração local...', 'info');
+            
+            if (!empresaConfig) {
+                addLog('❌ Nenhuma configuração encontrada!', 'error');
+                addLog('👉 Acesse: Configurações da Empresa e preencha os dados', 'warning');
+                showToast('Configure a empresa primeiro!', 'error');
+                return;
+            }
+
+            let problemas = [];
+            let avisos = [];
+
+            // Verificar campos obrigatórios
+            if (!empresaConfig.focusnfe_token) {
+                problemas.push('Token Focus NFe não configurado');
+            } else {
+                addLog('✓ Token Focus NFe configurado', 'success');
+            }
+
+            if (!empresaConfig.cnpj) {
+                problemas.push('CNPJ não configurado');
+            } else {
+                addLog(`✓ CNPJ: ${empresaConfig.cnpj}`, 'success');
+            }
+
+            if (!empresaConfig.inscricao_estadual) {
+                avisos.push('Inscrição Estadual não configurada');
+            } else {
+                addLog(`✓ IE: ${empresaConfig.inscricao_estadual}`, 'success');
+            }
+
+            if (!empresaConfig.csc_id || !empresaConfig.csc_token) {
+                avisos.push('CSC não configurado (necessário para NFC-e)');
+            } else {
+                addLog('✓ CSC configurado', 'success');
+            }
+
+            if (!empresaConfig.certificado_digital && !empresaConfig.certificado_validade) {
+                avisos.push('Certificado Digital não enviado');
+            } else {
+                addLog('✓ Certificado Digital enviado', 'success');
+            }
+
+            // Ambiente
+            const ambienteNome = empresaConfig.focusnfe_ambiente === 1 ? 'PRODUÇÃO' : 'HOMOLOGAÇÃO';
+            addLog(`📍 Ambiente: ${ambienteNome}`, 'info');
+
+            // Séries e números
+            addLog(`📄 NFC-e: Série ${empresaConfig.nfce_serie || 1}, Próximo número: ${empresaConfig.nfce_numero || 1}`, 'info');
+            addLog(`📄 NF-e: Série ${empresaConfig.nfe_serie || 1}, Próximo número: ${empresaConfig.nfe_numero || 1}`, 'info');
+
+            // Resumo
+            if (problemas.length > 0) {
+                addLog('❌ PROBLEMAS ENCONTRADOS:', 'error');
+                problemas.forEach(p => addLog(`  • ${p}`, 'error'));
+                showToast(`${problemas.length} problema(s) encontrado(s)`, 'error');
+            }
+
+            if (avisos.length > 0) {
+                addLog('⚠️ AVISOS:', 'warning');
+                avisos.forEach(a => addLog(`  • ${a}`, 'warning'));
+            }
+
+            if (problemas.length === 0 && avisos.length === 0) {
+                addLog('✅ TUDO CONFIGURADO CORRETAMENTE!', 'success');
+                addLog('👉 Instale a extensão CORS para testar a conexão com a API', 'info');
+                showToast('Configuração OK! Instale a extensão CORS para testar.', 'success');
+            }
+        }
+
+        // ========== TESTE 1: CONEXÃO ==========
+        async function testarConexao() {
+            addLog('🔄 Testando conexão com Focus NFe via Edge Functions...', 'info');
+            
+            if (!empresaConfig?.focusnfe_token) {
+                addLog('❌ Token Focus NFe não configurado', 'error');
+                showToast('Configure o token da Focus NFe primeiro', 'error');
+                return;
+            }
+
+            try {
+                const resultado = await FocusNFe.testarConexao();
+                
+                if (resultado.success) {
+                    addLog(`✅ Conexão bem-sucedida! Ambiente: ${resultado.ambiente}`, 'success');
+                    addLog(resultado.mensagem, 'success');
+                    addLog('✅ Edge Function funcionando corretamente (sem CORS)', 'success');
+                    showToast('Conexão estabelecida com sucesso!', 'success');
+                } else {
+                    addLog(`❌ Falha na conexão: ${resultado.mensagem}`, 'error');
+                    showToast('Falha na conexão: ' + resultado.mensagem, 'error');
+                }
+            } catch (error) {
+                addLog(`❌ Erro: ${error.message}`, 'error');
+                addLog('💡 Verifique se a Edge Function proxy-focus-nfe está implantada', 'warning');
+                addLog('🚀 Deploy: supabase functions deploy proxy-focus-nfe', 'info');
+                showToast('Erro ao testar conexão. Verifique o console.', 'error');
+            }
+        }
+
+        // ========== TESTE 2: CONSULTAR EMPRESA ==========
+        async function consultarEmpresa() {
+            addLog('🔄 Verificando dados da empresa configurados...', 'info');
+            
+            if (!empresaConfig) {
+                addLog('❌ Configuração não carregada', 'error');
+                return;
+            }
+
+            try {
+                // Mostrar dados configurados localmente
+                addLog('✅ Dados da empresa carregados do sistema:', 'success');
+                
+                if (empresaConfig.cnpj) {
+                    addLog(`📄 CNPJ: ${empresaConfig.cnpj}`, 'info');
+                } else {
+                    addLog('⚠️ CNPJ não configurado', 'warning');
+                }
+                
+                if (empresaConfig.razao_social || empresaConfig.nome_empresa) {
+                    addLog(`🏢 Razão Social: ${empresaConfig.razao_social || empresaConfig.nome_empresa}`, 'info');
+                }
+                
+                if (empresaConfig.inscricao_estadual) {
+                    addLog(`📋 Inscrição Estadual: ${empresaConfig.inscricao_estadual}`, 'info');
+                }
+                
+                if (empresaConfig.inscricao_municipal) {
+                    addLog(`📋 Inscrição Municipal: ${empresaConfig.inscricao_municipal}`, 'info');
+                }
+                
+                if (empresaConfig.regime_tributario) {
+                    const regimes = {
+                        '1': 'Simples Nacional',
+                        '2': 'Simples Nacional - Excesso',
+                        '3': 'Regime Normal'
+                    };
+                    addLog(`💼 Regime Tributário: ${regimes[empresaConfig.regime_tributario] || empresaConfig.regime_tributario}`, 'info');
+                }
+                
+                if (empresaConfig.endereco || empresaConfig.logradouro) {
+                    addLog(`📍 Endereço: ${empresaConfig.logradouro || empresaConfig.endereco}${empresaConfig.endereco_numero ? ', ' + empresaConfig.endereco_numero : ''}`, 'info');
+                }
+                
+                if (empresaConfig.cidade && empresaConfig.estado) {
+                    addLog(`🌎 Cidade: ${empresaConfig.cidade} - ${empresaConfig.estado}`, 'info');
+                }
+                
+                if (empresaConfig.cep) {
+                    addLog(`📮 CEP: ${empresaConfig.cep}`, 'info');
+                }
+                
+                addLog('💡 Nota: A API Focus NFe não possui endpoint para consultar dados cadastrais da empresa.', 'info');
+                addLog('💡 Os dados acima são do cadastro local do sistema.', 'info');
+                
+                showToast('Dados da empresa exibidos com sucesso!', 'success');
+            } catch (error) {
+                addLog(`❌ Erro: ${error.message}`, 'error');
+                showToast('Erro ao consultar empresa: ' + error.message, 'error');
+            }
+        }
+
+        // ========== TESTE 3: VERIFICAR CERTIFICADO ==========
+        async function verificarCertificado() {
+            addLog('🔄 Verificando certificado digital...', 'info');
+            
+            try {
+                const resultado = await FocusNFe.verificarCertificado();
+                
+                if (resultado.valido) {
+                    addLog(`✅ ${resultado.mensagem}`, 'success');
+                    if (resultado.diasRestantes) {
+                        addLog(`📅 Dias restantes: ${resultado.diasRestantes}`, 'info');
+                        addLog(`📅 Validade: ${new Date(resultado.validade).toLocaleDateString('pt-BR')}`, 'info');
+                    }
+                    showToast(resultado.mensagem, 'success');
+                } else {
+                    addLog(`⚠️ ${resultado.mensagem}`, 'warning');
+                    showToast(resultado.mensagem, 'warning');
+                }
+            } catch (error) {
+                addLog(`❌ Erro ao verificar certificado: ${error.message}`, 'error');
+                showToast('Erro ao verificar certificado', 'error');
+            }
+        }
+
+        // ========== TESTE 4: EMITIR NFC-e DE TESTE ==========
+        // ========== CARREGAR VENDAS ==========
+        let vendasDisponiveis = [];
+        
+        async function carregarVendas() {
+            try {
+                const { data: vendas, error } = await supabase
+                    .from('vendas')
+                    .select(`
+                        *,
+                        cliente:clientes(id, nome, cpf_cnpj, telefone, email, endereco, cidade, estado, cep)
+                    `)
+                    .eq('status', 'FINALIZADA')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (error) throw error;
+
+                vendasDisponiveis = vendas || [];
+                
+                const select = document.getElementById('venda-select');
+                if (vendasDisponiveis.length === 0) {
+                    select.innerHTML = '<option value="">Nenhuma venda finalizada encontrada</option>';
+                    return;
+                }
+                
+                select.innerHTML = '<option value="">Selecione uma venda...</option>';
+                vendasDisponiveis.forEach(venda => {
+                    const option = document.createElement('option');
+                    option.value = venda.id;
+                    const data = new Date(venda.created_at).toLocaleString('pt-BR');
+                    const cliente = venda.cliente?.nome || 'Consumidor';
+                    option.textContent = `Venda #${venda.numero_venda} - ${cliente} - R$ ${venda.total.toFixed(2)} - ${data}`;
+                    select.appendChild(option);
+                });
+                
+                addLog(`✅ ${vendasDisponiveis.length} vendas carregadas`, 'success');
+            } catch (error) {
+                console.error('Erro ao carregar vendas:', error);
+                addLog(`❌ Erro ao carregar vendas: ${error.message}`, 'error');
+            }
+        }
+
+        // ========== TESTE 4: EMITIR NFC-e ==========
+        async function emitirNFCeTeste() {
+            const vendaId = document.getElementById('venda-select').value;
+            
+            if (!vendaId) {
+                showToast('Selecione uma venda para emitir NFC-e', 'error');
+                return;
+            }
+
+            if (empresaConfig?.focusnfe_ambiente === 1) {
+                if (!confirm('⚠️ ATENÇÃO: Você está em AMBIENTE DE PRODUÇÃO!\n\nEsta ação irá emitir uma NFC-e REAL que será enviada à SEFAZ.\n\nDeseja continuar?')) {
+                    return;
+                }
+            }
+
+            addLog('🔄 Carregando dados da venda...', 'info');
+
+            try {
+                // Buscar venda completa
+                const { data: venda, error: vendaError } = await supabase
+                    .from('vendas')
+                    .select(`
+                        *,
+                        cliente:clientes(*)
+                    `)
+                    .eq('id', vendaId)
+                    .single();
+
+                if (vendaError) throw vendaError;
+
+                // Buscar itens da venda (sem join com produtos)
+                const { data: itens, error: itensError } = await supabase
+                    .from('venda_itens')
+                    .select('*')
+                    .eq('venda_id', vendaId);
+
+                if (itensError) throw itensError;
+
+                if (!itens || itens.length === 0) {
+                    throw new Error('Venda sem itens');
+                }
+                
+                // Buscar produtos separadamente se necessário
+                const produtoIds = itens.map(i => i.produto_id).filter(Boolean);
+                let produtosMap = {};
+                
+                if (produtoIds.length > 0) {
+                    const { data: produtos } = await supabase
+                        .from('produtos')
+                        .select('*')
+                        .in('id', produtoIds);
+                    
+                    if (produtos) {
+                        produtos.forEach(p => {
+                            produtosMap[p.id] = p;
+                        });
+                    }
+                }
+
+                addLog(`📦 Venda #${venda.numero_venda} carregada`, 'info');
+                addLog(`📋 ${itens.length} item(ns)`, 'info');
+                addLog(`💰 Valor: R$ ${venda.total.toFixed(2)}`, 'info');
+
+                // Buscar pagamentos (opcional - usar padrão se não existir)
+                let pagamentos = [];
+                try {
+                    const { data: pagData } = await supabase
+                        .from('pagamentos')
+                        .select('*')
+                        .eq('venda_id', vendaId);
+                    
+                    if (pagData && pagData.length > 0) {
+                        pagamentos = pagData;
+                    }
+                } catch (pagError) {
+                    console.log('Tabela pagamentos não existe, usando pagamento padrão em dinheiro');
+                }
+
+                // Preparar dados para Focus NFe
+                const vendaNFe = {
+                    id: venda.id,
+                    numero_venda: venda.numero_venda,
+                    subtotal: venda.subtotal,
+                    desconto_valor: venda.desconto_valor || 0,
+                    total: venda.total,
+                    data_emissao: venda.created_at || new Date().toISOString()
+                };
+
+                const itensNFe = itens.map(item => {
+                    const produto = produtosMap[item.produto_id];
+                    
+                    return {
+                        produto_id: item.produto_id,
+                        codigo_barras: produto?.codigo_barras || item.codigo_barras || item.produto_id.substring(0, 13),
+                        descricao: produto?.nome || item.descricao || 'PRODUTO',
+                        ncm: produto?.ncm || item.ncm || '22021000',
+                        cfop: item.cfop || '5102',
+                        cst_icms: item.cst_icms || '102',
+                        unidade: produto?.unidade || item.unidade || 'UN',
+                        quantidade: item.quantidade,
+                        preco_unitario: item.preco_unitario,
+                        subtotal: item.subtotal,
+                        desconto_valor: item.desconto_valor || 0,
+                        aliquota_icms: item.aliquota_icms || 0
+                    };
+                });
+
+                const pagamentosNFe = pagamentos && pagamentos.length > 0 ? pagamentos : [{
+                    tipo: 'DINHEIRO',
+                    valor: venda.total
+                }];
+
+                addLog('📤 Enviando NFC-e para Focus NFe...', 'info');
+                
+                const resultado = await FocusNFe.emitirNFCe(vendaNFe, itensNFe, pagamentosNFe, venda.cliente);
+                
+                if (resultado.success) {
+                    addLog('✅ NFC-e emitida com sucesso!', 'success');
+                    addLog(`📋 Referência: ${resultado.ref}`, 'info');
+                    addLog(`🔑 Chave: ${resultado.chave_nfe || 'Processando...'}`, 'info');
+                    addLog(`📄 Status: ${resultado.status}`, 'info');
+                    
+                    if (resultado.caminho_danfe) {
+                        addLog(`📥 DANFE disponível: <a href="${resultado.caminho_danfe}" target="_blank" class="underline">Baixar PDF</a>`, 'success');
+                    }
+                    
+                    showToast('NFC-e emitida com sucesso!', 'success');
+                } else {
+                    addLog(`❌ Erro na emissão: ${resultado.mensagem_sefaz || resultado.erro}`, 'error');
+                    showToast('Erro ao emitir NFC-e', 'error');
+                }
+                
+            } catch (error) {
+                const errorMsg = error.message;
+                addLog(`❌ Erro: ${errorMsg}`, 'error');
+                showToast('Erro: ' + errorMsg, 'error');
+            }
+        }
+
+        // ========== TESTE 5: LISTAR NOTAS ==========
+        async function listarNotas() {
+            addLog('🔄 Listando notas fiscais emitidas...', 'info');
+            
+            try {
+                const { data, error } = await supabase
+                    .from('documentos_fiscais')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(10);
+
+                if (error) throw error;
+
+                if (data && data.length > 0) {
+                    addLog(`✅ Encontradas ${data.length} notas fiscais`, 'success');
+                    data.forEach((nota, i) => {
+                        const statusDesc = nota.status_sefaz === '100' ? '✅ Autorizada' : 
+                                         nota.status_sefaz === '135' ? '🚫 Cancelada' : 
+                                         `⚠️ Status ${nota.status_sefaz}`;
+                        addLog(`${i + 1}. ${nota.tipo_documento} ${nota.numero_documento}/${nota.serie} - ${statusDesc} - Chave: ${nota.chave_acesso?.substring(3, 23)}...`, 'info');
+                    });
+                } else {
+                    addLog('ℹ️ Nenhuma nota fiscal encontrada no banco de dados', 'warning');
+                }
+                
+            } catch (error) {
+                addLog(`❌ Erro ao listar notas: ${error.message}`, 'error');
+                showToast('Erro ao listar notas', 'error');
+            }
+        }
+
+        // ========== EXECUTAR TODOS OS TESTES ==========
+        async function executarTodosTestes() {
+            limparLog();
+            addLog('🚀 Iniciando bateria completa de testes...', 'info');
+            
+            await testarConexao();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await consultarEmpresa();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await verificarCertificado();
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            await listarNotas();
+            
+            addLog('✅ Todos os testes concluídos!', 'success');
+        }
+    </script>
+</body>
+</html>
