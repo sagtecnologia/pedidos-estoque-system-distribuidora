@@ -1958,25 +1958,35 @@ class PDVSystem {
                                 throw new Error('Chave de acesso não disponível');
                             }
                             
-                            // Consultar nota para obter PDF
-                            const notaConsultada = await FiscalService.consultarDocumento(chaveAcesso, 'nfce');
+                            console.log('📄 [PDV] Baixando DANFE com chave:', chaveAcesso);
+                            showToast('Gerando DANFE...', 'info');
                             
-                            // Nuvem Fiscal usa método obterPDF() com autenticação
-                            if (notaConsultada.caminho_danfe === 'USE_OBTER_PDF_METHOD' && notaConsultada.obterPDF) {
-                                const pdfUrl = await notaConsultada.obterPDF();
-                                window.open(pdfUrl, '_blank');
-                            } else if (notaConsultada.caminho_danfe) {
-                                // Focus NFe retorna URL direta
-                                window.open(notaConsultada.caminho_danfe, '_blank');
-                            } else if (resultado.caminho_danfe && resultado.caminho_danfe !== 'USE_OBTER_PDF_METHOD') {
-                                // Fallback: usar URL do resultado da emissão
-                                window.open(resultado.caminho_danfe, '_blank');
+                            // Usar FiscalService.baixarDANFE para obter o PDF (como URL ou Blob)
+                            const pdfUrl = await FiscalService.baixarDANFE(chaveAcesso, 'nfce');
+                            
+                            if (pdfUrl) {
+                                console.log('📄 [PDV] DANFE obtido, tipo:', typeof pdfUrl, 'Abrindo...');
+                                
+                                // Se for um Blob, converter para URL
+                                let urlParaAbrir = pdfUrl;
+                                if (pdfUrl instanceof Blob) {
+                                    console.log('🔄 [PDV] Convertendo Blob para ObjectURL...');
+                                    urlParaAbrir = URL.createObjectURL(pdfUrl);
+                                }
+                                
+                                console.log('🔗 [PDV] Abrindo URL:', urlParaAbrir.substring(0, 80) + '...');
+                                window.open(urlParaAbrir, '_blank');
+                                showToast('✅ DANFE aberto!', 'success');
                             } else {
-                                throw new Error('DANFE não disponível');
+                                throw new Error('URL do DANFE não disponível');
                             }
                         } catch (error) {
                             console.error('❌ Erro ao abrir DANFE:', error);
-                            showToast('❌ Erro ao abrir DANFE: ' + error.message, 'error');
+                            showToast('❌ Erro ao gerar DANFE: ' + error.message, 'error');
+                            // Oferecer para abrir depois
+                            setTimeout(() => {
+                                showToast('💡 Você pode visualizar o DANFE depois em "Documentos Fiscais"', 'info');
+                            }, 1000);
                         }
                     }
                 }, 1000);

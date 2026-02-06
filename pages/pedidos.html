@@ -30,6 +30,10 @@
                         <i class="fas fa-key"></i>
                         <span>Importar Chave</span>
                     </button>
+                    <button onclick="abrirModalSincronizarNotas()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition flex items-center gap-2">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Sincronizar Notas</span>
+                    </button>
                     <button onclick="novoPedido()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
                         <i class="fas fa-plus"></i>
                         <span>Novo Pedido</span>
@@ -326,6 +330,91 @@
         </div>
     </div>
 
+    <!-- Modal Sincronizar Notas Recebidas -->
+    <div id="modal-sincronizar-notas" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-indigo-50">
+                <h3 class="text-lg font-semibold text-indigo-900">
+                    <i class="fas fa-sync-alt mr-2"></i>Sincronizar Notas Recebidas
+                </h3>
+                <button onclick="closeModal('modal-sincronizar-notas')" class="text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="px-6 py-4">
+                <p class="text-gray-600 text-sm mb-6">
+                    Sincronize automaticamente suas NF-e e NFC-e recebidas da Nuvem Fiscal para criar pedidos de entrada no estoque.
+                </p>
+
+                <!-- Filtro por período -->
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data Início</label>
+                            <input type="date" id="sync-data-inicio" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Data Fim</label>
+                            <input type="date" id="sync-data-fim" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Tipos de nota -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Tipos de Nota</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="sync-tipo-nfe" checked class="w-4 h-4 text-indigo-600 border-gray-300 rounded">
+                                <span class="ml-2 text-sm text-gray-700">NF-e (Nota Fiscal Eletrônica)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="sync-tipo-nfce" checked class="w-4 h-4 text-indigo-600 border-gray-300 rounded">
+                                <span class="ml-2 text-sm text-gray-700">NFC-e (Nota Fiscal do Consumidor Eletrônica)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Limite de notas -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Limite de Notas</label>
+                        <input type="number" id="sync-limite" value="50" min="1" max="500" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+
+                    <!-- Barra de progresso (oculta inicialmente) -->
+                    <div id="sync-progresso" class="hidden">
+                        <div class="mb-2 flex justify-between">
+                            <span class="text-sm font-medium text-gray-700">Sincronizando...</span>
+                            <span class="text-sm text-gray-600" id="sync-percentual">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="sync-barra" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <p id="sync-mensagem" class="text-sm text-gray-600 mt-2"></p>
+                    </div>
+
+                    <!-- Resultado (oculto inicialmente) -->
+                    <div id="sync-resultado" class="hidden bg-green-50 border border-green-200 rounded-lg p-4">
+                        <h4 class="font-semibold text-green-900 mb-2">Sincronização Concluída!</h4>
+                        <ul class="text-sm text-green-800 space-y-1">
+                            <li><strong>Total encontradas:</strong> <span id="sync-total-encontradas">0</span></li>
+                            <li><strong>Importadas com sucesso:</strong> <span id="sync-total-sucesso">0</span></li>
+                            <li><strong>Erros:</strong> <span id="sync-total-erros">0</span></li>
+                        </ul>
+                        <div id="sync-detalhes-erro" class="mt-3 text-sm text-red-700 hidden max-h-48 overflow-y-auto"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 px-6 py-4 border-t bg-gray-50">
+                <button type="button" onclick="closeModal('modal-sincronizar-notas')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100" id="btn-fechar-sync">
+                    Fechar
+                </button>
+                <button type="button" onclick="iniciarSincronizacao()" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50" id="btn-iniciar-sync">
+                    <i class="fas fa-sync-alt mr-2"></i>Iniciar Sincronização
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Novo Pedido -->
     <div id="modal-novo-pedido" class="modal-backdrop hidden">
         <div class="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4">
@@ -372,6 +461,8 @@
     <script src="../js/auth.js"></script>
     <script src="../js/services/estoque-central.js"></script>
     <script src="../js/services/focus-nfe.js"></script>
+    <script src="../js/services/nuvem-fiscal.js"></script>
+    <script src="../js/services/sync-notas-recebidas.js"></script>
     <script src="../js/services/pedidos.js"></script>
     <script src="../js/services/fornecedores.js"></script>
     <script src="../js/services/produtos.js"></script>
@@ -1740,6 +1831,118 @@
             if (!cnpj) return '';
             cnpj = cnpj.replace(/\D/g, '');
             return cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+        }
+
+        // ========================================
+        // SINCRONIZAÇÃO DE NOTAS RECEBIDAS
+        // ========================================
+        
+        function abrirModalSincronizarNotas() {
+            // Limpar campos
+            document.getElementById('sync-data-inicio').value = '';
+            document.getElementById('sync-data-fim').value = '';
+            document.getElementById('sync-tipo-nfe').checked = true;
+            document.getElementById('sync-tipo-nfce').checked = true;
+            document.getElementById('sync-limite').value = '50';
+            
+            // Ocultar progresso e resultado
+            document.getElementById('sync-progresso').classList.add('hidden');
+            document.getElementById('sync-resultado').classList.add('hidden');
+            document.getElementById('sync-detalhes-erro').classList.add('hidden');
+            
+            // Habilitar botões
+            document.getElementById('btn-iniciar-sync').disabled = false;
+            document.getElementById('btn-fechar-sync').disabled = false;
+            
+            openModal('modal-sincronizar-notas');
+        }
+
+        async function iniciarSincronizacao() {
+            try {
+                // Desabilitar botões
+                document.getElementById('btn-iniciar-sync').disabled = true;
+                document.getElementById('btn-fechar-sync').disabled = true;
+                
+                // Ocultar resultado anterior
+                document.getElementById('sync-resultado').classList.add('hidden');
+                document.getElementById('sync-detalhes-erro').classList.add('hidden');
+                
+                // Mostrar progresso
+                document.getElementById('sync-progresso').classList.remove('hidden');
+                
+                // Coletar opções
+                const dataInicio = document.getElementById('sync-data-inicio').value || null;
+                const dataFim = document.getElementById('sync-data-fim').value || null;
+                const tiposNota = [];
+                
+                if (document.getElementById('sync-tipo-nfe').checked) {
+                    tiposNota.push('nfe');
+                }
+                if (document.getElementById('sync-tipo-nfce').checked) {
+                    tiposNota.push('nfce');
+                }
+                
+                if (tiposNota.length === 0) {
+                    showToast('Selecione pelo menos um tipo de nota', 'error');
+                    document.getElementById('btn-iniciar-sync').disabled = false;
+                    document.getElementById('btn-fechar-sync').disabled = false;
+                    return;
+                }
+                
+                const top = parseInt(document.getElementById('sync-limite').value) || 50;
+                
+                console.log('🚀 [UI] Iniciando sincronização:', { dataInicio, dataFim, tiposNota, top });
+                
+                // Chamar sincronização
+                const resultado = await SincronizacaoNotas.sincronizar({
+                    dataInicio,
+                    dataFim,
+                    tiposNota,
+                    top,
+                    callback: (progresso) => {
+                        console.log('📊 [UI] Progresso:', progresso);
+                        document.getElementById('sync-percentual').textContent = progresso.percentual + '%';
+                        document.getElementById('sync-barra').style.width = progresso.percentual + '%';
+                        document.getElementById('sync-mensagem').textContent = progresso.mensagem;
+                    }
+                });
+                
+                // Ocultar progresso
+                document.getElementById('sync-progresso').classList.add('hidden');
+                
+                // Exibir resultado
+                document.getElementById('sync-resultado').classList.remove('hidden');
+                document.getElementById('sync-total-encontradas').textContent = resultado.totalEncontradas;
+                document.getElementById('sync-total-sucesso').textContent = resultado.totalImportadas;
+                document.getElementById('sync-total-erros').textContent = resultado.totalErros;
+                
+                // Exibir erros se houver
+                if (resultado.totalErros > 0 && resultado.detalhes?.erros?.length > 0) {
+                    const detalheDiv = document.getElementById('sync-detalhes-erro');
+                    detalheDiv.innerHTML = '<strong>Erros encontrados:</strong><ul class="mt-2 space-y-1">';
+                    
+                    resultado.detalhes.erros.forEach(erro => {
+                        detalheDiv.innerHTML += `<li>❌ ${erro.tipo.toUpperCase()} ${erro.chaveAcesso?.slice(-8) || erro.emitente}: ${erro.erro}</li>`;
+                    });
+                    
+                    detalheDiv.innerHTML += '</ul>';
+                    detalheDiv.classList.remove('hidden');
+                }
+                
+                showToast(`✅ Sincronização concluída! ${resultado.totalImportadas} notas importadas, ${resultado.totalErros} erros.`, 'success');
+                
+                // Recarregar pedidos
+                await loadPedidos();
+                
+            } catch (erro) {
+                console.error('❌ [UI] Erro ao sincronizar:', erro);
+                showToast('❌ Erro ao sincronizar: ' + erro.message, 'error');
+                document.getElementById('sync-progresso').classList.add('hidden');
+            } finally {
+                // Reabilitar botões
+                document.getElementById('btn-iniciar-sync').disabled = false;
+                document.getElementById('btn-fechar-sync').disabled = false;
+            }
         }
     </script>
 </body>

@@ -682,7 +682,7 @@ class EstoqueService {
                 throw new Error('Venda não encontrada');
             }
 
-            // 2. Buscar itens da venda (SEM JOIN porque não há FK para produto_id)
+            // 2. Buscar itens da venda
             const { data: itens, error: errItens } = await supabase
                 .from('venda_itens')
                 .select('id, produto_id, quantidade, preco_unitario, preco_custo')

@@ -183,8 +183,13 @@ class NuvemFiscalService {
             if (!response.ok) {
                 // Tentar extrair mensagens de erro detalhadas
                 let mensagemErro = `Erro HTTP ${response.status}`;
+                let codigoErro = null;
                 
-                if (data.mensagens && Array.isArray(data.mensagens)) {
+                // Estrutura de erro com "{error: {code, message}}"
+                if (data.error && data.error.code && data.error.message) {
+                    codigoErro = data.error.code;
+                    mensagemErro = `[${data.error.code}] ${data.error.message}`;
+                } else if (data.mensagens && Array.isArray(data.mensagens)) {
                     mensagemErro = data.mensagens.map(m => `[${m.codigo}] ${m.mensagem}`).join('; ');
                 } else if (data.mensagem) {
                     mensagemErro = data.mensagem;
@@ -195,7 +200,12 @@ class NuvemFiscalService {
                 }
                 
                 console.error('❌ [NuvemFiscal] Erro detalhado:', data);
-                throw new Error(mensagemErro);
+                
+                const erro = new Error(mensagemErro);
+                erro.code = codigoErro;
+                erro.status = response.status;
+                erro.details = data;
+                throw erro;
             }
 
             return data;
@@ -217,6 +227,35 @@ class NuvemFiscalService {
      */
     async emitirNFCe(dadosNFCe) {
         try {
+            // Validação pré-emissão: verificar se documento já existe/foi emitido
+            const chaveNFCe = dadosNFCe?.infNFe?.ide?.cDV;
+            if (!chaveNFCe) {
+                throw new Error('Erro: Chave da NFC-e não encontrada. Verifique os dados da NFC-e.');
+            }
+
+            console.log('🔍 [NuvemFiscal] Validando estado anterior da NFC-e com chave:', chaveNFCe);
+            
+            // Tentar consultar documento anterior
+            try {
+                const docAnterior = await this.consultarNFCe(chaveNFCe);
+                if (docAnterior && docAnterior.status === 'autorizado') {
+                    throw new Error(`❌ NFC-e com chave ${chaveNFCe} já foi AUTORIZADA anteriormente (Status: ${docAnterior.status}). Não é possível emitir novamente. Verifique o número sequencial da NFC-e.`);
+                }
+                if (docAnterior && docAnterior.status === 'cancelado') {
+                    throw new Error(`❌ NFC-e com chave ${chaveNFCe} já foi CANCELADA anteriormente. Não é possível reemitir um documento cancelado.`);
+                }
+                if (docAnterior && docAnterior.status === 'rejeitado') {
+                    console.warn('⚠️ [NuvemFiscal] NFC-e anterior foi rejeitada, permitindo nova tentativa...');
+                }
+            } catch (erroConsulta) {
+                // Se não encontrar (erro 404), é normal - documento novo
+                if (!erroConsulta.message?.includes('404') && !erroConsulta.message?.includes('não encontrado')) {
+                    console.warn('⚠️ [NuvemFiscal] Não foi possível validar documento anterior:', erroConsulta.message);
+                }
+            }
+
+            console.log('✅ [NuvemFiscal] Documento validado, prosseguindo com emissão...');
+            
             console.log('🚀 [NuvemFiscal] Estado ambiente antes:', { 
                 ambiente: this.ambiente, 
                 tipo: typeof this.ambiente 
@@ -237,14 +276,30 @@ class NuvemFiscalService {
                 cMun: payload.infNFe?.emit?.enderEmit?.cMun
             });
 
-            const resultado = await this.request('/nfce', 'POST', payload);
+            try {
+                const resultado = await this.request('/nfce', 'POST', payload);
 
-            // Se retornar status "pendente", aguardar processamento
-            if (resultado.status === 'pendente') {
-                return await this.aguardarProcessamento(resultado.id);
+                // Se retornar status "pendente", aguardar processamento
+                if (resultado.status === 'pendente') {
+                    return await this.aguardarProcessamento(resultado.id);
+                }
+
+                return resultado;
+            } catch (erroEmissao) {
+                // Tratamento específico para ValidationFailed
+                if (erroEmissao.code === 'ValidationFailed') {
+                    console.error('🛑 [NuvemFiscal] Erro de validação SEFAZ:', erroEmissao.message);
+                    
+                    // Tentar obter status atual do documento para diagnóstico
+                    try {
+                        const statusAtual = await this.consultarNFCe(chaveNFCe);
+                        erroEmissao.message += ` [Status atual: ${statusAtual.status}]`;
+                    } catch (e) {
+                        // Se erro ao consultar, continuar com mensagem anterior
+                    }
+                }
+                throw erroEmissao;
             }
-
-            return resultado;
         } catch (erro) {
             console.error('Erro ao emitir NFC-e:', erro);
             throw erro;
@@ -325,18 +380,72 @@ class NuvemFiscalService {
                 throw new Error('Justificativa deve ter no mínimo 15 caracteres');
             }
 
+            // Validação pré-cancelamento: verificar se documento está autorizado e dentro do prazo
+            console.log('🔍 [NuvemFiscal] Validando estado anterior da NFC-e para cancelamento ID:', id);
+            
+            try {
+                const docAtual = await this.consultarNFCe(id);
+                console.log('📋 [NuvemFiscal] Status atual do documento:', { id, status: docAtual.status });
+                
+                if (!docAtual || !docAtual.status) {
+                    throw new Error(`❌ Documento com ID ${id} não encontrado ou sem status válido.`);
+                }
+                
+                if (docAtual.status === 'cancelado') {
+                    throw new Error(`❌ NFC-e já foi CANCELADA anteriormente. Não é possível cancelar novamente.`);
+                }
+                
+                if (docAtual.status !== 'autorizado') {
+                    throw new Error(`❌ NFC-e não está em estado autorizado. Status atual: "${docAtual.status}". Apenas documentos autorizados podem ser cancelados.`);
+                }
+
+                // Verificar janela de cancelamento (NFC-e: 30min, NF-e: 24h)
+                if (docAtual.data_autorizacao) {
+                    const dataAutorizacao = new Date(docAtual.data_autorizacao);
+                    const agora = new Date();
+                    const minutosPassados = (agora - dataAutorizacao) / 1000 / 60;
+                    
+                    // NFC-e tem janela de 30 minutos
+                    if (minutosPassados > 30) {
+                        console.warn(`⚠️ [NuvemFiscal] NFC-e foi autorizada há ${Math.floor(minutosPassados)} minutos. A janela de cancelamento é de 30 minutos.`);
+                        // Continuar mesmo assim - deixar SEFAZ decidir
+                    }
+                }
+                
+                console.log('✅ [NuvemFiscal] Documento validado, prosseguindo com cancelamento...');
+            } catch (erroConsulta) {
+                console.error('⚠️ [NuvemFiscal] Erro ao validar documento para cancelamento:', erroConsulta.message);
+                // Continuar com o cancelamento mesmo assim
+            }
+
             const payload = {
                 justificativa: justificativa
             };
 
-            const resultado = await this.request(`/nfce/${id}/cancelamento`, 'POST', payload);
+            try {
+                const resultado = await this.request(`/nfce/${id}/cancelamento`, 'POST', payload);
 
-            // Se retornar status "pendente", aguardar processamento
-            if (resultado.status === 'pendente') {
-                return await this.aguardarProcessamento(resultado.id);
+                // Se retornar status "pendente", aguardar processamento
+                if (resultado.status === 'pendente') {
+                    return await this.aguardarProcessamento(resultado.id);
+                }
+
+                return resultado;
+            } catch (erroCancelamento) {
+                // Tratamento específico para ValidationFailed
+                if (erroCancelamento.code === 'ValidationFailed') {
+                    console.error('🛑 [NuvemFiscal] Erro de validação SEFAZ ao cancelar:', erroCancelamento.message);
+                    
+                    // Tentar obter status atual do documento para diagnóstico
+                    try {
+                        const statusAtual = await this.consultarNFCe(id);
+                        erroCancelamento.message += ` [Status atual: ${statusAtual.status}]`;
+                    } catch (e) {
+                        // Se erro ao consultar, continuar com mensagem anterior
+                    }
+                }
+                throw erroCancelamento;
             }
-
-            return resultado;
         } catch (erro) {
             console.error('Erro ao cancelar NFC-e:', erro);
             throw erro;
@@ -570,6 +679,13 @@ class NuvemFiscalService {
      * @param {Object} empresa - Dados da empresa emitente
      * @returns {Object} Payload formatado para API Nuvem Fiscal
      */
+    /**
+     * Formatar número com casas decimais e garantir que retorna número, não string
+     */
+    static formatarNumero(valor, casasDecimais = 2) {
+        return parseFloat(parseFloat(valor || 0).toFixed(casasDecimais));
+    }
+
     async montarPayloadNFCe(venda, empresa) {
         try {
             console.log('📋 [NuvemFiscal] Dados recebidos:', { venda, empresa });
@@ -635,32 +751,182 @@ class NuvemFiscalService {
             }
             console.log('🏙️ [NuvemFiscal] Código município formatado:', codigoMunicipio);
 
-            // Montar itens
-            const itens = venda.venda_itens.map((item, index) => ({
-                numero_item: index + 1,
-                codigo_produto: item.codigo_produto || String(item.produto_id),
-                descricao: item.nome_produto,
-                cfop: '5102', // Venda de mercadoria adquirida ou recebida de terceiros
-                ncm: item.ncm || '00000000',
-                unidade_comercial: item.unidade || 'UN',
-                quantidade_comercial: item.quantidade,
-                valor_unitario_comercial: item.preco_unitario,
-                valor_bruto: item.subtotal,
-                unidade_tributavel: item.unidade || 'UN',
-                quantidade_tributavel: item.quantidade,
-                valor_unitario_tributavel: item.preco_unitario,
-                valor_desconto: item.desconto || 0,
-                icms: {
-                    situacao_tributaria: '102', // Tributada sem débito
-                    origem: '0' // Nacional
-                },
-                pis: {
-                    situacao_tributaria: '49' // Outras operações
-                },
-                cofins: {
-                    situacao_tributaria: '49' // Outras operações
+            // ==========================================
+            // VALIDAÇÃO FISCAL PRÉ-EMISSÃO (OPCIONAL)
+            // ==========================================
+            console.log('🔍 [NuvemFiscal] Validando configuração fiscal...');
+            if (typeof ServicoFiscalService !== 'undefined' && ServicoFiscalService) {
+                try {
+                    const validacao = await ServicoFiscalService.validarConfigFiscal(empresa, venda.venda_itens);
+                    
+                    if (!validacao.valido) {
+                        console.error('❌ [NuvemFiscal] Validação fiscal falhou:', validacao);
+                        throw new Error(`Configuração fiscal inválida:\n${validacao.erros.join('\n')}`);
+                    }
+                    
+                    if (validacao.avisos.length > 0) {
+                        console.warn('⚠️ [NuvemFiscal] Avisos fiscais:', validacao.avisos);
+                    }
+                    
+                    console.log('✅ [NuvemFiscal] Validação fiscal OK');
+                } catch (validacaoError) {
+                    console.warn('⚠️ [NuvemFiscal] Erro na validação fiscal (ignorado):', validacaoError.message);
+                    // Continuar mesmo com erro - a validação é apenas informativa
                 }
-            }));
+            } else {
+                console.warn('⚠️ [NuvemFiscal] ServicoFiscalService não disponível, pulando validação fiscal');
+            }
+
+            // ==========================================
+            // CALCULAR DADOS FISCAIS DE CADA ITEM
+            // ==========================================
+            console.log('🧮 [NuvemFiscal] Calculando impostos dos itens...');
+            
+            // Determinar UF destino (se tiver cliente com endereço, senão usa UF da empresa)
+            const ufDestino = venda.clientes?.uf || empresa.uf || empresa.estado;
+            
+            // Calcular dados fiscais para cada item
+            // Se ServicoFiscalService não estiver disponível, usar dados já presentes no venda_itens
+            const itensComDadosFiscais = [];
+            for (const item of venda.venda_itens) {
+                let dadosFiscais = null;
+                
+                // Tentar usar ServicoFiscalService se disponível
+                if (typeof ServicoFiscalService !== 'undefined' && ServicoFiscalService) {
+                    try {
+                        dadosFiscais = await ServicoFiscalService.calcularImpostosItem(
+                            item,
+                            empresa,
+                            ufDestino
+                        );
+                        console.log(`📊 [NuvemFiscal] Item fiscal ${item.produto_id} calculado:`, dadosFiscais);
+                    } catch (calcError) {
+                        console.warn(`⚠️ [NuvemFiscal] Erro ao calcular impostos do item:`, calcError.message);
+                        dadosFiscais = null; // Usar fallback
+                    }
+                } else {
+                    console.log(`💡 [NuvemFiscal] ServicoFiscalService não disponível, usando dados do banco`);
+                }
+                
+                // Se não conseguiu calcular, usar dados já presentes no item (do banco)
+                if (!dadosFiscais) {
+                    dadosFiscais = {
+                        cfop: item.cfop || '5102', // 5102 = venda de produto
+                        ncm: item.ncm || '22021000', // bebida não alcoólica
+                        cst_icms: item.cst_icms || '102',
+                        cst_pis: item.cst_pis || '99',
+                        cst_cofins: item.cst_cofins || '99',
+                        origem: item.icms_origem || 0,
+                        aliquota_icms: item.icms_aliquota || 0,
+                        valor_icms: item.icms_valor || 0,
+                        base_icms: item.icms_base_calculo || item.valor_total || 0,
+                        aliquota_pis: item.pis_aliquota || 0,
+                        valor_pis: item.pis_valor || 0,
+                        base_pis: item.pis_base_calculo || item.valor_total || 0,
+                        aliquota_cofins: item.cofins_aliquota || 0,
+                        valor_cofins: item.cofins_valor || 0,
+                        base_cofins: item.cofins_base_calculo || item.valor_total || 0,
+                        icms: {
+                            base_calculo: item.icms_base_calculo || item.valor_total || 0,
+                            aliquota: item.icms_aliquota || 0,
+                            valor: item.icms_valor || 0,
+                            situacao_tributaria: item.cst_icms || '102',
+                            origem: item.icms_origem || 0
+                        },
+                        pis: {
+                            base_calculo: item.pis_base_calculo || item.valor_total || 0,
+                            aliquota: item.pis_aliquota || 0,
+                            valor: item.pis_valor || 0,
+                            situacao_tributaria: item.cst_pis || '99'
+                        },
+                        cofins: {
+                            base_calculo: item.cofins_base_calculo || item.valor_total || 0,
+                            aliquota: item.cofins_aliquota || 0,
+                            valor: item.cofins_valor || 0,
+                            situacao_tributaria: item.cst_cofins || '99'
+                        }
+                    };
+                    console.log(`📊 [NuvemFiscal] Item ${item.produto_id} usando dados do banco:`, dadosFiscais);
+                }
+                
+                itensComDadosFiscais.push({
+                    ...item,
+                    dadosFiscais
+                });
+            }
+            
+            // Calcular totais gerais da nota
+            let totaisFiscais = null;
+            if (typeof ServicoFiscalService !== 'undefined' && ServicoFiscalService) {
+                try {
+                    totaisFiscais = await ServicoFiscalService.calcularTotaisNota(
+                        itensComDadosFiscais.map(i => i.dadosFiscais), 
+                        empresa
+                    );
+                    console.log('💰 [NuvemFiscal] Totais fiscais calculados:', totaisFiscais);
+                } catch (totalError) {
+                    console.warn('⚠️ [NuvemFiscal] Erro ao calcular totais:',totalError.message);
+                    totaisFiscais = null; // Usar fallback
+                }
+            }
+            
+            // Se não tem totais, calcular manualmente
+            if (!totaisFiscais) {
+                const totalICMS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.icms.valor || 0), 0);
+                const totalPIS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.pis.valor || 0), 0);
+                const totalCOFINS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.cofins.valor || 0), 0);
+                const baseICMS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.icms.base_calculo || 0), 0);
+                
+                totaisFiscais = {
+                    base_icms: baseICMS,
+                    valor_icms: totalICMS,
+                    valor_pis: totalPIS,
+                    valor_cofins: totalCOFINS,
+                    valor_ipi: 0,
+                    total_impostos: totalICMS + totalPIS + totalCOFINS
+                };
+                console.log('💰 [NuvemFiscal] Totais fiscais calculados manualmente:', totaisFiscais);
+            }
+
+            // Montar itens com dados fiscais calculados
+            const itens = itensComDadosFiscais.map((item, index) => {
+                const fiscal = item.dadosFiscais;
+                
+                return {
+                    numero_item: index + 1,
+                    codigo_produto: item.codigo_produto || String(item.produto_id),
+                    descricao: item.nome_produto,
+                    cfop: fiscal.cfop, // Calculado dinamicamente (5102/6102)
+                    ncm: fiscal.ncm, // Do banco de dados (obrigatório)
+                    unidade_comercial: item.unidade || 'UN',
+                    quantidade_comercial: item.quantidade,
+                    valor_unitario_comercial: item.preco_unitario,
+                    valor_bruto: item.subtotal,
+                    unidade_tributavel: item.unidade || 'UN',
+                    quantidade_tributavel: item.quantidade,
+                    valor_unitario_tributavel: item.preco_unitario,
+                    valor_desconto: item.desconto || 0,
+                    icms: {
+                        situacao_tributaria: fiscal.cst_icms, // Calculado por regime tributário
+                        origem: fiscal.origem, // Do banco de dados (0-8)
+                        aliquota: fiscal.aliquota_icms || 0,
+                        valor: fiscal.valor_icms || 0,
+                        base_calculo: fiscal.base_icms || 0
+                    },
+                    pis: {
+                        situacao_tributaria: fiscal.cst_pis, // Calculado por regime
+                        aliquota: fiscal.aliquota_pis || 0,
+                        valor: fiscal.valor_pis || 0,
+                        base_calculo: fiscal.base_pis || 0
+                    },
+                    cofins: {
+                        situacao_tributaria: fiscal.cst_cofins, // Calculado por regime
+                        aliquota: fiscal.aliquota_cofins || 0,
+                        valor: fiscal.valor_cofins || 0,
+                        base_calculo: fiscal.base_cofins || 0
+                    }
+                };
+            });
 
             // Montar dados do destinatário (se houver cliente)
             let destinatario = null;
@@ -765,14 +1031,233 @@ class NuvemFiscalService {
                             calculo: `${precoUnitario} × ${quantidade} = ${valorTotal}`
                         });
                         
+                        // Montar estrutura de imposto baseada no regime tributário
+                        let impostoICMS = {};
+                        const crt = parseInt(empresa.regime_tributario_codigo || empresa.crt || '1');
+                        
+                        if (crt === 1 || crt === 2) {
+                            // Simples Nacional - usar CSOSN
+                            const csosn = item.icms.situacao_tributaria;
+                            const origemNumero = parseInt(item.icms.origem || 0) || 0; // Garantir inteiro
+                            
+                            // Mapeamento conforme CSOSN
+                            if (csosn === '101') {
+                                impostoICMS.ICMSSN101 = {
+                                    orig: origemNumero,
+                                    CSOSN: csosn,
+                                    pCredSN: NuvemFiscalService.formatarNumero(item.icms.aliquota, 4),
+                                    vCredICMSSN: NuvemFiscalService.formatarNumero(item.icms.valor)
+                                };
+                            } else if (csosn === '102' || csosn === '103' || csosn === '300' || csosn === '400') {
+                                impostoICMS[`ICMSSN${csosn}`] = {
+                                    orig: origemNumero,
+                                    CSOSN: csosn
+                                };
+                            } else if (csosn === '201' || csosn === '202' || csosn === '203') {
+                                impostoICMS[`ICMSSN${csosn}`] = {
+                                    orig: origemNumero,
+                                    CSOSN: csosn,
+                                    modBCST: '4',
+                                    pMVAST: NuvemFiscalService.formatarNumero(0),
+                                    pRedBCST: NuvemFiscalService.formatarNumero(0),
+                                    vBCST: NuvemFiscalService.formatarNumero(0),
+                                    pICMSST: NuvemFiscalService.formatarNumero(0),
+                                    vICMSST: NuvemFiscalService.formatarNumero(0),
+                                    pCredSN: NuvemFiscalService.formatarNumero(item.icms.aliquota, 4),
+                                    vCredICMSSN: NuvemFiscalService.formatarNumero(item.icms.valor)
+                                };
+                            } else if (csosn === '500') {
+                                impostoICMS.ICMSSN500 = {
+                                    orig: origemNumero,
+                                    CSOSN: csosn,
+                                    vBCSTRet: NuvemFiscalService.formatarNumero(0),
+                                    vICMSSTRet: NuvemFiscalService.formatarNumero(0)
+                                };
+                            } else if (csosn === '900') {
+                                impostoICMS.ICMSSN900 = {
+                                    orig: origemNumero,
+                                    CSOSN: csosn,
+                                    modBC: '3',
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pRedBC: NuvemFiscalService.formatarNumero(0),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor),
+                                    modBCST: '4',
+                                    pMVAST: NuvemFiscalService.formatarNumero(0),
+                                    pRedBCST: NuvemFiscalService.formatarNumero(0),
+                                    vBCST: NuvemFiscalService.formatarNumero(0),
+                                    pICMSST: NuvemFiscalService.formatarNumero(0),
+                                    vICMSST: NuvemFiscalService.formatarNumero(0),
+                                    pCredSN: NuvemFiscalService.formatarNumero(item.icms.aliquota, 4),
+                                    vCredICMSSN: NuvemFiscalService.formatarNumero(item.icms.valor)
+                                };
+                            }
+                        } else {
+                            // Regime Normal - usar CST
+                            const cst = item.icms.situacao_tributaria;
+                            const origemNumero = parseInt(item.icms.origem || 0) || 0; // Garantir inteiro
+                            
+                            if (cst === '00') {
+                                impostoICMS.ICMS00 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBC: '3',
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor)
+                                };
+                            } else if (cst === '10') {
+                                impostoICMS.ICMS10 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBC: '3',
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor),
+                                    modBCST: '4',
+                                    pMVAST: NuvemFiscalService.formatarNumero(0),
+                                    pRedBCST: NuvemFiscalService.formatarNumero(0),
+                                    vBCST: NuvemFiscalService.formatarNumero(0),
+                                    pICMSST: NuvemFiscalService.formatarNumero(0),
+                                    vICMSST: NuvemFiscalService.formatarNumero(0)
+                                };
+                            } else if (cst === '20') {
+                                impostoICMS.ICMS20 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBC: '3',
+                                    pRedBC: NuvemFiscalService.formatarNumero(0),
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor)
+                                };
+                            } else if (cst === '30') {
+                                impostoICMS.ICMS30 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBCST: '4',
+                                    pMVAST: NuvemFiscalService.formatarNumero(0),
+                                    pRedBCST: NuvemFiscalService.formatarNumero(0),
+                                    vBCST: NuvemFiscalService.formatarNumero(0),
+                                    pICMSST: NuvemFiscalService.formatarNumero(0),
+                                    vICMSST: NuvemFiscalService.formatarNumero(0)
+                                };
+                            } else if (cst === '40' || cst === '41' || cst === '50') {
+                                impostoICMS.ICMS40 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    vICMSDeson: NuvemFiscalService.formatarNumero(0),
+                                    motDesICMS: '9'
+                                };
+                            } else if (cst === '51') {
+                                impostoICMS.ICMS51 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBC: '3',
+                                    pRedBC: NuvemFiscalService.formatarNumero(0),
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor)
+                                };
+                            } else if (cst === '60') {
+                                impostoICMS.ICMS60 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    vBCSTRet: NuvemFiscalService.formatarNumero(0),
+                                    vICMSSTRet: NuvemFiscalService.formatarNumero(0)
+                                };
+                            } else if (cst === '70') {
+                                impostoICMS.ICMS70 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBC: '3',
+                                    pRedBC: NuvemFiscalService.formatarNumero(0),
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor),
+                                    modBCST: '4',
+                                    pMVAST: NuvemFiscalService.formatarNumero(0),
+                                    pRedBCST: NuvemFiscalService.formatarNumero(0),
+                                    vBCST: NuvemFiscalService.formatarNumero(0),
+                                    pICMSST: NuvemFiscalService.formatarNumero(0),
+                                    vICMSST: NuvemFiscalService.formatarNumero(0)
+                                };
+                            } else if (cst === '90') {
+                                impostoICMS.ICMS90 = {
+                                    orig: origemNumero,
+                                    CST: cst,
+                                    modBC: '3',
+                                    vBC: NuvemFiscalService.formatarNumero(item.icms.base_calculo),
+                                    pRedBC: NuvemFiscalService.formatarNumero(0),
+                                    pICMS: NuvemFiscalService.formatarNumero(item.icms.aliquota),
+                                    vICMS: NuvemFiscalService.formatarNumero(item.icms.valor),
+                                    modBCST: '4',
+                                    pMVAST: NuvemFiscalService.formatarNumero(0),
+                                    pRedBCST: NuvemFiscalService.formatarNumero(0),
+                                    vBCST: NuvemFiscalService.formatarNumero(0),
+                                    pICMSST: NuvemFiscalService.formatarNumero(0),
+                                    vICMSST: NuvemFiscalService.formatarNumero(0)
+                                };
+                            }
+                        }
+                        
+                        // Montar estrutura PIS/COFINS
+                        let impostoPIS = {};
+                        let impostoCOFINS = {};
+                        
+                        const cstPIS = item.pis.situacao_tributaria;
+                        const cstCOFINS = item.cofins.situacao_tributaria;
+                        
+                        // PIS
+                        if (cstPIS === '01' || cstPIS === '02') {
+                            impostoPIS.PISAliq = {
+                                CST: cstPIS,
+                                vBC: NuvemFiscalService.formatarNumero(item.pis.base_calculo),
+                                pPIS: NuvemFiscalService.formatarNumero(item.pis.aliquota, 4),
+                                vPIS: NuvemFiscalService.formatarNumero(item.pis.valor)
+                            };
+                        } else if (cstPIS === '04' || cstPIS === '05' || cstPIS === '06' || cstPIS === '07' || cstPIS === '08' || cstPIS === '09') {
+                            impostoPIS.PISNT = {
+                                CST: cstPIS
+                            };
+                        } else if (cstPIS === '49' || cstPIS === '50' || cstPIS === '51' || cstPIS === '52' || cstPIS === '53' || cstPIS === '54' || cstPIS === '55' || cstPIS === '56' || cstPIS === '60' || cstPIS === '61' || cstPIS === '62' || cstPIS === '63' || cstPIS === '64' || cstPIS === '65' || cstPIS === '66' || cstPIS === '67' || cstPIS === '70' || cstPIS === '71' || cstPIS === '72' || cstPIS === '73' || cstPIS === '74' || cstPIS === '75' || cstPIS === '98' || cstPIS === '99') {
+                            impostoPIS.PISOutr = {
+                                CST: cstPIS,
+                                vBC: NuvemFiscalService.formatarNumero(item.pis.base_calculo),
+                                pPIS: NuvemFiscalService.formatarNumero(item.pis.aliquota, 4),
+                                vPIS: NuvemFiscalService.formatarNumero(item.pis.valor)
+                            };
+                        }
+                        
+                        // COFINS
+                        if (cstCOFINS === '01' || cstCOFINS === '02') {
+                            impostoCOFINS.COFINSAliq = {
+                                CST: cstCOFINS,
+                                vBC: NuvemFiscalService.formatarNumero(item.cofins.base_calculo),
+                                pCOFINS: NuvemFiscalService.formatarNumero(item.cofins.aliquota, 4),
+                                vCOFINS: NuvemFiscalService.formatarNumero(item.cofins.valor)
+                            };
+                        } else if (cstCOFINS === '04' || cstCOFINS === '05' || cstCOFINS === '06' || cstCOFINS === '07' || cstCOFINS === '08' || cstCOFINS === '09') {
+                            impostoCOFINS.COFINSNT = {
+                                CST: cstCOFINS
+                            };
+                        } else if (cstCOFINS === '49' || cstCOFINS === '50' || cstCOFINS === '51' || cstCOFINS === '52' || cstCOFINS === '53' || cstCOFINS === '54' || cstCOFINS === '55' || cstCOFINS === '56' || cstCOFINS === '60' || cstCOFINS === '61' || cstCOFINS === '62' || cstCOFINS === '63' || cstCOFINS === '64' || cstCOFINS === '65' || cstCOFINS === '66' || cstCOFINS === '67' || cstCOFINS === '70' || cstCOFINS === '71' || cstCOFINS === '72' || cstCOFINS === '73' || cstCOFINS === '74' || cstCOFINS === '75' || cstCOFINS === '98' || cstCOFINS === '99') {
+                            impostoCOFINS.COFINSOutr = {
+                                CST: cstCOFINS,
+                                vBC: NuvemFiscalService.formatarNumero(item.cofins.base_calculo),
+                                pCOFINS: NuvemFiscalService.formatarNumero(item.cofins.aliquota, 4),
+                                vCOFINS: NuvemFiscalService.formatarNumero(item.cofins.valor)
+                            };
+                        }
+                        
                         return {
                             nItem: index + 1,
                             prod: {
                                 cProd: String(item.codigo_produto || item.cProd || '000'),
                                 cEAN: item.codigo_barras || 'SEM GTIN',
                                 xProd: String(item.descricao || item.xProd || 'PRODUTO'),
-                                NCM: item.ncm || '00000000',
-                                CFOP: item.cfop || '5102',
+                                NCM: item.ncm, // Obrigatório - vem do banco de dados
+                                CFOP: item.cfop, // Calculado dinamicamente (5102/6102)
                                 uCom: item.unidade || 'UN',
                                 qCom: quantidade,
                                 vUnCom: precoUnitario,
@@ -784,37 +1269,34 @@ class NuvemFiscalService {
                                 indTot: 1
                             },
                             imposto: {
-                                ICMS: {
-                                    ICMSSN102: {
-                                        orig: 0,
-                                        CSOSN: '102'
-                                    }
-                                }
+                                ICMS: impostoICMS,
+                                PIS: impostoPIS,
+                                COFINS: impostoCOFINS
                             }
                         };
                     }),
                     total: {
                         ICMSTot: {
-                            vBC: 0,
-                            vICMS: 0,
-                            vICMSDeson: 0,
-                            vFCP: 0,
-                            vBCST: 0,
-                            vST: 0,
-                            vFCPST: 0,
-                            vFCPSTRet: 0,
-                            vProd: parseFloat(subtotal.toFixed(2)),
-                            vFrete: 0,
-                            vSeg: 0,
-                            vDesc: parseFloat(desconto.toFixed(2)),
-                            vII: 0,
-                            vIPI: 0,
-                            vIPIDevol: 0,
-                            vPIS: 0,
-                            vCOFINS: 0,
-                            vOutro: 0,
-                            vNF: parseFloat(valorTotal.toFixed(2)),
-                            vTotTrib: 0
+                            vBC: NuvemFiscalService.formatarNumero(totaisFiscais.base_icms),
+                            vICMS: NuvemFiscalService.formatarNumero(totaisFiscais.valor_icms),
+                            vICMSDeson: NuvemFiscalService.formatarNumero(0),
+                            vFCP: NuvemFiscalService.formatarNumero(0),
+                            vBCST: NuvemFiscalService.formatarNumero(0),
+                            vST: NuvemFiscalService.formatarNumero(0),
+                            vFCPST: NuvemFiscalService.formatarNumero(0),
+                            vFCPSTRet: NuvemFiscalService.formatarNumero(0),
+                            vProd: NuvemFiscalService.formatarNumero(subtotal),
+                            vFrete: NuvemFiscalService.formatarNumero(0),
+                            vSeg: NuvemFiscalService.formatarNumero(0),
+                            vDesc: NuvemFiscalService.formatarNumero(desconto),
+                            vII: NuvemFiscalService.formatarNumero(0),
+                            vIPI: NuvemFiscalService.formatarNumero(totaisFiscais.valor_ipi),
+                            vIPIDevol: NuvemFiscalService.formatarNumero(0),
+                            vPIS: NuvemFiscalService.formatarNumero(totaisFiscais.valor_pis),
+                            vCOFINS: NuvemFiscalService.formatarNumero(totaisFiscais.valor_cofins),
+                            vOutro: NuvemFiscalService.formatarNumero(0),
+                            vNF: NuvemFiscalService.formatarNumero(valorTotal),
+                            vTotTrib: NuvemFiscalService.formatarNumero(totaisFiscais.total_impostos)
                         }
                     },
                     transp: {
@@ -824,9 +1306,9 @@ class NuvemFiscalService {
                         detPag: [{
                             tPag: this.mapearFormaPagamento(venda.forma_pagamento),
                             xPag: venda.forma_pagamento_descricao || this.obterDescricaoPagamento(venda.forma_pagamento),
-                            vPag: parseFloat(valorTotal.toFixed(2))
+                            vPag: NuvemFiscalService.formatarNumero(valorTotal)
                         }],
-                        vTroco: parseFloat(troco.toFixed(2))
+                        vTroco: NuvemFiscalService.formatarNumero(troco)
                     }
                 }
             };
@@ -925,6 +1407,136 @@ class NuvemFiscalService {
         }
 
         return resposta;
+    }
+
+    // ===================================
+    // MÉTODOS PARA NOTAS RECEBIDAS
+    // ===================================
+
+    /**
+     * Listar NF-e recebidas (como destinatário)
+     * GET /nf-e?cpf_cnpj={cpf_cnpj}&ambiente={ambiente}
+     * @param {string} cpfCnpj - CPF ou CNPJ da empresa (como destinatário)
+     * @param {string} ambiente - 'homologacao' ou 'producao'
+     * @param {number} top - Número máximo de registros (padrão: 50)
+     * @param {string} dataInicio - Filtrar por data início (YYYY-MM-DD)
+     * @param {string} dataFim - Filtrar por data fim (YYYY-MM-DD)
+     * @returns {Object} Lista de NF-e recebidas
+     */
+    async listarNFeRecebidas(cpfCnpj, ambiente = 'homologacao', top = 50, dataInicio = null, dataFim = null) {
+        try {
+            const cnpjLimpo = cpfCnpj.replace(/\D/g, '');
+            let url = `/nf-e?cpf_cnpj=${cnpjLimpo}&ambiente=${ambiente}&$top=${top}&$orderby=data_emissao desc`;
+            
+            // Filtrar por data se especificado
+            if (dataInicio || dataFim) {
+                let filtro = '$filter=';
+                if (dataInicio) {
+                    filtro += `data_emissao ge datetime'${dataInicio}T00:00:00'`;
+                }
+                if (dataFim) {
+                    if (dataInicio) filtro += ' and ';
+                    filtro += `data_emissao le datetime'${dataFim}T23:59:59'`;
+                }
+                url += '&' + filtro;
+            }
+            
+            console.log('📋 [NuvemFiscal] Listando NF-e recebidas:', url);
+            const resultado = await this.request(url, 'GET');
+            console.log('📋 [NuvemFiscal] NF-e recebidas encontradas:', resultado?.data?.length || 0);
+            return resultado;
+        } catch (erro) {
+            console.error('Erro ao listar NF-e recebidas:', erro);
+            throw erro;
+        }
+    }
+
+    /**
+     * Listar NFC-e recebidas (como destinatário)
+     * @param {string} cpfCnpj - CPF ou CNPJ da empresa (como destinatário)
+     * @param {string} ambiente - 'homologacao' ou 'producao'
+     * @param {number} top - Número máximo de registros (padrão: 50)
+     * @param {string} dataInicio - Filtrar por data início (YYYY-MM-DD)
+     * @param {string} dataFim - Filtrar por data fim (YYYY-MM-DD)
+     * @returns {Object} Lista de NFC-e recebidas
+     */
+    async listarNFCeRecebidas(cpfCnpj, ambiente = 'homologacao', top = 50, dataInicio = null, dataFim = null) {
+        try {
+            const cnpjLimpo = cpfCnpj.replace(/\D/g, '');
+            let url = `/nfce?cpf_cnpj=${cnpjLimpo}&ambiente=${ambiente}&tipo=recebida&$top=${top}&$orderby=data_emissao desc`;
+            
+            // Filtrar por data se especificado
+            if (dataInicio || dataFim) {
+                let filtro = '$filter=';
+                if (dataInicio) {
+                    filtro += `data_emissao ge datetime'${dataInicio}T00:00:00'`;
+                }
+                if (dataFim) {
+                    if (dataInicio) filtro += ' and ';
+                    filtro += `data_emissao le datetime'${dataFim}T23:59:59'`;
+                }
+                url += '&' + filtro;
+            }
+            
+            console.log('📋 [NuvemFiscal] Listando NFC-e recebidas:', url);
+            const resultado = await this.request(url, 'GET');
+            console.log('📋 [NuvemFiscal] NFC-e recebidas encontradas:', resultado?.data?.length || 0);
+            return resultado;
+        } catch (erro) {
+            console.error('Erro ao listar NFC-e recebidas:', erro);
+            throw erro;
+        }
+    }
+
+    /**
+     * Consultar uma nota recebida (NF-e ou NFC-e) pela chave de acesso
+     * @param {string} chaveAcesso - Chave de acesso da nota (44 dígitos)
+     * @param {string} tipo - 'nfe' ou 'nfce'
+     * @returns {Object} Dados da nota com ID para download
+     */
+    async consultarNotaRecebida(chaveAcesso, tipo = 'nfe') {
+        try {
+            const chave = chaveAcesso.replace(/\D/g, '');
+            
+            if (chave.length !== 44) {
+                throw new Error('Chave de acesso inválida. Deve ter 44 dígitos.');
+            }
+            
+            const endpoint = tipo.toLowerCase() === 'nfce' ? '/nfce' : '/nf-e';
+            const url = `${endpoint}?$filter=chave_acesso eq '${chave}'`;
+            
+            console.log('🔍 [NuvemFiscal] Consultando nota recebida:', url);
+            const resultado = await this.request(url, 'GET');
+            
+            if (!resultado?.data || resultado.data.length === 0) {
+                throw new Error('Nota não encontrada na Nuvem Fiscal');
+            }
+            
+            return resultado.data[0];
+        } catch (erro) {
+            console.error('Erro ao consultar nota recebida:', erro);
+            throw erro;
+        }
+    }
+
+    /**
+     * Baixar XML de uma nota recebida
+     * @param {string} notaId - ID da nota retornado na listagem
+     * @param {string} tipo - 'nfe' ou 'nfce'
+     * @returns {Blob} Arquivo XML
+     */
+    async baixarXMLNotaRecebida(notaId, tipo = 'nfe') {
+        try {
+            const endpoint = tipo.toLowerCase() === 'nfce' ? `/nfce/${notaId}/xml` : `/nf-e/${notaId}/xml`;
+            
+            console.log('📥 [NuvemFiscal] Baixando XML:', endpoint);
+            return await this.request(endpoint, 'GET', null, {
+                'Accept': 'application/xml'
+            });
+        } catch (erro) {
+            console.error('Erro ao baixar XML da nota recebida:', erro);
+            throw erro;
+        }
     }
 }
 

@@ -348,7 +348,17 @@
         let contasSelecionadas = new Set();
 
         document.addEventListener('DOMContentLoaded', async () => {
-            await verificarAutenticacao();
+            // Verificar autenticação
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                if (error || !user) {
+                    window.location.href = '/index.html';
+                    return;
+                }
+            } catch (erro) {
+                console.error('Erro ao verificar autenticação:', erro);
+            }
+
             await carregarClientes();
             await carregarContas();
             atualizarResumo();

@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comandas - Sistema Distribuidora</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        .comanda-card {
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            min-height: 180px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .comanda-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .comanda-card.aberta {
+            border-color: #10b981;
+            background: linear-gradient(135deg, #f9fafb 0%, #d1fae5 100%);
+        }
+        .tab-tipo {
+            padding: 1rem 1.5rem;
+            border-bottom: 2px solid transparent;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-tipo:hover {
+            color: #3b82f6;
+        }
+        .tab-tipo.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+            padding: 1rem;
+        }
+        .modal-backdrop.hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-4xl font-bold text-gray-900 flex items-center">
+                            <i class="fas fa-receipt mr-4 text-orange-600"></i>Comandas
+                        </h1>
+                        <p class="text-gray-600 mt-2">Vendas em aberto para consumo no local</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="carregarComandas()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition flex items-center gap-2">
+                            <i class="fas fa-redo"></i> Atualizar
+                        </button>
+                        <button onclick="abrirModalNovaComanda()" class="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
+                            <i class="fas fa-plus"></i> Nova Comanda
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cards de Resumo -->
+            <div class="grid grid-cols-4 gap-4 mb-8">
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                    <h6 class="text-gray-600 text-sm font-medium mb-2">Total Abertas</h6>
+                    <h2 class="text-3xl font-bold text-blue-600" id="count-total">0</h2>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+                    <h6 class="text-gray-600 text-sm font-medium mb-2">Mesas</h6>
+                    <h2 class="text-3xl font-bold text-green-600" id="count-mesas">0</h2>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+                    <h6 class="text-gray-600 text-sm font-medium mb-2">Balcao</h6>
+                    <h2 class="text-3xl font-bold text-yellow-600" id="count-balcao">0</h2>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                    <h6 class="text-gray-600 text-sm font-medium mb-2">Delivery</h6>
+                    <h2 class="text-3xl font-bold text-purple-600" id="count-delivery">0</h2>
+                </div>
+            </div>
+
+            <!-- Tabs de Filtro -->
+            <div class="bg-white rounded-lg shadow-sm mb-6">
+                <div class="border-b border-gray-200">
+                    <nav class="flex space-x-4 px-6" aria-label="Tabs">
+                        <button onclick="filtrarPorTipo('todas')" class="tab-tipo active" data-tipo="todas">Todas</button>
+                        <button onclick="filtrarPorTipo('mesa')" class="tab-tipo" data-tipo="mesa">Mesas</button>
+                        <button onclick="filtrarPorTipo('balcao')" class="tab-tipo" data-tipo="balcao">Balcao</button>
+                        <button onclick="filtrarPorTipo('delivery')" class="tab-tipo" data-tipo="delivery">Delivery</button>
+                    </nav>
+                </div>
+            </div>
+
+            <!-- Grid de Comandas -->
+            <div id="comandas-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                <!-- Comandas serao inseridas aqui -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Nova Comanda -->
+    <div id="modalNovaComanda" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-2xl max-w-md w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Nova Comanda</h3>
+                <button onclick="fecharModalNovaComanda()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="form-nova-comanda" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tipo *</label>
+                    <select id="comanda-tipo" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" required onchange="atualizarCamposMesa()">
+                        <option value="mesa">Mesa</option>
+                        <option value="balcao">Balcao</option>
+                        <option value="delivery">Delivery</option>
+                    </select>
+                </div>
+                <div id="campo-numero-mesa">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Numero da Mesa</label>
+                    <input type="text" id="comanda-numero-mesa" placeholder="Ex: 5" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <small class="text-gray-500 text-xs">Numero da comanda sera gerado automaticamente</small>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Cliente (opcional)</label>
+                    <select id="comanda-cliente" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Sem cliente</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Cliente (se nao cadastrado)</label>
+                    <input type="text" id="comanda-cliente-nome" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                </div>
+            </form>
+            <div class="flex justify-end gap-2 mt-6">
+                <button onclick="fecharModalNovaComanda()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">
+                    Cancelar
+                </button>
+                <button onclick="salvarNovaComanda()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                    Abrir Comanda
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detalhes da Comanda -->
+    <div id="modalDetalhesComanda" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-2xl max-w-4xl w-full mx-4 p-6 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" id="titulo-comanda">Comanda</h3>
+                <button onclick="fecharModalDetalhes()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-6 text-sm">
+                <div><strong>Cliente:</strong> <span id="comanda-cliente-nome-display">-</span></div>
+                <div class="text-right"><strong>Aberta em:</strong> <span id="comanda-data-abertura">-</span></div>
+            </div>
+
+            <!-- Adicionar Item -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                <h6 class="font-medium mb-3"><i class="fas fa-barcode mr-2"></i>Adicionar Item</h6>
+                <div class="grid grid-cols-12 gap-2">
+                    <div class="col-span-6 relative">
+                        <input 
+                            type="text" 
+                            id="busca-produto-comanda" 
+                            placeholder="Codigo de barras ou nome do produto"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                        >
+                        <div id="dropdown-sugestoes-comanda" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 hidden max-h-64 overflow-y-auto"></div>
+                    </div>
+                    <input type="number" id="add-quantidade" value="1" min="0.01" step="0.01" class="col-span-3 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <button onclick="document.getElementById('busca-produto-comanda').focus()" class="col-span-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                        <i class="fas fa-search mr-2"></i> Buscar
+                    </button>
+                </div>
+                <small class="text-gray-500 text-xs mt-2 block">Digite o nome para pesquisar ou cole/digite o codigo e pressione ENTER</small>
+            </div>
+
+            <!-- Lista de Itens -->
+            <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6"  style="max-height: 300px; overflow-y: auto;">
+                <h6 class="font-medium mb-3">Itens da Comanda</h6>
+                <div id="lista-itens-comanda">
+                    <p class="text-gray-500 text-center">Nenhum item adicionado</p>
+                </div>
+            </div>
+
+            <!-- Totais -->
+            <div class="space-y-2 border-t pt-4 bg-gray-50 rounded-lg p-4 mt-6">
+                <div class="flex justify-between text-lg">
+                    <span>Subtotal:</span>
+                    <span id="comanda-subtotal" class="font-bold">R$ 0,00</span>
+                </div>
+                <div class="flex justify-between text-green-600">
+                    <span>Desconto:</span>
+                    <span id="comanda-desconto" class="font-bold">-R$ 0,00</span>
+                </div>
+                <div class="flex justify-between text-orange-600">
+                    <span>Acrescimo:</span>
+                    <span id="comanda-acrescimo" class="font-bold">+R$ 0,00</span>
+                </div>
+                <div class="flex justify-between text-2xl font-bold bg-blue-50 p-3 rounded mt-2">
+                    <span>Total:</span>
+                    <span id="comanda-total">R$ 0,00</span>
+                </div>
+            </div>
+
+            <!-- Botoes de Acao -->
+            <div class="flex justify-between gap-2 mt-6">
+                <button onclick="fecharModalDetalhes()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition">
+                    <i class="fas fa-arrow-left mr-2"></i> Voltar
+                </button>
+                <div class="flex gap-2">
+                    <button onclick="cancelarComanda()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+                        <i class="fas fa-times-circle mr-2"></i> Cancelar Comanda
+                    </button>
+                    <button onclick="fecharComanda()" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-bold text-lg">
+                        <i class="fas fa-check-circle mr-2"></i> Fechar Comanda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+    <script src="../js/services/estoque-central.js"></script>
+    <script src="../js/services/comandas.js"></script>
+    
+    <script>
+        let todasComandas = [];
+        let comandasFiltradas = [];
+        let comandaAtual = null;
+        let tipoFiltroAtual = "todas";
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                await checkAuth();
+                
+                document.getElementById("navbar").innerHTML = createNavbar();
+                document.getElementById("sidebar-container").innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                
+                await carregarComandas();
+                await carregarClientesSelect();
+                
+                // Setup busca de produto com autocomplete
+                setupBuscaProduto();
+
+                setInterval(() => carregarComandas(), 30 * 1000);
+            } catch (error) {
+                console.error("Erro ao inicializar comandas:", error);
+                window.location.href = "/index.html";
+            }
+        });
+
+        async function carregarComandas() {
+            try {
+                todasComandas = await ServicoComandasService.buscarComandasAbertas();
+                const contagem = await ServicoComandasService.contarComandasAbertas();
+
+                document.getElementById("count-total").textContent = contagem.total;
+                document.getElementById("count-mesas").textContent = contagem.mesa;
+                document.getElementById("count-balcao").textContent = contagem.balcao;
+                document.getElementById("count-delivery").textContent = contagem.delivery;
+
+                filtrarPorTipo(tipoFiltroAtual);
+            } catch (erro) {
+                console.error("Erro ao carregar comandas:", erro);
+            }
+        }
+
+        function filtrarPorTipo(tipo) {
+            tipoFiltroAtual = tipo;
+            
+            document.querySelectorAll(".tab-tipo").forEach(tab => {
+                tab.classList.toggle("active", tab.dataset.tipo === tipo);
+            });
+
+            comandasFiltradas = tipo === "todas" ? todasComandas : todasComandas.filter(c => c.tipo === tipo);
+            
+            renderizarGrid();
+        }
+
+        function renderizarGrid() {
+            const container = document.getElementById("comandas-container");
+            
+            if (comandasFiltradas.length === 0) {
+                container.innerHTML = '<div class="col-span-4 text-center text-gray-500 py-12">Nenhuma comanda aberta</div>';
+                return;
+            }
+
+            container.innerHTML = comandasFiltradas.map(comanda => {
+                const qtdItens = comanda.itens.length;
+                const valorTotal = comanda.valor_total || 0;
+                const clienteNome = comanda.cliente?.nome || comanda.cliente_nome || "Sem cliente";
+                
+                // Mostrar número da mesa se disponível, senão mostrar tipo
+                let displayInfo = '';
+                if (comanda.numero_mesa) {
+                    displayInfo = `Mesa ${comanda.numero_mesa}`;
+                } else {
+                    const tipoIcon = {
+                        'mesa': 'fa-utensils',
+                        'balcao': 'fa-store',
+                        'delivery': 'fa-motorcycle'
+                    };
+                    displayInfo = `<i class="fas ${tipoIcon[comanda.tipo] || 'fa-receipt'} mr-1"></i>${comanda.tipo}`;
+                }
+
+                return `
+                    <div class="comanda-card aberta" onclick="abrirDetalhesComanda('${comanda.id}')"
+                        <span class="absolute top-3 right-3 bg-green-500 text-white text-xs px-2 py-1 rounded">
+                            ${qtdItens} ${qtdItens === 1 ? "item" : "itens"}
+                        </span>
+                        <div class="text-2xl font-bold mb-1">
+                            ${displayInfo}
+                        </div>
+                        <div class="text-sm text-gray-500 mb-2">
+                            <i class="fas fa-hashtag mr-1"></i>${comanda.numero_comanda}
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2">
+                            <i class="fas fa-user mr-2"></i>${clienteNome}
+                        </div>
+                        <div class="text-sm text-gray-600 mb-3">
+                            <i class="fas fa-clock mr-2"></i>${formatarHora(comanda.data_abertura)}
+                        </div>
+                        <div class="text-xl font-bold text-green-600">
+                            R$ ${valorTotal.toLocaleString("pt-BR", {minimumFractionDigits: 2})}
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        async function abrirDetalhesComanda(comandaId) {
+            try {
+                comandaAtual = await ServicoComandasService.buscarComandaPorId(comandaId);
+                
+                // Mostrar Mesa X se tiver numero_mesa, senão só o numero_comanda
+                let tituloComanda = comandaAtual.numero_mesa 
+                    ? `Mesa ${comandaAtual.numero_mesa} (${comandaAtual.numero_comanda})`
+                    : comandaAtual.numero_comanda;
+                
+                document.getElementById("titulo-comanda").textContent = tituloComanda;
+                document.getElementById("comanda-cliente-nome-display").textContent = 
+                    comandaAtual.cliente?.nome || comandaAtual.cliente_nome || "Sem cliente";
+                document.getElementById("comanda-data-abertura").textContent = 
+                    formatarDataHora(comandaAtual.data_abertura);
+
+                renderizarItensComanda();
+                atualizarTotais();
+                
+                // Re-setup busca ao abrir modal
+                setupBuscaProduto();
+
+                document.getElementById("modalDetalhesComanda").classList.remove("hidden");
+            } catch (erro) {
+                console.error("Erro ao carregar detalhes:", erro);
+                mostrarMensagem('Erro', 'Erro ao carregar detalhes da comanda', 'erro');
+            }
+        }
+
+        function renderizarItensComanda() {
+            const container = document.getElementById("lista-itens-comanda");
+            
+            if (!comandaAtual.itens || comandaAtual.itens.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center">Nenhum item adicionado</p>';
+                return;
+            }
+
+            container.innerHTML = comandaAtual.itens.map(item => {
+                if (item.status === "cancelado") return "";
+                
+                return `
+                    <div class="flex justify-between items-center py-3 border-b border-gray-200 gap-3">
+                        <div class="flex-grow min-w-0">
+                            <div class="font-medium">${item.nome_produto}</div>
+                            <div class="text-sm text-gray-600">
+                                ${item.quantidade} x R$ ${item.preco_unitario.toFixed(2)}
+                            </div>
+                            ${item.observacoes ? `<div class="text-xs text-gray-500 mt-1"><i class="fas fa-comment mr-1"></i>${item.observacoes}</div>` : ""}
+                        </div>
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                            <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                                <button onclick="alterarQuantidadeItem('${item.id}', ${item.quantidade - 1})" class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm" ${item.quantidade <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+                                    <i class="fas fa-minus"></i>
+                                </button>
+                                <span class="px-3 font-bold text-sm">${item.quantidade.toFixed(2)}</span>
+                                <button onclick="alterarQuantidadeItem('${item.id}', ${item.quantidade + 1})" class="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            <div class="font-bold text-lg text-right min-w-[80px]">R$ ${item.subtotal.toFixed(2)}</div>
+                            <button onclick="removerItemComanda('${item.id}')" class="text-red-600 hover:text-red-800 p-2">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        function atualizarTotais() {
+            document.getElementById("comanda-subtotal").textContent = "R$ " + comandaAtual.subtotal.toFixed(2);
+            document.getElementById("comanda-desconto").textContent = "-R$ " + (comandaAtual.desconto || 0).toFixed(2);
+            document.getElementById("comanda-acrescimo").textContent = "+R$ " + (comandaAtual.acrescimo || 0).toFixed(2);
+            document.getElementById("comanda-total").textContent = "R$ " + comandaAtual.valor_total.toFixed(2);
+        }
+
+        async function adicionarProdutoPorId(produtoId) {
+            const quantidade = parseFloat(document.getElementById("add-quantidade").value);
+
+            if (!produtoId || quantidade <= 0) {
+                mostrarMensagem('Atenção', 'Produto ou quantidade inválida', 'aviso');
+                return;
+            }
+
+            try {
+                await ServicoComandasService.adicionarItem(comandaAtual.id, produtoId, quantidade);
+                await abrirDetalhesComanda(comandaAtual.id);
+                document.getElementById("add-quantidade").value = "1";
+                document.getElementById("busca-produto-comanda").value = "";
+            } catch (erro) {
+                console.error("Erro ao adicionar item:", erro);
+                mostrarMensagem('Erro', erro.message, 'erro');
+            }
+        }
+
+        async function removerItemComanda(itemId) {
+            try {
+                // Confirma\u00e7\u00e3o via modal
+                const overlay = document.createElement('div');
+                overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                overlay.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg max-w-sm">
+                        <h3 class="text-lg font-bold mb-3"><i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>Confirmar Remo\u00e7\u00e3o</h3>
+                        <p class="text-gray-600 mb-4">Remover este item da comanda?</p>
+                        <div class="flex gap-2">
+                            <button id="btn-cancelar-remocao" class="flex-1 px-4 py-2 border rounded hover:bg-gray-100">Cancelar</button>
+                            <button id="btn-confirmar-remocao" class="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Remover</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(overlay);
+                
+                const confirmar = await new Promise((resolve) => {
+                    overlay.querySelector('#btn-confirmar-remocao').onclick = () => { overlay.remove(); resolve(true); };
+                    overlay.querySelector('#btn-cancelar-remocao').onclick = () => { overlay.remove(); resolve(false); };
+                });
+                
+                if (!confirmar) return;
+                
+                await ServicoComandasService.removerItem(itemId);
+                await abrirDetalhesComanda(comandaAtual.id);
+            } catch (erro) {
+                console.error("Erro ao remover item:", erro);
+                mostrarMensagem('Erro', erro.message, 'erro');
+            }
+        }
+
+        async function alterarQuantidadeItem(itemId, novaQuantidade) {
+            if (novaQuantidade <= 0) {
+                // Se quantidade for 0 ou menor, remove o item
+                await removerItemComanda(itemId);
+                return;
+            }
+
+            try {
+                // Buscar o produto do item para validar estoque
+                const item = comandaAtual.itens.find(i => i.id === itemId);
+                if (!item) {
+                    throw new Error('Item n\u00e3o encontrado');
+                }
+
+                // Validar estoque antes de aumentar quantidade
+                const { data: produto } = await supabase
+                    .from('produtos')
+                    .select('estoque_atual')
+                    .eq('id', item.produto_id)
+                    .single();
+
+                const estoqueDisponivel = produto?.estoque_atual || 0;
+                if (novaQuantidade > estoqueDisponivel) {
+                    mostrarMensagem(
+                        'Estoque Insuficiente',
+                        `Disponível: ${estoqueDisponivel.toFixed(2)}\nSolicitado: ${novaQuantidade.toFixed(2)}`,
+                        'aviso'
+                    );
+                    return;
+                }
+
+                await ServicoComandasService.alterarQuantidadeItem(itemId, novaQuantidade);
+                await abrirDetalhesComanda(comandaAtual.id);
+            } catch (erro) {
+                console.error("Erro ao alterar quantidade:", erro);
+                mostrarMensagem('Erro', 'Erro ao alterar quantidade: ' + erro.message, 'erro');
+            }
+        }
+
+        async function fecharComanda() {
+            exibirTelaFinalizacaoComanda();
+        }
+
+        function exibirTelaFinalizacaoComanda() {
+            console.log('🔵 Abrindo modal de finalizacao da comanda...');
+            const total = comandaAtual.valor_total;
+            
+            // Criar elementos
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            overlay.id = 'modal-finalizar-comanda-overlay';
+            
+            const container = document.createElement('div');
+            container.className = 'bg-white p-6 rounded-lg max-w-lg w-full mx-4';
+            
+            // Construir HTML manualmente
+            container.innerHTML = `
+                <h3 class="text-xl font-bold mb-4">Finalizar Comanda</h3>
+                <p class="text-gray-600 mb-4">Total: <strong>R$ ${total.toFixed(2)}</strong></p>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Forma de Pagamento</label>
+                    <select id="forma-pagamento-comanda" class="w-full border rounded px-3 py-2">
+                        <option value="DINHEIRO">Dinheiro</option>
+                        <option value="PIX">PIX</option>
+                        <option value="CARTAO_DEBITO">Cartao Debito</option>
+                        <option value="CARTAO_CREDITO">Cartao Credito</option>
+                        <option value="PRAZO">A Prazo</option>
+                    </select>
+                </div>
+
+                <div id="secao-acrescimo-comanda" class="mb-4 hidden">
+                    <label class="block text-sm font-medium mb-2">Acrescimo (Tarifa) - <span id="taxa-percentual-comanda" class="text-blue-600 text-xs font-bold"></span></label>
+                    <div class="flex gap-2">
+                        <input type="number" id="acrescimo-tarifa-comanda" class="flex-1 border rounded px-3 py-2" placeholder="0.00" step="0.01" min="0">
+                        <span class="flex items-center text-gray-600 font-medium">R$</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1"><span id="taxa-descricao-comanda">Valor da tarifa</span></p>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Valor Recebido</label>
+                    <input type="number" id="valor-pago-comanda" class="w-full border rounded px-3 py-2" value="${total.toFixed(2)}" step="0.01" min="0">
+                </div>
+
+                <div class="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                    <div class="text-sm">Troco: <strong id="troco-valor-comanda" class="text-blue-600 font-bold">R$ 0.00</strong></div>
+                </div>
+
+                <div class="flex gap-2">
+                    <button id="btn-cancelar-comanda" class="flex-1 px-4 py-2 border rounded hover:bg-gray-100">Cancelar</button>
+                    <button id="btn-confirmar-comanda" class="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirmar</button>
+                </div>
+            `;
+            
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+
+            // Agora buscar os elementos (ja estao no DOM)
+            const formaPagamentoSelect = container.querySelector('#forma-pagamento-comanda');
+            const secaoAcrescimo = container.querySelector('#secao-acrescimo-comanda');
+            const acrescimoTarifaInput = container.querySelector('#acrescimo-tarifa-comanda');
+            const valorPagoInput = container.querySelector('#valor-pago-comanda');
+            const trocoValor = container.querySelector('#troco-valor-comanda');
+            const btnCancelar = container.querySelector('#btn-cancelar-comanda');
+            const btnConfirmar = container.querySelector('#btn-confirmar-comanda');
+
+            if (!valorPagoInput || !trocoValor) {
+                console.error('❌ Elementos nao encontrados!');
+                return;
+            }
+
+            // Funcao para calcular e atualizar troco
+            const atualizarTroco = (e) => {
+                const acrescimo = parseFloat(acrescimoTarifaInput.value) || 0;
+                const totalComAcrescimo = total + acrescimo;
+                const valorPago = parseFloat(valorPagoInput.value) || 0;
+                const troco = valorPago - totalComAcrescimo;
+                trocoValor.textContent = `R$ ${troco.toFixed(2)}`;
+                
+                console.log(`💰 Calculo: R$ ${valorPago.toFixed(2)} - (R$ ${total.toFixed(2)} + R$ ${acrescimo.toFixed(2)}) = R$ ${troco.toFixed(2)}`);
+                
+                // Mudar cor conforme o troco
+                if (troco < -0.01) {
+                    trocoValor.className = 'text-red-600 font-bold';
+                } else if (Math.abs(troco) < 0.01) {
+                    trocoValor.className = 'text-green-600 font-bold';
+                } else {
+                    trocoValor.className = 'text-blue-600 font-bold';
+                }
+            };
+
+            // Listener para mudanca de forma de pagamento
+            formaPagamentoSelect.addEventListener('change', (e) => {
+                const forma = e.target.value;
+                const isCartao = forma === 'CARTAO_CREDITO' || forma === 'CARTAO_DEBITO';
+                
+                if (isCartao) {
+                    secaoAcrescimo.classList.remove('hidden');
+                    
+                    // Definir taxa e calcular acrescimo
+                    let taxa = 0;
+                    let descricao = '';
+                    
+                    if (forma === 'CARTAO_DEBITO') {
+                        taxa = 1.09; // 1,09%
+                        descricao = 'Taxa de debito: 1,09%';
+                    } else if (forma === 'CARTAO_CREDITO') {
+                        taxa = 3.16; // 3,16%
+                        descricao = 'Taxa de credito: 3,16%';
+                    }
+                    
+                    // Calcular acrescimo baseado na taxa
+                    const acrescimo = (total * taxa) / 100;
+                    
+                    // Preencher campo de acrescimo
+                    acrescimoTarifaInput.value = acrescimo.toFixed(2);
+                    
+                    // Atualizar descricao
+                    container.querySelector('#taxa-percentual-comanda').textContent = `${taxa.toFixed(2)}%`;
+                    container.querySelector('#taxa-descricao-comanda').textContent = descricao;
+                    
+                    // Atualizar valor recebido com o novo total
+                    const totalComAcrescimo = total + acrescimo;
+                    valorPagoInput.value = totalComAcrescimo.toFixed(2);
+                    
+                    console.log(`💳 ${forma}: Taxa ${taxa}% = R$ ${acrescimo.toFixed(2)}`);
+                } else {
+                    secaoAcrescimo.classList.add('hidden');
+                    acrescimoTarifaInput.value = '0';
+                    valorPagoInput.value = total.toFixed(2);
+                    container.querySelector('#taxa-percentual-comanda').textContent = '';
+                    container.querySelector('#taxa-descricao-comanda').textContent = 'Valor da tarifa';
+                }
+                
+                atualizarTroco();
+            });
+
+            // Inicializar troco
+            atualizarTroco();
+
+            // Listeners para eventos
+            valorPagoInput.addEventListener('change', atualizarTroco);
+            valorPagoInput.addEventListener('keyup', atualizarTroco);
+            valorPagoInput.addEventListener('input', atualizarTroco);
+            acrescimoTarifaInput.addEventListener('change', atualizarTroco);
+            acrescimoTarifaInput.addEventListener('keyup', atualizarTroco);
+            acrescimoTarifaInput.addEventListener('input', atualizarTroco);
+
+            // Cancelar venda - usar { once: true } para evitar multiplos listeners
+            btnCancelar.addEventListener('click', () => {
+                console.log('❌ Cancelando finalizacao...');
+                overlay.remove();
+            }, { once: true });
+
+            // Confirmar pagamento
+            btnConfirmar.addEventListener('click', (e) => {
+                console.log('✅ Confirmar clicado');
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const forma = container.querySelector('#forma-pagamento-comanda')?.value;
+                const valorPago = parseFloat(container.querySelector('#valor-pago-comanda')?.value);
+                const acrescimo = parseFloat(container.querySelector('#acrescimo-tarifa-comanda')?.value) || 0;
+
+                console.log('💳 Confirmando pagamento:', { forma, valorPago, acrescimo });
+
+                if (!forma) {
+                    mostrarMensagem('Atenção', 'Selecione uma forma de pagamento!', 'aviso');
+                    return;
+                }
+
+                if (isNaN(valorPago) || valorPago < 0) {
+                    mostrarMensagem('Atenção', 'Digite um valor válido!', 'aviso');
+                    return;
+                }
+
+                // Adicionar feedback visual ANTES de processar
+                btnConfirmar.disabled = true;
+                btnCancelar.disabled = true;
+                btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Processando...';
+                
+                // Chamar finalizarComandaFinal (async)
+                (async () => {
+                    try {
+                        const totalComAcrescimo = total + acrescimo;
+                        const troco = valorPago - totalComAcrescimo;
+                        
+                        // Chamar serviço passando acrescimo de tarifa (NÃO atualizar comanda manualmente)
+                        await ServicoComandasService.fecharComanda(comandaAtual.id, forma, valorPago, acrescimo);
+                        
+                        // Fechar overlay e exibir cupom
+                        overlay.remove();
+                        exibirCupomComanda({
+                            numero: comandaAtual.numero_comanda,
+                            total: totalComAcrescimo,
+                            valorPago: valorPago,
+                            troco: troco,
+                            forma: forma
+                        });
+                        
+                        fecharModalDetalhes();
+                        await carregarComandas();
+                    } catch (erro) {
+                        console.error('❌ Erro ao finalizar comanda:', erro);
+                        mostrarMensagem('Erro', erro.message, 'erro');
+                        
+                        // Reabilitar botoes para retry
+                        btnConfirmar.disabled = false;
+                        btnCancelar.disabled = false;
+                        btnConfirmar.innerHTML = 'Confirmar';
+                    }
+                })();
+            });
+
+            // Fechar ao clicar no overlay (fora do container)
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay || e.target.id === 'modal-finalizar-comanda-overlay') {
+                    console.log('🚪 Fechando modal por clique no overlay');
+                    overlay.remove();
+                }
+            });
+            
+            // Impedir que cliques no container fechem o modal
+            container.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // Focus no input para facilitar digitacao
+            valorPagoInput.focus();
+            valorPagoInput.select();
+        }
+
+        function exibirCupomComanda(cupom) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            modal.innerHTML = `
+                <div class="bg-white p-8 rounded-lg max-w-2xl w-full">
+                    <div class="text-center mb-8">
+                        <i class="fas fa-check-circle text-green-500 text-8xl mb-4"></i>
+                        <h3 class="text-4xl font-bold text-gray-800 mb-3">Comanda Finalizada!</h3>
+                        <p class="text-gray-600 text-lg">Transacao finalizada com sucesso</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg mb-6 text-center border-2 border-blue-200">
+                        <p class="text-sm text-gray-700 mb-2 font-medium uppercase">Numero da Comanda</p>
+                        <p class="text-4xl font-bold text-blue-700">${cupom.numero}</p>
+                    </div>
+
+                    <div class="bg-gray-50 p-6 rounded-lg mb-6 space-y-3">
+                        <div class="flex justify-between text-lg">
+                            <span class="text-gray-600">Total:</span>
+                            <span class="font-bold">R$ ${cupom.total.toFixed(2)}</span>
+                        </div>
+                        <div class="flex justify-between text-lg">
+                            <span class="text-gray-600">Pago:</span>
+                            <span class="font-bold">R$ ${cupom.valorPago.toFixed(2)}</span>
+                        </div>
+                        <div class="flex justify-between text-lg border-t pt-3">
+                            <span class="text-gray-600 font-medium">Troco:</span>
+                            <span class="font-bold text-blue-600">R$ ${cupom.troco.toFixed(2)}</span>
+                        </div>
+                        <div class="flex justify-between text-sm mt-2">
+                            <span class="text-gray-500">Forma de Pagamento:</span>
+                            <span class="font-medium">${cupom.forma.replace('_', ' ')}</span>
+                        </div>
+                    </div>
+                    
+                    <button onclick="this.closest('.fixed').remove(); carregarComandas();" class="w-full px-6 py-5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold text-xl transition-colors shadow-lg">
+                        <i class="fas fa-arrow-right mr-2"></i>Proxima Comanda
+                    </button>
+                    
+                    <p class="text-sm text-gray-500 text-center mt-6">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Comanda finalizada com sucesso
+                    </p>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Auto-fechar ao clicar no overlay
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                    carregarComandas();
+                }
+            });
+        }
+
+        async function cancelarComanda() {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+            
+            const container = document.createElement('div');
+            container.className = 'bg-white p-6 rounded-lg max-w-md w-full mx-4';
+            
+            container.innerHTML = `
+                <h3 class="text-xl font-bold mb-4 text-red-600">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Cancelar Comanda
+                </h3>
+                <p class="text-gray-700 mb-4">
+                    Tem certeza que deseja cancelar a comanda <strong>${comandaAtual.numero_comanda}</strong>?
+                </p>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Motivo do Cancelamento *</label>
+                    <textarea id="motivo-cancelamento" rows="3" class="w-full border rounded px-3 py-2" placeholder="Digite o motivo..." required></textarea>
+                </div>
+                <div class="flex gap-2">
+                    <button id="btn-cancelar-acao" class="flex-1 px-4 py-2 border rounded hover:bg-gray-100">Voltar</button>
+                    <button id="btn-confirmar-cancelamento" class="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Confirmar Cancelamento</button>
+                </div>
+            `;
+            
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+            
+            const btnCancelar = container.querySelector('#btn-cancelar-acao');
+            const btnConfirmar = container.querySelector('#btn-confirmar-cancelamento');
+            const motivoInput = container.querySelector('#motivo-cancelamento');
+            
+            btnCancelar.addEventListener('click', () => {
+                overlay.remove();
+            });
+            
+            btnConfirmar.addEventListener('click', async () => {
+                const motivo = motivoInput.value.trim();
+                
+                if (!motivo) {
+                    mostrarMensagem('Atenção', 'Por favor, informe o motivo do cancelamento', 'aviso');
+                    motivoInput.focus();
+                    return;
+                }
+                
+                btnConfirmar.disabled = true;
+                btnCancelar.disabled = true;
+                btnConfirmar.innerHTML = '<i class=\"fas fa-spinner fa-spin mr-2\"></i>Cancelando...';
+                
+                try {
+                    await ServicoComandasService.cancelarComanda(comandaAtual.id, motivo);
+                    overlay.remove();
+                    fecharModalDetalhes();
+                    await carregarComandas();
+                    
+                    // Modal de sucesso
+                    const sucessoModal = document.createElement('div');
+                    sucessoModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                    sucessoModal.innerHTML = `
+                        <div class="bg-white p-8 rounded-lg max-w-md text-center">
+                            <i class="fas fa-check-circle text-green-500 text-6xl mb-4"></i>
+                            <h3 class="text-2xl font-bold mb-2">Comanda Cancelada</h3>
+                            <p class="text-gray-600 mb-6">A comanda foi cancelada com sucesso</p>
+                            <button onclick="this.closest('.fixed').remove()" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
+                                OK
+                            </button>
+                        </div>
+                    `;
+                    document.body.appendChild(sucessoModal);
+                    
+                    setTimeout(() => sucessoModal.remove(), 3000);
+                } catch (erro) {
+                    console.error("Erro ao cancelar:", erro);
+                    mostrarMensagem('Erro', erro.message, 'erro');
+                    
+                    btnConfirmar.disabled = false;
+                    btnCancelar.disabled = false;
+                    btnConfirmar.innerHTML = 'Confirmar Cancelamento';
+                }
+            });
+            
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                }
+            });
+            
+            container.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+            
+            motivoInput.focus();
+        }
+
+        function abrirModalNovaComanda() {
+            document.getElementById("form-nova-comanda").reset();
+            document.getElementById("modalNovaComanda").classList.remove("hidden");
+        }
+
+        function fecharModalNovaComanda() {
+            document.getElementById("modalNovaComanda").classList.add("hidden");
+        }
+
+        async function fecharModalDetalhes() {
+            document.getElementById("modalDetalhesComanda").classList.add("hidden");
+            // Atualizar grid de comandas ao fechar
+            await carregarComandas();
+        }
+
+        // Função helper para mostrar mensagens em modal
+        function mostrarMensagem(titulo, mensagem, tipo = 'info') {
+            const cores = {
+                'sucesso': { bg: 'bg-green-500', icon: 'fa-check-circle', texto: 'text-green-700' },
+                'erro': { bg: 'bg-red-500', icon: 'fa-exclamation-circle', texto: 'text-red-700' },
+                'aviso': { bg: 'bg-yellow-500', icon: 'fa-exclamation-triangle', texto: 'text-yellow-700' },
+                'info': { bg: 'bg-blue-500', icon: 'fa-info-circle', texto: 'text-blue-700' }
+            };
+            const cor = cores[tipo] || cores['info'];
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4';
+            modal.innerHTML = `
+                <div class="bg-white p-8 rounded-lg max-w-md text-center shadow-2xl">
+                    <i class="fas ${cor.icon} ${cor.bg.replace('bg-', 'text-')} text-6xl mb-4"></i>
+                    <h3 class="text-2xl font-bold ${cor.texto} mb-2">${titulo}</h3>
+                    <p class="text-gray-600 mb-6 whitespace-pre-line">${mensagem}</p>
+                    <button onclick="this.closest('.fixed').remove()" class="px-6 py-3 ${cor.bg} text-white rounded-lg hover:opacity-90 font-bold">
+                        OK
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            setTimeout(() => modal.remove(), 5000);
+        }
+
+        function atualizarCamposMesa() {
+            const tipo = document.getElementById("comanda-tipo").value;
+            document.getElementById("campo-numero-mesa").style.display = tipo === "mesa" ? "block" : "none";
+        }
+
+        async function salvarNovaComanda() {
+            const tipo = document.getElementById("comanda-tipo").value;
+            const numeroMesa = document.getElementById("comanda-numero-mesa").value.trim();
+            const clienteId = document.getElementById("comanda-cliente").value || null;
+            const clienteNome = document.getElementById("comanda-cliente-nome").value.trim() || null;
+
+            // SEMPRE gerar número de comanda automaticamente
+            const numeroComanda = await ServicoComandasService.gerarNumeroComanda();
+
+            try {
+                await ServicoComandasService.abrirComanda({
+                    numero_comanda: numeroComanda,
+                    tipo,
+                    numero_mesa: numeroMesa || null,
+                    cliente_id: clienteId,
+                    cliente_nome: clienteNome
+                });
+
+                fecharModalNovaComanda();
+                await carregarComandas();
+                mostrarMensagem('Sucesso', `Comanda ${numeroComanda} aberta com sucesso!`, 'sucesso');
+            } catch (erro) {
+                console.error("Erro ao abrir comanda:", erro);
+                mostrarMensagem('Erro', erro.message, 'erro');
+            }
+        }
+
+        async function carregarClientesSelect() {
+            const { data: clientes } = await supabase
+                .from("clientes")
+                .select("id, nome")
+                .order("nome");
+
+            const select = document.getElementById("comanda-cliente");
+            select.innerHTML += clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join("");
+        }
+
+        // Buscar produto por codigo de barras ou SKU
+        async function buscarProdutoPorCodigo(codigo) {
+            try {
+                const { data, error } = await supabase
+                    .from("produtos")
+                    .select("*")
+                    .or(`codigo_barras.eq.${codigo},sku.eq.${codigo}`)
+                    .eq("ativo", true)
+                    .single();
+
+                if (error && error.code !== "PGRST116") throw error;
+                return data || null;
+            } catch (error) {
+                console.error("Erro ao buscar produto:", error);
+                return null;
+            }
+        }
+
+        // Buscar produtos por nome (autocomplete)
+        async function buscarProdutosPorNome(nome) {
+            try {
+                if (!nome || nome.length < 2) return [];
+                
+                const { data, error } = await supabase
+                    .from("produtos")
+                    .select("id, codigo, nome, preco_venda, estoque_atual")
+                    .ilike("nome", `%${nome}%`)
+                    .eq("ativo", true)
+                    .limit(10);
+
+                if (error) throw error;
+                return data || [];
+            } catch (error) {
+                console.error("Erro ao buscar produtos por nome:", error);
+                return [];
+            }
+        }
+
+        // Setup do campo de busca com autocomplete
+        function setupBuscaProduto() {
+            const inputBusca = document.getElementById("busca-produto-comanda");
+            const dropdownSugestoes = document.getElementById("dropdown-sugestoes-comanda");
+
+            if (!inputBusca) return;
+
+            // Input para sugestoes
+            inputBusca.addEventListener("input", async (e) => {
+                const valor = e.target.value.trim();
+                
+                if (valor.length >= 2) {
+                    const produtos = await buscarProdutosPorNome(valor);
+                    
+                    if (produtos.length > 0) {
+                        dropdownSugestoes.innerHTML = produtos.map(p => `
+                            <div class="p-3 border-b hover:bg-blue-50 cursor-pointer transition produto-sugestao" data-produto-id="${p.id}">
+                                <div class="font-semibold text-gray-800">${p.nome}</div>
+                                <div class="text-xs text-gray-500">Codigo: ${p.codigo || "N/A"} | R$ ${(p.preco_venda || 0).toFixed(2)} | Estoque: ${p.estoque_atual || 0}</div>
+                            </div>
+                        `).join("");
+                        
+                        // Adicionar listeners aos itens do dropdown
+                        dropdownSugestoes.querySelectorAll(".produto-sugestao").forEach(item => {
+                            item.addEventListener("click", async () => {
+                                const produtoId = item.getAttribute("data-produto-id");
+                                await selecionarProdutoAutoComplete(produtoId);
+                            });
+                        });
+                        
+                        dropdownSugestoes.classList.remove("hidden");
+                    } else {
+                        dropdownSugestoes.classList.add("hidden");
+                    }
+                } else {
+                    dropdownSugestoes.classList.add("hidden");
+                }
+            });
+
+            // Enter para buscar por codigo
+            inputBusca.addEventListener("keypress", async (e) => {
+                if (e.key === "Enter") {
+                    dropdownSugestoes.classList.add("hidden");
+                    const produto = await buscarProdutoPorCodigo(e.target.value);
+                    if (produto) {
+                        await adicionarProdutoPorId(produto.id);
+                        e.target.value = "";
+                    } else {
+                        mostrarMensagem('Aviso', 'Produto não encontrado', 'aviso');
+                    }
+                }
+            });
+
+            // Fechar dropdown ao clicar fora
+            document.addEventListener("click", (e) => {
+                if (e.target !== inputBusca && !dropdownSugestoes.contains(e.target)) {
+                    dropdownSugestoes.classList.add("hidden");
+                }
+            });
+        }
+
+        // Selecionar produto do autocomplete
+        async function selecionarProdutoAutoComplete(produtoId) {
+            try {
+                await adicionarProdutoPorId(produtoId);
+                document.getElementById("busca-produto-comanda").value = "";
+                document.getElementById("dropdown-sugestoes-comanda").classList.add("hidden");
+            } catch (error) {
+                console.error("Erro ao adicionar produto:", error);
+                mostrarMensagem('Erro', error.message || 'Erro ao adicionar produto', 'erro');
+            }
+        }
+
+        function formatarHora(data) {
+            return new Date(data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+        }
+
+        function formatarDataHora(data) {
+            return new Date(data).toLocaleString("pt-BR");
+        }
+    </script>
+</body>
+</html>

@@ -123,7 +123,24 @@ class FiscalSystem {
             }
         } catch (error) {
             console.error('❌ [FiscalSystem] Erro ao emitir NFC-e:', error);
-            throw error;
+            
+            // Melhorar mensagem de erro para o usuário
+            let mensagemUsuario = error.message || 'Erro desconhecido ao emitir NFC-e';
+            
+            if (error.code === 'ValidationFailed') {
+                mensagemUsuario = `❌ ERRO DE VALIDAÇÃO (${error.code}): ${error.message}\n\nPossíveis causas:\n` +
+                    `• NFC-e com este número já foi AUTORIZADA\n` +
+                    `• NFC-e com este número já foi CANCELADA\n` +
+                    `• Incrementar o número sequencial da NFC-e\n` +
+                    `• Aguarde alguns segundos e tente novamente`;
+            } else if (error.message?.includes('já foi AUTORIZADA') || error.message?.includes('já foi emitida')) {
+                mensagemUsuario = `❌ Erro ao emitir NFC-e:\n\nEste documento já foi autorizado anteriormente!\n\n` +
+                    `SOLUÇÃO: Incrementar o número sequencial da NFC-e no leiaute de produtos ou no PDV e tentar novamente.`;
+            }
+            
+            const errorToThrow = new Error(mensagemUsuario);
+            errorToThrow.originalError = error;
+            throw errorToThrow;
         }
     }
 
@@ -703,12 +720,17 @@ class FiscalSystem {
                 // Buscar ID da nota no banco pela chave de acesso
                 const { data: venda } = await supabase
                     .from('vendas')
-                    .select('nfce_id')
+                    .select('id, nfce_id, status_fiscal')
                     .eq('chave_acesso_nfce', chaveAcesso)
                     .maybeSingle();
 
                 if (!venda?.nfce_id) {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
+                }
+
+                // Verificar status da venda antes de cancelar
+                if (venda.status_fiscal !== 'EMITIDA_NFCE') {
+                    throw new Error(`Erro ao cancelar: A venda está com status "${venda.status_fiscal}". Apenas notas EMITIDAS podem ser canceladas.`);
                 }
 
                 return await NuvemFiscal.cancelarNFCe(venda.nfce_id, justificativa);
@@ -717,7 +739,127 @@ class FiscalSystem {
             }
         } catch (erro) {
             console.error('Erro ao cancelar documento:', erro);
-            throw erro;
+            
+            // Detectar se documento já foi cancelado e sincronizar banco
+            if (erro.message?.includes('[Status atual: cancelado]') || 
+                erro.message?.includes('já foi CANCELADA')) {
+                
+                console.log('⚠️ [FiscalSystem] Documento já estava cancelado na SEFAZ. Sincronizando banco de dados...');
+                console.log('📋 [FiscalSystem] Chave de acesso:', chaveAcesso);
+                
+                try {
+                    // Buscar venda por chave de acesso
+                    const { data: venda, error: erroSelect } = await supabase
+                        .from('vendas')
+                        .select('id, numero_nfce, status_fiscal')
+                        .eq('chave_acesso_nfce', chaveAcesso)
+                        .maybeSingle();
+
+                    console.log('🔍 [FiscalSystem] Resultado da busca:', { venda, erroSelect });
+
+                    if (erroSelect) {
+                        console.error('❌ Erro ao buscar venda:', erroSelect);
+                        throw erroSelect;
+                    }
+
+                    if (!venda?.id) {
+                        console.warn('⚠️ [FiscalSystem] Venda não encontrada com chave:', chaveAcesso);
+                        // Procurar por nfce_id se houver
+                        const { data: vendaPorId } = await supabase
+                            .from('vendas')
+                            .select('id, numero_nfce')
+                            .neq('nfce_id', null)
+                            .limit(1);
+                        
+                        if (!vendaPorId?.[0]?.id) {
+                            throw new Error('Não foi possível encontrar a venda no banco de dados para sincronização');
+                        }
+                    }
+
+                    const vendaId = venda?.id;
+                    console.log('📌 [FiscalSystem] Sincronizando venda ID:', vendaId);
+
+                    if (vendaId) {
+                        // Atualizar status para cancelado COM retry
+                        let tentativas = 0;
+                        let sucesso = false;
+                        
+                        while (tentativas < 3 && !sucesso) {
+                            tentativas++;
+                            console.log(`📝 [FiscalSystem] Tentativa ${tentativas} de atualizar status...`);
+                            
+                            const { error: erroUpdate } = await supabase
+                                .from('vendas')
+                                .update({
+                                    status_fiscal: 'CANCELADA_NFCE',
+                                    data_cancelamento: new Date().toISOString()
+                                })
+                                .eq('id', vendaId);
+
+                            if (!erroUpdate) {
+                                sucesso = true;
+                                console.log('✅ [FiscalSystem] Documento sincronizado: status_fiscal = CANCELADA_NFCE');
+                                
+                                // Retornar sucesso com informação de sincronização
+                                return {
+                                    sucesso: true,
+                                    sincronizado: true,
+                                    mensagem: '✅ Documento já estava CANCELADO na SEFAZ. Status sincronizado no banco de dados.'
+                                };
+                            } else {
+                                console.warn(`⚠️ [FiscalSystem] Erro na tentativa ${tentativas}:`, erroUpdate.message);
+                                
+                                // Aguardar um pouco antes de retry
+                                if (tentativas < 3) {
+                                    await new Promise(r => setTimeout(r, 500));
+                                }
+                            }
+                        }
+                        
+                        if (!sucesso) {
+                            console.error('❌ [FiscalSystem] Todas as tentativas de sincronização falharam');
+                            // Mesmo com erro, retornar sucesso porque SEFAZ confirmou que foi cancelado
+                            return {
+                                sucesso: true,
+                                sincronizado: false,
+                                aviso: true,
+                                mensagem: '⚠️ Documento já estava CANCELADO na SEFAZ, mas não conseguimos atualizar o banco. Contacte suporte.'
+                            };
+                        }
+                    }
+                } catch (erroSync) {
+                    console.error('❌ [FiscalSystem] Erro ao sincronizar:', erroSync.message);
+                    console.error('Stack:', erroSync.stack);
+                    
+                    // Mesmo com erro de sincronização, SEFAZ confirmou que foi cancelado
+                    // Então retornar sucesso para usuário
+                    return {
+                        sucesso: true,
+                        sincronizado: false,
+                        aviso: true,
+                        mensagem: '⚠️ Documento já estava CANCELADO na SEFAZ. Banco será atualizado manualmente. Contate suporte se problema persistir.'
+                    };
+                }
+            }
+            
+            // Melhorar mensagem de erro para o usuário
+            let mensagemUsuario = erro.message || 'Erro desconhecido ao cancelar documento';
+            
+            if (erro.code === 'ValidationFailed') {
+                mensagemUsuario = `❌ ERRO DE VALIDAÇÃO (${erro.code}): ${erro.message}\n\nPossíveis causas:\n` +
+                    `• NFC-e já foi cancelada anteriormente\n` +
+                    `• Prazo para cancelamento expirou (30 minutos para NFC-e)\n` +
+                    `• Documento em estado inválido\n\n` +
+                    `Contate seu gerente se o problema persistir.`;
+            } else if (mensagemUsuario.includes('já CANCELADA')) {
+                mensagemUsuario = `❌ Erro ao cancelar:\n\nEste documento já foi cancelado anteriormente.\n\nNão é permitido cancelar um documento que já foi cancelado.`;
+            } else if (mensagemUsuario.includes('não está em estado') || mensagemUsuario.includes('não pode ser cancelado')) {
+                mensagemUsuario = `❌ Erro ao cancelar:\n\n${mensagemUsuario}\n\nVerifique o status do documento e tente novamente.`;
+            }
+            
+            const errorToThrow = new Error(mensagemUsuario);
+            errorToThrow.originalError = erro;
+            throw errorToThrow;
         }
     }
 
@@ -736,6 +878,8 @@ class FiscalSystem {
 
             const provider = config?.api_fiscal_provider || 'focus_nfe';
 
+            let pdfBlobOrUrl = null;
+
             if (provider === 'nuvem_fiscal') {
                 // Nuvem Fiscal usa ID da nota, não chave de acesso
                 // Buscar ID da nota no banco pela chave de acesso
@@ -749,10 +893,26 @@ class FiscalSystem {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
                 }
 
-                return await NuvemFiscal.baixarPDF(venda.nfce_id);
+                pdfBlobOrUrl = await NuvemFiscal.baixarPDF(venda.nfce_id);
+                
+                // Se for um Blob, converter para URL
+                if (pdfBlobOrUrl instanceof Blob) {
+                    const blobUrl = URL.createObjectURL(pdfBlobOrUrl);
+                    console.log('📄 [FiscalService] Blob convertido para URL:', blobUrl.substring(0, 50) + '...');
+                    return blobUrl;
+                }
             } else {
-                return await FocusNFe.baixarDANFE(referencia, tipo);
+                pdfBlobOrUrl = await FocusNFe.baixarDANFE(referencia, tipo);
+                
+                // Se for um Blob, converter para URL
+                if (pdfBlobOrUrl instanceof Blob) {
+                    const blobUrl = URL.createObjectURL(pdfBlobOrUrl);
+                    console.log('📄 [FiscalService] Blob convertido para URL:', blobUrl.substring(0, 50) + '...');
+                    return blobUrl;
+                }
             }
+            
+            return pdfBlobOrUrl; // Já é uma URL
         } catch (erro) {
             console.error('Erro ao baixar DANFE:', erro);
             throw erro;
