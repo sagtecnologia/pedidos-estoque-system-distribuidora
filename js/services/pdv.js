@@ -788,9 +788,18 @@ class PDVSystem {
                 return false;
             }
 
-            // Verificar estoque
-            if (quantidade > produto.estoque_atual && !false) { // permitir_venda_zerado
-                this.exibirErro(`Estoque insuficiente. Disponível: ${produto.estoque_atual}`);
+            // 🚀 VALIDAR ESTOQUE CONSIDERANDO O QUE JÁ ESTÁ NO CARRINHO
+            const estoqueDisponivel = produto.estoque_atual || 0;
+            const itemExistenteIdx = this.itensCarrinho.findIndex(i => i.produto_id === produtoId);
+            const quantidadeJaAdicionada = itemExistenteIdx >= 0 ? this.itensCarrinho[itemExistenteIdx].quantidade : 0;
+            const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
+
+            if (quantidadeTotalNecessaria > estoqueDisponivel && !false) { // permitir_venda_zerado
+                const mensagem = `Já adicionado: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                                `Novo: ${quantidade.toFixed(2)}\n` +
+                                `Total solicitado: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
+                                `Disponível: ${estoqueDisponivel.toFixed(2)}`;
+                this.exibirMensagemModal(`Estoque insuficiente para ${produto.nome}`, mensagem);
                 return false;
             }
 
@@ -808,12 +817,11 @@ class PDVSystem {
             };
 
             // Verificar se já existe no carrinho
-            const indiceExistente = this.itensCarrinho.findIndex(i => i.produto_id === produtoId);
-            if (indiceExistente >= 0) {
-                this.itensCarrinho[indiceExistente].quantidade += quantidade;
-                this.itensCarrinho[indiceExistente].subtotal = 
-                    this.itensCarrinho[indiceExistente].preco_unitario * 
-                    this.itensCarrinho[indiceExistente].quantidade;
+            if (itemExistenteIdx >= 0) {
+                this.itensCarrinho[itemExistenteIdx].quantidade += quantidade;
+                this.itensCarrinho[itemExistenteIdx].subtotal = 
+                    this.itensCarrinho[itemExistenteIdx].preco_unitario * 
+                    this.itensCarrinho[itemExistenteIdx].quantidade;
             } else {
                 this.itensCarrinho.push(item);
             }
@@ -1309,8 +1317,11 @@ class PDVSystem {
                     dropdownSugestoes.classList.add('hidden');
                     const produto = await this.buscarProduto(e.target.value);
                     if (produto) {
-                        await this.adicionarItem(produto.id);
-                        e.target.value = '';
+                        // 🚀 Verificar se adicionarItem foi bem-sucedido
+                        const sucesso = await this.adicionarItem(produto.id);
+                        if (sucesso) {
+                            e.target.value = '';
+                        }
                     } else {
                         this.exibirErro('Produto não encontrado');
                     }
@@ -1343,10 +1354,13 @@ class PDVSystem {
      */
     static async selecionarProdutoAutoComplete(produtoId) {
         try {
-            await this.adicionarItem(produtoId);
-            document.getElementById('busca-produto').value = '';
-            const dropdown = document.getElementById('dropdown-sugestoes');
-            if (dropdown) dropdown.classList.add('hidden');
+            // 🚀 Verificar se adicionarItem foi bem-sucedido
+            const sucesso = await this.adicionarItem(produtoId);
+            if (sucesso) {
+                document.getElementById('busca-produto').value = '';
+                const dropdown = document.getElementById('dropdown-sugestoes');
+                if (dropdown) dropdown.classList.add('hidden');
+            }
         } catch (error) {
             console.error('Erro ao selecionar produto:', error);
             this.exibirErro('Erro ao adicionar produto');
@@ -2049,6 +2063,65 @@ class PDVSystem {
      */
     static async consultarFiscal() {
         this.exibirErro('Consulta fiscal em desenvolvimento.\n\nFuncionalidades planejadas:\n- Consultar status da NFC-e\n- Verificar autorização SEFAZ\n- Reenviar NFC-e rejeitada\n- Cancelar NFC-e');
+    }
+
+    /**
+     * 🚀 Exibir mensagem em modal elegante (para mensagens importantes)
+     */
+    static exibirMensagemModal(titulo, mensagem) {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+        
+        const container = document.createElement('div');
+        container.className = 'bg-white rounded-lg shadow-xl max-w-sm w-full';
+        
+        // Determinar cor com base no conteúdo
+        const ehErro = titulo.toLowerCase().includes('estoque') || titulo.toLowerCase().includes('erro') || titulo.toLowerCase().includes('insuficiente');
+        const icone = ehErro ? 'fa-exclamation-circle text-red-500' : 'fa-info-circle text-blue-500';
+        const botaoCor = ehErro ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700';
+        
+        container.innerHTML = `
+            <div class="p-6">
+                <div class="flex items-start gap-4 mb-4">
+                    <div class="flex-shrink-0">
+                        <i class="fas ${icone} text-2xl"></i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-gray-800 mb-2">${titulo}</h3>
+                        <p class="text-gray-600 whitespace-pre-line text-sm leading-relaxed">${mensagem}</p>
+                    </div>
+                </div>
+                <div class="flex gap-2 justify-end pt-4 border-t border-gray-200">
+                    <button class="px-4 py-2 ${botaoCor} text-white rounded-lg font-medium transition-colors">
+                        OK
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        overlay.appendChild(container);
+        document.body.appendChild(overlay);
+        
+        const btnOk = container.querySelector('button');
+        btnOk.addEventListener('click', () => {
+            overlay.remove();
+        });
+        
+        // Fecha ao clicar fora
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+            }
+        });
+        
+        // Fecha com ESC
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                overlay.remove();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
     }
 
     /**

@@ -253,6 +253,9 @@
                 <button onclick="fecharModalEditarVencimento()" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">
                     Cancelar
                 </button>
+                <button onclick="baixarVencimento()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition flex items-center gap-2">
+                    <i class="fas fa-trash"></i> Baixar
+                </button>
                 <button onclick="salvarAlteracaoVencimento()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
                     <i class="fas fa-save"></i> Salvar
                 </button>
@@ -420,13 +423,14 @@
         async function carregarProdutosSelect() {
             const { data: produtos } = await supabase
                 .from('produtos')
-                .select('id, nome, codigo')
+                .select('id, nome, codigo, estoque_atual')
                 .eq('ativo', true)
+                .gt('estoque_atual', 0)
                 .order('nome');
 
             const select = document.getElementById('lote-produto');
             select.innerHTML = '<option value="">Selecione...</option>' + 
-                produtos.map(p => `<option value="${p.id}">${p.codigo || ''} - ${p.nome}</option>`).join('');
+                produtos.map(p => `<option value="${p.id}">${p.codigo || ''} - ${p.nome} (${p.estoque_atual.toFixed(2)} un)</option>`).join('');
         }
 
         async function carregarCategoriasSelect() {
@@ -488,8 +492,11 @@
         }
 
         async function abrirDetalhesLote(loteId) {
-            const lote = todosLotes.find(l => l.id === loteId);
-            if (!lote) return;
+            const lote = mapLotes[loteId];
+            if (!lote) {
+                alert('Erro: Lote não encontrado');
+                return;
+            }
 
             const produto = lote.produto;
             
@@ -609,6 +616,44 @@
                 const btnSalvar = event.target;
                 btnSalvar.disabled = false;
                 btnSalvar.innerHTML = '<i class="fas fa-save"></i> Salvar';
+            }
+        }
+
+        async function baixarVencimento() {
+            try {
+                const inputData = document.getElementById('editar-nova-data');
+                const loteId = inputData.dataset.loteId;
+                const loteData = mapLotes[loteId];
+
+                if (!confirm(`Tem certeza que deseja baixar o vencimento de "${loteData.produto?.nome || 'Produto'}" - Lote ${loteData.numero_lote}?\n\nEsta ação não pode ser desfeita.`)) {
+                    return;
+                }
+
+                // Mostrar loading
+                const btnBaixar = event.target;
+                btnBaixar.disabled = true;
+                btnBaixar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Baixando...';
+
+                // Deletar o registro de vencimento
+                const { error } = await supabase
+                    .from('produto_lotes')
+                    .delete()
+                    .eq('id', loteId);
+
+                if (error) throw error;
+
+                alert('✅ Vencimento baixado com sucesso!');
+                fecharModalEditarVencimento();
+                
+                // Recarregar dados
+                await carregarDados();
+            } catch (erro) {
+                console.error('Erro ao baixar vencimento:', erro);
+                alert('Erro: ' + (erro.message || 'Falha ao baixar vencimento'));
+            } finally {
+                const btnBaixar = event.target;
+                btnBaixar.disabled = false;
+                btnBaixar.innerHTML = '<i class="fas fa-trash"></i> Baixar';
             }
         }
 

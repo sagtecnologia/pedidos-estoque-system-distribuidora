@@ -6,6 +6,7 @@
 class ServicoComandas {
     constructor() {
         this.comandaAtual = null;
+        this.cachesProdutos = {}; // 🚀 Cache para evitar re-queries de produtos
     }
 
     /**
@@ -124,6 +125,25 @@ class ServicoComandas {
     }
 
     /**
+     * 🚀 Atualizar apenas os itens da comanda (otimizado - mais rápido que recarregar tudo)
+     */
+    async atualizarItensComanda(comandaId) {
+        try {
+            const { data: itens, error } = await supabase
+                .from('comanda_itens')
+                .select('id, produto_id, nome_produto, quantidade, preco_unitario, subtotal, desconto, status, observacoes, created_at')
+                .eq('comanda_id', comandaId)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            return itens || [];
+        } catch (erro) {
+            console.error('Erro ao atualizar itens:', erro);
+            return [];
+        }
+    }
+
+    /**
      * Abrir nova comanda
      * @param {Object} dados - { numero_comanda, tipo, numero_mesa, cliente_id, cliente_nome }
      */
@@ -159,57 +179,119 @@ class ServicoComandas {
 
     /**
      * Adicionar item à comanda
+    /**
+     * Adicionar item à comanda com otimizações de performance
      */
     async adicionarItem(comandaId, produtoId, quantidade, observacoes = null) {
         try {
-            // Buscar dados do produto com estoque
-            const { data: produto, error: erroProduto } = await supabase
-                .from('produtos')
-                .select('id, nome, preco_venda, estoque_atual')
-                .eq('id', produtoId)
-                .single();
+            const inicio = performance.now();
 
-            if (erroProduto) throw erroProduto;
+            // 🚀 OTIMIZAÇÃO 1: Usar cache se produto já foi buscado
+            let produto = this.cacheProdutos?.[produtoId];
+            
+            if (!produto) {
+                const { data: p, error: erroProduto } = await supabase
+                    .from('produtos')
+                    .select('id, nome, preco_venda, estoque_atual')
+                    .eq('id', produtoId)
+                    .single();
 
-            // ✅ VALIDAR ESTOQUE ANTES DE ADICIONAR
+                if (erroProduto) throw erroProduto;
+                
+                produto = p;
+                // Armazenar em cache
+                if (!this.cacheProdutos) this.cacheProdutos = {};
+                this.cacheProdutos[produtoId] = produto;
+            }
+
+            // 🚀 OTIMIZAÇÃO 2: Buscar item existente E usuário em PARALELO
+            const [
+                { data: itemExistente },
+                { data: { user } }
+            ] = await Promise.all([
+                supabase
+                    .from('comanda_itens')
+                    .select('id, quantidade, preco_unitario')
+                    .eq('comanda_id', comandaId)
+                    .eq('produto_id', produtoId)
+                    .eq('status', 'pendente')
+                    .maybeSingle(),
+                supabase.auth.getUser()
+            ]);
+
+            // ✅ VALIDAR ESTOQUE CONSIDERANDO O QUE JÁ ESTÁ NA COMANDA
             const estoqueDisponivel = produto.estoque_atual || 0;
-            if (quantidade > estoqueDisponivel) {
+            const quantidadeJaAdicionada = itemExistente ? itemExistente.quantidade : 0;
+            const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
+
+            if (quantidadeTotalNecessaria > estoqueDisponivel) {
                 throw new Error(
                     `Estoque insuficiente para ${produto.nome}\n` +
-                    `Disponível: ${estoqueDisponivel.toFixed(2)}\n` +
-                    `Solicitado: ${quantidade.toFixed(2)}`
+                    `Já adicionado: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                    `Novo: ${quantidade.toFixed(2)}\n` +
+                    `Total solicitado: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
+                    `Disponível: ${estoqueDisponivel.toFixed(2)}`
                 );
             }
 
-            // Buscar usuário atual
-            const { data: { user } } = await supabase.auth.getUser();
-
             const precoUnitario = parseFloat(produto.preco_venda);
-            const subtotal = precoUnitario * quantidade;
+            let result;
 
-            const { data: item, error } = await supabase
-                .from('comanda_itens')
-                .insert({
-                    comanda_id: comandaId,
-                    produto_id: produtoId,
-                    nome_produto: produto.nome,
-                    quantidade,
-                    preco_unitario: precoUnitario,
-                    subtotal,
-                    observacoes,
-                    usuario_id: user?.id,
-                    status: 'pendente'
-                })
-                .select()
-                .single();
+            // Se produto já existe, AUMENTAR A QUANTIDADE
+            if (itemExistente) {
+                console.log('✅ Produto já existe. Incrementando...');
+                
+                const novaQuantidade = itemExistente.quantidade + quantidade;
+                const novoSubtotal = novaQuantidade * precoUnitario;
 
-            if (error) throw error;
+                const { data: itemAtualizado, error: erroUpdate } = await supabase
+                    .from('comanda_itens')
+                    .update({
+                        quantidade: novaQuantidade,
+                        subtotal: novoSubtotal,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', itemExistente.id)
+                    .select()
+                    .single();
 
-            // Recalcular totais da comanda após adicionar o item
-            await this.recalcularTotaisComanda(comandaId);
+                if (erroUpdate) throw erroUpdate;
+                result = itemAtualizado;
+            } else {
+                // Se NÃO existe, CRIAR NOVO ITEM
+                console.log('✅ Produto novo. Criando item...');
 
-            console.log('✅ Item adicionado à comanda:', item);
-            return item;
+                const subtotal = precoUnitario * quantidade;
+
+                const { data: item, error } = await supabase
+                    .from('comanda_itens')
+                    .insert({
+                        comanda_id: comandaId,
+                        produto_id: produtoId,
+                        nome_produto: produto.nome,
+                        quantidade,
+                        preco_unitario: precoUnitario,
+                        subtotal,
+                        observacoes,
+                        usuario_id: user?.id,
+                        status: 'pendente'
+                    })
+                    .select()
+                    .single();
+
+                if (error) throw error;
+                result = item;
+            }
+
+            // 🚀 OTIMIZAÇÃO 3: Recalcular totais em background (não bloqueia UX)
+            this.recalcularTotaisComanda(comandaId).catch(err => 
+                console.error('Erro ao recalcular totais:', err)
+            );
+
+            const tempo = (performance.now() - inicio).toFixed(0);
+            console.log(`✅ Item adicionado em ${tempo}ms`);
+            
+            return result;
         } catch (erro) {
             console.error('Erro ao adicionar item:', erro);
             throw erro;

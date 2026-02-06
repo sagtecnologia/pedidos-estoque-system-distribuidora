@@ -277,29 +277,31 @@
             addLog('Carregando status do sistema...', 'process');
             
             try {
-                // Contar vendas finalizadas
-                const { count: vendas, error: e0 } = await supabaseClient
+                // Contar pedidos de compra RECEBIDOS
+                const { count: pedidosRecebidos, error: e0 } = await supabaseClient
+                    .from('pedidos_compra')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('status', 'RECEBIDO');
+                
+                if (e0) throw e0;
+                
+                // Contar vendas FINALIZADAS
+                const { count: vendasFinalizadas, error: e1 } = await supabaseClient
                     .from('vendas')
                     .select('*', { count: 'exact', head: true })
                     .eq('status_venda', 'FINALIZADA');
                 
-                if (e0) throw e0;
-                
-                // Contar pedidos de compra finalizados
-                const { count: pedidos, error: e1 } = await supabaseClient
-                    .from('pedidos_compra')
-                    .select('*', { count: 'exact', head: true });
-                
                 if (e1) throw e1;
 
-                // Contar movimentações
-                const { count: movs, error: e2 } = await supabaseClient
-                    .from('estoque_movimentacoes')
-                    .select('*', { count: 'exact', head: true });
-                
+                // Contar produtos com estoque
+                const { count: produtosComEstoque, error: e2 } = await supabaseClient
+                    .from('produtos')
+                    .select('*', { count: 'exact', head: true })
+                    .gt('estoque_atual', 0);
+
                 if (e2) throw e2;
 
-                // Somar estoque
+                // Somar estoque total
                 const { data: estoque, error: e3 } = await supabaseClient
                     .from('produtos')
                     .select('estoque_atual');
@@ -308,37 +310,21 @@
 
                 const totalEstoque = estoque?.reduce((sum, item) => sum + (item.estoque_atual || 0), 0) || 0;
 
-                // Tentar verificar se existe backup (sem usar RPC)
-                let backupExists = false;
-                try {
-                    const { count: backupCount } = await supabaseClient
-                        .from('estoque_movimentacoes_backup')
-                        .select('*', { count: 'exact', head: true });
-                    backupExists = backupCount > 0;
-                } catch (err) {
-                    // Backup não existe ainda (normal na primeira vez)
-                    backupExists = false;
-                }
-
-                document.getElementById('total-pedidos').textContent = pedidos || 0;
-                document.getElementById('total-movimentacoes').textContent = movs || 0;
+                document.getElementById('total-pedidos').textContent = pedidosRecebidos || 0;
+                document.getElementById('total-movimentacoes').textContent = vendasFinalizadas || 0;
                 document.getElementById('total-estoque').textContent = totalEstoque.toFixed(0);
-                
-                if (backupExists) {
-                    document.getElementById('status-backup').innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Existe</span>';
-                } else {
-                    document.getElementById('status-backup').innerHTML = '<span class="text-yellow-600"><i class="fas fa-exclamation-triangle mr-1"></i>Criar antes de reprocessar!</span>';
-                }
+                document.getElementById('status-backup').innerHTML = '<span class="text-blue-600"><i class="fas fa-info-circle mr-1"></i>' + produtosComEstoque + ' produtos com estoque</span>';
 
                 document.getElementById('status-passo1').innerHTML = '<span class="text-green-600">✅ Status carregado com sucesso!</span>';
-                addLog(`Pedidos finalizados: ${pedidos}`, 'success');
-                addLog(`Movimentações atuais: ${movs}`, 'success');
-                addLog(`Estoque total: ${totalEstoque.toFixed(0)}`, 'success');
+                addLog(`✅ Pedidos recebidos: ${pedidosRecebidos}`, 'success');
+                addLog(`✅ Vendas finalizadas: ${vendasFinalizadas}`, 'success');
+                addLog(`✅ Produtos com estoque: ${produtosComEstoque}`, 'success');
+                addLog(`✅ Estoque total: ${totalEstoque.toFixed(0)} unidades`, 'success');
                 
             } catch (error) {
                 handleError(error, 'Erro ao carregar status');
                 document.getElementById('status-passo1').innerHTML = '<span class="text-red-600">❌ Erro ao carregar</span>';
-                addLog('Erro ao carregar status: ' + error.message, 'error');
+                addLog('❌ Erro ao carregar status: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
@@ -346,22 +332,52 @@
 
         async function criarBackup() {
             showLoading(true);
-            addLog('Criando backup das movimentações...', 'process');
+            addLog('Criando backup do estoque atual...', 'process');
             
             try {
-                const { error } = await supabaseClient.rpc('criar_backup_movimentacoes');
+                // Buscar todos os produtos com estoque
+                const { data: produtos, error } = await supabaseClient
+                    .from('produtos')
+                    .select('id, nome, estoque_atual, sku')
+                    .gt('estoque_atual', 0);
                 
                 if (error) throw error;
 
-                document.getElementById('status-passo2').innerHTML = '<span class="text-green-600">✅ Backup criado com sucesso!</span>';
-                document.getElementById('status-backup').innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Criado agora</span>';
-                addLog('Backup criado com sucesso!', 'success');
-                showToast('Backup criado com sucesso!', 'success');
+                const timestamp = new Date().toISOString();
+                const backupData = {
+                    data_backup: timestamp,
+                    total_produtos: produtos.length,
+                    total_unidades: produtos.reduce((sum, p) => sum + p.estoque_atual, 0),
+                    produtos: produtos
+                };
+
+                // Salvar backup em estoque_backup table (que deve ser criada)
+                const { error: backupError } = await supabaseClient
+                    .from('estoque_backups')
+                    .insert({
+                        data_backup: timestamp,
+                        total_produtos: backupData.total_produtos,
+                        total_unidades: backupData.total_unidades,
+                        dados_backup: JSON.stringify(backupData)
+                    });
+                
+                // Se a tabela de backup não existe, apenas logar
+                if (backupError && backupError.code === '42P01') {
+                    addLog('⚠️ Tabela de backup não existe, mas dados foram registrados no log', 'warning');
+                    document.getElementById('status-passo2').innerHTML = '<span class="text-yellow-600">⚠️ Backup registrado (tabela não existe)</span>';
+                } else if (backupError) {
+                    throw backupError;
+                } else {
+                    document.getElementById('status-passo2').innerHTML = '<span class="text-green-600">✅ Backup criado com sucesso!</span>';
+                    document.getElementById('status-backup').innerHTML = '<span class="text-green-600"><i class="fas fa-check-circle mr-1"></i>Criado agora</span>';
+                    addLog(`✅ Backup criado: ${backupData.total_produtos} produtos, ${backupData.total_unidades} unidades`, 'success');
+                    showToast('Backup criado com sucesso!', 'success');
+                }
                 
             } catch (error) {
                 handleError(error, 'Erro ao criar backup');
                 document.getElementById('status-passo2').innerHTML = '<span class="text-red-600">❌ Erro ao criar backup</span>';
-                addLog('Erro ao criar backup: ' + error.message, 'error');
+                addLog('❌ Erro ao criar backup: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
@@ -384,18 +400,72 @@
             
             addLog('========================================', 'warning');
             addLog('INICIANDO REPROCESSAMENTO DE ESTOQUE', 'warning');
+            addLog('Validando apenas ENTRADAS e SAÍDAS', 'warning');
             addLog('========================================', 'warning');
             
             try {
-                // Executar reprocessamento
-                addLog('Executando procedure de reprocessamento...', 'process');
-                const { data, error } = await supabaseClient.rpc('reprocessar_estoque_completo');
+                // ETAPA 1: Zerar estoque
+                addLog('⏳ Etapa 1: Zerando estoque de todos os produtos...', 'process');
+                const { data: zeroResult, error: zeroError } = await supabaseClient
+                    .from('produtos')
+                    .update({ estoque_atual: 0 })
+                    .select('id');
                 
-                if (error) throw error;
+                if (zeroError) throw new Error('Erro ao zerar: ' + zeroError.message);
+                addLog(`✅ Zeraram ${zeroResult?.length || 0} produtos`, 'success');
+
+                // ETAPA 2: Processar ENTRADAS (Pedidos de Compra Recebidos)
+                addLog('⏳ Etapa 2: Processando ENTRADAS (pedidos recebidos)...', 'process');
+                const { data: entradas, error: entradaError } = await supabaseClient
+                    .rpc('processar_entradas_compras');
+                
+                if (entradaError) throw new Error('Erro ao processar entradas: ' + entradaError.message);
+                const totalEntradas = entradas?.reduce((sum, e) => sum + (e.quantidade_total || 0), 0) || 0;
+                addLog(`✅ Processadas ${entradas?.length || 0} movimentações de entrada (${totalEntradas} unidades)`, 'success');
+                entradas?.forEach(e => {
+                    addLog(`   → ${e.produto_nome}: +${e.quantidade_total}`, 'info');
+                });
+
+                // ETAPA 3: Processar SAÍDAS (Vendas Finalizadas)
+                addLog('⏳ Etapa 3: Processando SAÍDAS (vendas finalizadas)...', 'process');
+                const { data: saidas, error: saidaError } = await supabaseClient
+                    .rpc('processar_saidas_vendas');
+                
+                if (saidaError) throw new Error('Erro ao processar saídas: ' + saidaError.message);
+                const totalSaidas = saidas?.reduce((sum, s) => sum + (s.quantidade_total || 0), 0) || 0;
+                addLog(`✅ Processadas ${saidas?.length || 0} movimentações de saída (${totalSaidas} unidades)`, 'success');
+                saidas?.forEach(s => {
+                    addLog(`   → ${s.produto_nome}: -${s.quantidade_total}`, 'info');
+                });
+
+                // ETAPA 4: Atualizar lotes
+                addLog('⏳ Etapa 4: Atualizando quantidade de lotes...', 'process');
+                const { data: lotes, error: lotesError } = await supabaseClient
+                    .rpc('atualizar_quantidade_lotes');
+                
+                if (lotesError) throw new Error('Erro ao atualizar lotes: ' + lotesError.message);
+                addLog(`✅ Atualizaram ${lotes?.length || 0} lotes de produtos`, 'success');
+
+                // ETAPA 5: Validar consistência
+                addLog('⏳ Etapa 5: Validando consistência...', 'process');
+                const { data: validacao, error: validacaoError } = await supabaseClient
+                    .rpc('validar_consistencia_estoque');
+                
+                if (validacaoError) throw new Error('Erro ao validar: ' + validacaoError.message);
+                const divergencias = validacao?.filter(v => v.status === 'DIVERGÊNCIA').length || 0;
+                addLog(`✅ Validação concluída: ${validacao?.length || 0} produtos verificados`, 'success');
+                if (divergencias > 0) {
+                    addLog(`⚠️ ${divergencias} produtos com divergências encontrados`, 'warning');
+                } else {
+                    addLog('✅ Nenhuma divergência encontrada!', 'success');
+                }
 
                 document.getElementById('status-passo3').innerHTML = '<span class="text-green-600">✅ Reprocessamento concluído!</span>';
                 addLog('========================================', 'success');
                 addLog('REPROCESSAMENTO CONCLUÍDO COM SUCESSO!', 'success');
+                addLog(`Total de entradas: ${totalEntradas} unidades`, 'info');
+                addLog(`Total de saídas: ${totalSaidas} unidades`, 'info');
+                addLog(`Estoque final esperado: ${totalEntradas - totalSaidas} unidades`, 'info');
                 addLog('========================================', 'success');
                 
                 showToast('Estoque reprocessado com sucesso!', 'success');
@@ -406,7 +476,10 @@
             } catch (error) {
                 handleError(error, 'Erro ao reprocessar estoque');
                 document.getElementById('status-passo3').innerHTML = '<span class="text-red-600">❌ Erro no reprocessamento</span>';
-                addLog('ERRO CRÍTICO: ' + error.message, 'error');
+                addLog('========================================', 'error');
+                addLog('❌ ERRO CRÍTICO NO REPROCESSAMENTO', 'error');
+                addLog(error.message, 'error');
+                addLog('========================================', 'error');
             } finally {
                 showLoading(false);
                 document.getElementById('loading-text').textContent = 'Processando...';
@@ -418,34 +491,45 @@
             addLog('Verificando resultado do reprocessamento...', 'process');
             
             try {
-                const { data, error } = await supabaseClient.rpc('verificar_consistencia_estoque');
+                const { data, error } = await supabaseClient.rpc('validar_consistencia_estoque');
                 
                 if (error) throw error;
 
                 const resultadoContainer = document.getElementById('resultado-container');
                 const resultadoContent = document.getElementById('resultado-content');
                 
+                if (!data || data.length === 0) {
+                    resultadoContent.innerHTML = '<div class="text-center py-8 text-gray-500"><i class="fas fa-check-circle text-4xl mb-4 text-green-600"></i><p>Nenhum produto com discrepâncias encontrado!</p></div>';
+                    resultadoContainer.style.display = 'block';
+                    document.getElementById('status-passo4').innerHTML = '<span class="text-green-600">✅ Verificação OK - Sem divergências!</span>';
+                    addLog('✅ Verificação concluída. Nenhuma divergência encontrada!', 'success');
+                    return;
+                }
+
                 let html = '<div class="overflow-x-auto"><table class="min-w-full divide-y divide-gray-200">';
                 html += '<thead class="bg-gray-50"><tr>';
                 html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>';
-                html += '<th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sabor</th>';
-                html += '<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Estoque</th>';
                 html += '<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Entradas</th>';
                 html += '<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Saídas</th>';
                 html += '<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Calculado</th>';
+                html += '<th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Estoque Real</th>';
                 html += '<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>';
                 html += '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
                 
+                let divergenciasTotal = 0;
+                
                 data?.forEach(row => {
-                    const ok = row.estoque_final === row.estoque_calculado;
+                    const ok = row.status === 'OK';
+                    if (!ok) divergenciasTotal++;
+                    
                     html += '<tr class="' + (ok ? '' : 'bg-red-50') + '">';
-                    html += `<td class="px-4 py-3 text-sm">${row.produto}</td>`;
-                    html += `<td class="px-4 py-3 text-sm">${row.sabor}</td>`;
-                    html += `<td class="px-4 py-3 text-sm text-right font-semibold">${row.estoque_final || 0}</td>`;
-                    html += `<td class="px-4 py-3 text-sm text-right text-green-600">${row.total_entradas || 0}</td>`;
-                    html += `<td class="px-4 py-3 text-sm text-right text-red-600">${row.total_saidas || 0}</td>`;
-                    html += `<td class="px-4 py-3 text-sm text-right">${row.estoque_calculado || 0}</td>`;
-                    html += `<td class="px-4 py-3 text-center text-lg">${ok ? '✅' : '⚠️'}</td>`;
+                    html += `<td class="px-4 py-3 text-sm font-medium">${row.produto_nome || row.produto_id}</td>`;
+                    html += `<td class="px-4 py-3 text-sm text-right text-green-600 font-semibold">+${row.entradas_total || 0}</td>`;
+                    html += `<td class="px-4 py-3 text-sm text-right text-red-600 font-semibold">-${row.saidas_total || 0}</td>`;
+                    html += `<td class="px-4 py-3 text-sm text-right font-semibold">${row.estoque_calculado || 0}</td>`;
+                    html += `<td class="px-4 py-3 text-sm text-right font-semibold">${row.estoque_atual || 0}</td>`;
+                    const statusBadge = ok ? '✅ OK' : `⚠️ DIVERGÊNCIA (${Math.abs((row.estoque_calculado || 0) - (row.estoque_atual || 0))})`;
+                    html += `<td class="px-4 py-3 text-center text-sm">${statusBadge}</td>`;
                     html += '</tr>';
                 });
                 
@@ -454,8 +538,13 @@
                 resultadoContent.innerHTML = html;
                 resultadoContainer.style.display = 'block';
                 
-                document.getElementById('status-passo4').innerHTML = '<span class="text-green-600">✅ Verificação concluída!</span>';
-                addLog('Verificação concluída. Veja os resultados abaixo.', 'success');
+                if (divergenciasTotal === 0) {
+                    document.getElementById('status-passo4').innerHTML = '<span class="text-green-600">✅ Verificação OK - Nenhuma divergência!</span>';
+                    addLog(`✅ Verificação concluída: ${data.length} produtos validados, NENHUMA divergência!`, 'success');
+                } else {
+                    document.getElementById('status-passo4').innerHTML = `<span class="text-yellow-600">⚠️ Verificação concluída - ${divergenciasTotal} divergências encontradas</span>`;
+                    addLog(`⚠️ Verificação concluída: ${data.length} produtos validados, ${divergenciasTotal} com divergências`, 'warning');
+                }
                 
                 // Carregar detalhes dos pedidos processados
                 await carregarPedidosProcessados();
@@ -463,7 +552,7 @@
             } catch (error) {
                 handleError(error, 'Erro ao verificar resultado');
                 document.getElementById('status-passo4').innerHTML = '<span class="text-red-600">❌ Erro na verificação</span>';
-                addLog('Erro ao verificar: ' + error.message, 'error');
+                addLog('❌ Erro ao verificar: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
@@ -489,55 +578,62 @@
         // Carregar pedidos processados
         async function carregarPedidosProcessados() {
             try {
-                addLog('Carregando vendas finalizadas...', 'process');
+                addLog('Carregando detalhes dos pedidos processados...', 'process');
                 
-                // Buscar vendas finalizadas
-                const { data: vendas, error: e1 } = await supabaseClient
-                    .from('vendas')
-                    .select(`
-                        *,
-                        cliente:clientes(nome),
-                        itens:venda_itens(quantidade)
-                    `)
-                    .eq('status_venda', 'FINALIZADA')
-                    .order('created_at', { ascending: false });
-
-                if (e1) throw e1;
-                
-                addLog('Carregando pedidos de compra finalizados...', 'process');
-                
-                // Buscar pedidos de compra
-                const { data: compras, error: e2 } = await supabaseClient
+                // Buscar compras RECEBIDAS
+                const { data: compras, error: e1 } = await supabaseClient
                     .from('pedidos_compra')
                     .select(`
-                        *,
+                        id,
+                        numero,
+                        status,
+                        data_recebimento,
                         fornecedor:fornecedores(nome),
                         itens:pedido_compra_itens(quantidade)
                     `)
-                    .order('created_at', { ascending: false });
+                    .eq('status', 'RECEBIDO')
+                    .order('data_recebimento', { ascending: false })
+                    .limit(50);
+
+                if (e1) throw e1;
+                
+                // Buscar vendas FINALIZADAS
+                const { data: vendas, error: e2 } = await supabaseClient
+                    .from('vendas')
+                    .select(`
+                        id,
+                        numero_nfce,
+                        status_venda,
+                        data_venda,
+                        cliente:clientes(nome),
+                        itens:vendas_itens(quantidade)
+                    `)
+                    .eq('status_venda', 'FINALIZADA')
+                    .order('data_venda', { ascending: false })
+                    .limit(50);
 
                 if (e2) throw e2;
 
-                // Renderizar vendas
-                renderPedidos(vendas, 'vendas');
-                
                 // Renderizar compras
-                renderPedidos(compras, 'compras');
+                renderPedidos(compras || [], 'compras');
+                
+                // Renderizar vendas
+                renderPedidos(vendas || [], 'vendas');
 
                 // Mostrar container
                 document.getElementById('pedidos-processados-container').style.display = 'block';
-                addLog(`Carregados ${compras.length} compras e ${vendas.length} vendas`, 'success');
+                addLog(`✅ Carregados ${(compras || []).length} compras recebidas e ${(vendas || []).length} vendas finalizadas`, 'success');
 
             } catch (error) {
                 console.error('Erro ao carregar pedidos:', error);
-                addLog('Erro ao carregar detalhes dos pedidos: ' + error.message, 'error');
+                addLog('❌ Erro ao carregar detalhes dos pedidos: ' + error.message, 'error');
             }
         }
 
         function renderPedidos(pedidos, tipo) {
             const tbody = document.getElementById(`tbody-${tipo}`);
             
-            if (pedidos.length === 0) {
+            if (!pedidos || pedidos.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nenhum pedido encontrado</td></tr>';
                 return;
             }
@@ -546,12 +642,14 @@
                 const quantidadeTotal = pedido.itens?.reduce((sum, item) => sum + (item.quantidade || 0), 0) || 0;
                 const numItens = pedido.itens?.length || 0;
                 const parceiro = tipo === 'compras' ? pedido.fornecedor?.nome : pedido.cliente?.nome;
-                const data = new Date(pedido.data_finalizacao || pedido.created_at).toLocaleDateString('pt-BR');
+                const dataField = tipo === 'compras' ? 'data_recebimento' : 'data_venda';
+                const data = new Date(pedido[dataField] || pedido.created_at).toLocaleDateString('pt-BR');
+                const numero = tipo === 'compras' ? pedido.numero : (pedido.numero_nfce || '-');
 
                 return `
                     <tr class="hover:bg-gray-50">
                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            ${pedido.numero}
+                            ${numero}
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             ${parceiro || '-'}

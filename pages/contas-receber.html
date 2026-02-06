@@ -359,6 +359,12 @@
                 console.error('Erro ao verificar autenticação:', erro);
             }
 
+            // 🚀 Inicializar navbar e sidebar
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
+
             await carregarClientes();
             await carregarContas();
             atualizarResumo();

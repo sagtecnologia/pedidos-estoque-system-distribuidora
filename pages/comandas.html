@@ -260,6 +260,8 @@
         let comandasFiltradas = [];
         let comandaAtual = null;
         let tipoFiltroAtual = "todas";
+        let adicionandoItemComanda = false; // ✅ Flag para evitar race condition
+        let itensLocaisComanda = []; // 🚀 Array local para operações instantâneas (como PDV)
 
         document.addEventListener("DOMContentLoaded", async () => {
             try {
@@ -364,7 +366,30 @@
 
         async function abrirDetalhesComanda(comandaId) {
             try {
-                comandaAtual = await ServicoComandasService.buscarComandaPorId(comandaId);
+                const inicio = performance.now();
+                
+                // 🚀 Se já temos a comanda carregada, só atualizar itens (mais rápido)
+                if (comandaAtual && comandaAtual.id === comandaId) {
+                    console.log('🚀 Atualizando apenas itens (otimizado)...');
+                    const itens = await ServicoComandasService.atualizarItensComanda(comandaId);
+                    comandaAtual.itens = itens;
+                } else {
+                    // Primeira vez carregando, buscar dados completos
+                    console.log('📥 Carregando comanda completa...');
+                    comandaAtual = await ServicoComandasService.buscarComandaPorId(comandaId);
+                }
+                
+                // 🚀 CARREGAR ITENS EM ARRAY LOCAL
+                itensLocaisComanda = (comandaAtual.itens || []).map(item => ({
+                    id: item.id,
+                    produto_id: item.produto_id,
+                    nome_produto: item.nome_produto,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.preco_unitario,
+                    subtotal: item.subtotal,
+                    status: item.status,
+                    observacoes: item.observacoes
+                }));
                 
                 // Mostrar Mesa X se tiver numero_mesa, senão só o numero_comanda
                 let tituloComanda = comandaAtual.numero_mesa 
@@ -377,28 +402,141 @@
                 document.getElementById("comanda-data-abertura").textContent = 
                     formatarDataHora(comandaAtual.data_abertura);
 
-                renderizarItensComanda();
-                atualizarTotais();
+                renderizarItensComandaLocal();
+                atualizarTotaisLocal();
                 
                 // Re-setup busca ao abrir modal
                 setupBuscaProduto();
 
                 document.getElementById("modalDetalhesComanda").classList.remove("hidden");
+                
+                const tempo = (performance.now() - inicio).toFixed(0);
+                console.log(`✅ Modal aberto em ${tempo}ms`);
             } catch (erro) {
                 console.error("Erro ao carregar detalhes:", erro);
                 mostrarMensagem('Erro', 'Erro ao carregar detalhes da comanda', 'erro');
             }
         }
 
-        function renderizarItensComanda() {
+
+        // 🚀 Removed old renderizarItensComanda - using renderizarItensComandaLocal instead
+
+        async function adicionarProdutoPorId(produtoId) {
+            // ✅ BLOQUEAR CLIQUES MÚLTIPLOS ENQUANTO ESTÁ PROCESSANDO
+            if (adicionandoItemComanda) {
+                console.warn('⚠️ Já está adicionando item, aguarde...');
+                return;
+            }
+            
+            const quantidade = parseFloat(document.getElementById("add-quantidade").value);
+
+            if (!produtoId || quantidade <= 0) {
+                mostrarMensagem('Atenção', 'Produto ou quantidade inválida', 'aviso');
+                return;
+            }
+
+            try {
+                // 🚀 MARCAR COMO PROCESSANDO
+                adicionandoItemComanda = true;
+                const inputBusca = document.getElementById("busca-produto-comanda");
+                const inputQuantidade = document.getElementById("add-quantidade");
+                
+                // Desabilitar visualmente
+                inputBusca.disabled = true;
+                inputQuantidade.disabled = true;
+                inputBusca.style.opacity = "0.5";
+                inputQuantidade.style.opacity = "0.5";
+                inputBusca.style.cursor = "not-allowed";
+                inputQuantidade.style.cursor = "not-allowed";
+                
+                // 🚀 BUSCAR PRODUTO (rápido - apenas uma query)
+                const { data: produto, error: erroP } = await supabase
+                    .from('produtos')
+                    .select('id, nome, preco_venda, estoque_atual')
+                    .eq('id', produtoId)
+                    .single();
+
+                if (erroP || !produto) {
+                    throw new Error('Produto não encontrado');
+                }
+
+                // 🚀 VALIDAR ESTOQUE RAPIDAMENTE
+                const estoqueDisponivel = produto.estoque_atual || 0;
+                const quantidadeJaAdicionada = itensLocaisComanda
+                    .filter(i => i.produto_id === produtoId)
+                    .reduce((sum, i) => sum + i.quantidade, 0);
+                const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
+
+                if (quantidadeTotalNecessaria > estoqueDisponivel) {
+                    throw new Error(
+                        `Estoque insuficiente para ${produto.nome}\n` +
+                        `Já adicionado: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                        `Novo: ${quantidade.toFixed(2)}\n` +
+                        `Total: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
+                        `Disponível: ${estoqueDisponivel.toFixed(2)}`
+                    );
+                }
+
+                // 🚀 ADICIONAR LOCALMENTE (INSTANTÂNEO!)
+                const itemExistenteIdx = itensLocaisComanda.findIndex(i => i.produto_id === produtoId);
+                if (itemExistenteIdx >= 0) {
+                    itensLocaisComanda[itemExistenteIdx].quantidade += quantidade;
+                    itensLocaisComanda[itemExistenteIdx].subtotal = 
+                        itensLocaisComanda[itemExistenteIdx].quantidade * itensLocaisComanda[itemExistenteIdx].preco_unitario;
+                } else {
+                    itensLocaisComanda.push({
+                        id: `temp-${Date.now()}`,
+                        produto_id: produtoId,
+                        nome_produto: produto.nome,
+                        quantidade: quantidade,
+                        preco_unitario: parseFloat(produto.preco_venda),
+                        subtotal: parseFloat(produto.preco_venda) * quantidade,
+                        status: 'pendente',
+                        observacoes: null
+                    });
+                }
+
+                // 🚀 RENDERIZAR IMEDIATAMENTE (sem esperar banco)
+                renderizarItensComandaLocal();
+                atualizarTotaisLocal();
+
+                // 🚀 LIMPAR INPUTS
+                document.getElementById("add-quantidade").value = "1";
+                document.getElementById("busca-produto-comanda").value = "";
+
+                // 🚀 SINCRONIZAR COM BANCO EM BACKGROUND (não bloqueia UX)
+                sincronizarItensBanco(comandaAtual.id).catch(err => {
+                    console.error('Erro ao sincronizar com banco:', err);
+                    mostrarMensagem('Aviso', 'Item adicionado localmente, mas erro ao sincronizar', 'aviso');
+                });
+
+            } catch (erro) {
+                console.error("Erro ao adicionar item:", erro);
+                mostrarMensagem('Erro', erro.message, 'erro');
+            } finally {
+                // 🚀 LIBERAR CLIQUES NOVAMENTE
+                adicionandoItemComanda = false;
+                const inputBusca = document.getElementById("busca-produto-comanda");
+                const inputQuantidade = document.getElementById("add-quantidade");
+                inputBusca.disabled = false;
+                inputQuantidade.disabled = false;
+                inputBusca.style.opacity = "1";
+                inputQuantidade.style.opacity = "1";
+                inputBusca.style.cursor = "text";
+                inputQuantidade.style.cursor = "text";
+            }
+        }
+
+        // 🚀 RENDERIZAR ITENS DO ARRAY LOCAL
+        function renderizarItensComandaLocal() {
             const container = document.getElementById("lista-itens-comanda");
             
-            if (!comandaAtual.itens || comandaAtual.itens.length === 0) {
+            if (!itensLocaisComanda || itensLocaisComanda.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 text-center">Nenhum item adicionado</p>';
                 return;
             }
 
-            container.innerHTML = comandaAtual.itens.map(item => {
+            container.innerHTML = itensLocaisComanda.map(item => {
                 if (item.status === "cancelado") return "";
                 
                 return `
@@ -412,16 +550,16 @@
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0">
                             <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                                <button onclick="alterarQuantidadeItem('${item.id}', ${item.quantidade - 1})" class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm" ${item.quantidade <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
+                                <button onclick="alterarQuantidadeItemLocal('${item.produto_id}', ${item.quantidade - 1})" class="px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm" ${item.quantidade <= 1 ? 'disabled style="opacity: 0.5; cursor: not-allowed;"' : ''}>
                                     <i class="fas fa-minus"></i>
                                 </button>
                                 <span class="px-3 font-bold text-sm">${item.quantidade.toFixed(2)}</span>
-                                <button onclick="alterarQuantidadeItem('${item.id}', ${item.quantidade + 1})" class="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
+                                <button onclick="alterarQuantidadeItemLocal('${item.produto_id}', ${item.quantidade + 1})" class="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm">
                                     <i class="fas fa-plus"></i>
                                 </button>
                             </div>
                             <div class="font-bold text-lg text-right min-w-[80px]">R$ ${item.subtotal.toFixed(2)}</div>
-                            <button onclick="removerItemComanda('${item.id}')" class="text-red-600 hover:text-red-800 p-2">
+                            <button onclick="removerItemComandaLocal('${item.produto_id}')" class="text-red-600 hover:text-red-800 p-2">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -430,76 +568,109 @@
             }).join("");
         }
 
-        function atualizarTotais() {
-            document.getElementById("comanda-subtotal").textContent = "R$ " + comandaAtual.subtotal.toFixed(2);
-            document.getElementById("comanda-desconto").textContent = "-R$ " + (comandaAtual.desconto || 0).toFixed(2);
-            document.getElementById("comanda-acrescimo").textContent = "+R$ " + (comandaAtual.acrescimo || 0).toFixed(2);
-            document.getElementById("comanda-total").textContent = "R$ " + comandaAtual.valor_total.toFixed(2);
+        // 🚀 ATUALIZAR TOTAIS LOCALMENTE
+        function atualizarTotaisLocal() {
+            const subtotal = itensLocaisComanda.reduce((sum, item) => sum + item.subtotal, 0);
+            const desconto = (comandaAtual?.desconto || 0);
+            const acrescimo = (comandaAtual?.acrescimo || 0);
+            const total = subtotal - desconto + acrescimo;
+
+            document.getElementById("comanda-subtotal").textContent = "R$ " + subtotal.toFixed(2);
+            document.getElementById("comanda-desconto").textContent = "-R$ " + desconto.toFixed(2);
+            document.getElementById("comanda-acrescimo").textContent = "+R$ " + acrescimo.toFixed(2);
+            document.getElementById("comanda-total").textContent = "R$ " + total.toFixed(2);
         }
 
-        async function adicionarProdutoPorId(produtoId) {
-            const quantidade = parseFloat(document.getElementById("add-quantidade").value);
+        // 🚀 REMOVER ITEM LOCALMENTE
+        function removerItemComandaLocal(produtoId) {
+            itensLocaisComanda = itensLocaisComanda.filter(i => i.produto_id !== produtoId);
+            renderizarItensComandaLocal();
+            atualizarTotaisLocal();
+            sincronizarItensBanco(comandaAtual.id).catch(err => console.error('Erro ao sincronizar:', err));
+        }
 
-            if (!produtoId || quantidade <= 0) {
-                mostrarMensagem('Atenção', 'Produto ou quantidade inválida', 'aviso');
+        // 🚀 ALTERAR QUANTIDADE LOCALMENTE
+        function alterarQuantidadeItemLocal(produtoId, novaQuantidade) {
+            if (novaQuantidade <= 0) {
+                removerItemComandaLocal(produtoId);
                 return;
             }
 
-            try {
-                await ServicoComandasService.adicionarItem(comandaAtual.id, produtoId, quantidade);
-                await abrirDetalhesComanda(comandaAtual.id);
-                document.getElementById("add-quantidade").value = "1";
-                document.getElementById("busca-produto-comanda").value = "";
-            } catch (erro) {
-                console.error("Erro ao adicionar item:", erro);
-                mostrarMensagem('Erro', erro.message, 'erro');
+            const item = itensLocaisComanda.find(i => i.produto_id === produtoId);
+            if (item) {
+                item.quantidade = novaQuantidade;
+                item.subtotal = item.preco_unitario * novaQuantidade;
+                renderizarItensComandaLocal();
+                atualizarTotaisLocal();
+                sincronizarItensBanco(comandaAtual.id).catch(err => console.error('Erro ao sincronizar:', err));
             }
         }
 
-        async function removerItemComanda(itemId) {
+        // 🚀 SINCRONIZAR ITENS LOCAIS COM BANCO (background)
+        async function sincronizarItensBanco(comandaId) {
             try {
-                // Confirma\u00e7\u00e3o via modal
-                const overlay = document.createElement('div');
-                overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
-                overlay.innerHTML = `
-                    <div class="bg-white p-6 rounded-lg max-w-sm">
-                        <h3 class="text-lg font-bold mb-3"><i class="fas fa-exclamation-triangle text-yellow-500 mr-2"></i>Confirmar Remo\u00e7\u00e3o</h3>
-                        <p class="text-gray-600 mb-4">Remover este item da comanda?</p>
-                        <div class="flex gap-2">
-                            <button id="btn-cancelar-remocao" class="flex-1 px-4 py-2 border rounded hover:bg-gray-100">Cancelar</button>
-                            <button id="btn-confirmar-remocao" class="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Remover</button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(overlay);
+                console.log('🔄 Sincronizando itens com banco...');
                 
-                const confirmar = await new Promise((resolve) => {
-                    overlay.querySelector('#btn-confirmar-remocao').onclick = () => { overlay.remove(); resolve(true); };
-                    overlay.querySelector('#btn-cancelar-remocao').onclick = () => { overlay.remove(); resolve(false); };
-                });
+                // Limpar itens antigos desta comanda
+                await supabase
+                    .from('comanda_itens')
+                    .delete()
+                    .eq('comanda_id', comandaId)
+                    .eq('status', 'pendente');
+
+                // Inserir todos os itens locais
+                if (itensLocaisComanda.length > 0) {
+                    const { data: { user } } = await supabase.auth.getUser();
+                    
+                    const itensParaSalvar = itensLocaisComanda.map(item => ({
+                        comanda_id: comandaId,
+                        produto_id: item.produto_id,
+                        nome_produto: item.nome_produto,
+                        quantidade: item.quantidade,
+                        preco_unitario: item.preco_unitario,
+                        subtotal: item.subtotal,
+                        observacoes: item.observacoes,
+                        usuario_id: user?.id,
+                        status: 'pendente'
+                    }));
+
+                    await supabase
+                        .from('comanda_itens')
+                        .insert(itensParaSalvar);
+                }
+
+                // Recalcular totais da comanda
+                const subtotal = itensLocaisComanda.reduce((sum, item) => sum + item.subtotal, 0);
+                const { error: errorUpdate } = await supabase
+                    .from('comandas')
+                    .update({
+                        total_itens: itensLocaisComanda.length,
+                        subtotal: subtotal,
+                        valor_total: subtotal + (comandaAtual?.acrescimo || 0) - (comandaAtual?.desconto || 0),
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', comandaId);
+
+                if (errorUpdate) throw errorUpdate;
                 
-                if (!confirmar) return;
-                
-                await ServicoComandasService.removerItem(itemId);
-                await abrirDetalhesComanda(comandaAtual.id);
+                console.log('✅ Sincronização concluída');
             } catch (erro) {
-                console.error("Erro ao remover item:", erro);
-                mostrarMensagem('Erro', erro.message, 'erro');
+                console.error('Erro ao sincronizar:', erro);
             }
         }
 
         async function alterarQuantidadeItem(itemId, novaQuantidade) {
             if (novaQuantidade <= 0) {
                 // Se quantidade for 0 ou menor, remove o item
-                await removerItemComanda(itemId);
+                removerItemComandaLocal(itemId);
                 return;
             }
 
             try {
                 // Buscar o produto do item para validar estoque
-                const item = comandaAtual.itens.find(i => i.id === itemId);
+                const item = itensLocaisComanda.find(i => i.id === itemId);
                 if (!item) {
-                    throw new Error('Item n\u00e3o encontrado');
+                    throw new Error('Item não encontrado');
                 }
 
                 // Validar estoque antes de aumentar quantidade
@@ -519,8 +690,7 @@
                     return;
                 }
 
-                await ServicoComandasService.alterarQuantidadeItem(itemId, novaQuantidade);
-                await abrirDetalhesComanda(comandaAtual.id);
+                alterarQuantidadeItemLocal(item.produto_id, novaQuantidade);
             } catch (erro) {
                 console.error("Erro ao alterar quantidade:", erro);
                 mostrarMensagem('Erro', 'Erro ao alterar quantidade: ' + erro.message, 'erro');
@@ -533,7 +703,11 @@
 
         function exibirTelaFinalizacaoComanda() {
             console.log('🔵 Abrindo modal de finalizacao da comanda...');
-            const total = comandaAtual.valor_total;
+            // 🚀 Calcular total localmente
+            const subtotal = itensLocaisComanda.reduce((sum, item) => sum + item.subtotal, 0);
+            const desconto = (comandaAtual?.desconto || 0);
+            const acrescimo = (comandaAtual?.acrescimo || 0);
+            const total = subtotal - desconto + acrescimo;
             
             // Criar elementos
             const overlay = document.createElement('div');
