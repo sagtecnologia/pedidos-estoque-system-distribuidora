@@ -334,6 +334,40 @@ class ServicoVencimento {
             return `${diasRestantes} dias`;
         }
     }
+
+    /**
+     * Atualizar data de vencimento de um lote
+     * @param {number} loteId - ID do lote
+     * @param {string} novaData - Nova data no formato YYYY-MM-DD
+     * @returns {Object} Resultado da atualização
+     */
+    async atualizarDataVencimento(loteId, novaData) {
+        try {
+            console.log(`🔄 [Vencimentos] Atualizando vencimento do lote ${loteId} para ${novaData}...`);
+
+            const { data, error } = await supabase
+                .from('produto_lotes')
+                .update({
+                    data_vencimento: novaData,
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', loteId)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            console.log(`✅ [Vencimentos] Vencimento atualizado com sucesso`);
+            return {
+                sucesso: true,
+                lote: data,
+                mensagem: 'Data de vencimento atualizada com sucesso'
+            };
+        } catch (erro) {
+            console.error('❌ [Vencimentos] Erro ao atualizar vencimento:', erro);
+            throw erro;
+        }
+    }
 }
 
 // Exportar instância única
