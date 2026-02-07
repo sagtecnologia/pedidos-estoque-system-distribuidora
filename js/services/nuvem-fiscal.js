@@ -227,30 +227,73 @@ class NuvemFiscalService {
      */
     async emitirNFCe(dadosNFCe) {
         try {
-            // Validação pré-emissão: verificar se documento já existe/foi emitido
-            const chaveNFCe = dadosNFCe?.infNFe?.ide?.cDV;
-            if (!chaveNFCe) {
-                throw new Error('Erro: Chave da NFC-e não encontrada. Verifique os dados da NFC-e.');
-            }
-
-            console.log('🔍 [NuvemFiscal] Validando estado anterior da NFC-e com chave:', chaveNFCe);
+            // ✅ CORREÇÃO: Extrair chave da NFC-e corretamente
+            // A chave pode estar em:
+            // 1. dadosNFCe.chave_acesso (se já foi calculada)
+            // 2. dadosNFCe.infNFe.Id (no formato "NFe" + chave de 44 dígitos)
+            // 3. Precisar ser calculada a partir dos campos (último caso)
             
-            // Tentar consultar documento anterior
-            try {
-                const docAnterior = await this.consultarNFCe(chaveNFCe);
-                if (docAnterior && docAnterior.status === 'autorizado') {
-                    throw new Error(`❌ NFC-e com chave ${chaveNFCe} já foi AUTORIZADA anteriormente (Status: ${docAnterior.status}). Não é possível emitir novamente. Verifique o número sequencial da NFC-e.`);
+            let chaveNFCe = null;
+            
+            // Tentar extrair da chave pré-calculada
+            if (dadosNFCe?.chave_acesso) {
+                chaveNFCe = dadosNFCe.chave_acesso;
+            } 
+            // Tentar extrair do atributo Id da infNFe (formato: "NFe" + 44 dígitos)
+            else if (dadosNFCe?.infNFe?.Id) {
+                const id = dadosNFCe.infNFe.Id;
+                // Remove "NFe" do início se existir
+                chaveNFCe = id.replace(/^NFe/i, '');
+            }
+            // Tentar montar a partir dos componentes (UF, AAMM, CNPJ, modelo, série, número, etc)
+            else if (dadosNFCe?.infNFe?.ide) {
+                const ide = dadosNFCe.infNFe.ide;
+                const emit = dadosNFCe?.infNFe?.emit;
+                
+                // Validar se temos os campos mínimos
+                if (ide.cUF && ide.dhEmi && emit?.CNPJ && ide.mod && ide.serie && ide.nNF && ide.cNF && ide.cDV) {
+                    // Montar chave (44 dígitos): UF(2) + AAMM(4) + CNPJ(14) + mod(2) + serie(3) + nNF(9) + tpEmis(1) + cNF(8) + DV(1)
+                    const aamm = ide.dhEmi.substring(2, 4) + ide.dhEmi.substring(5, 7); // AAMM do dhEmi
+                    const cnpj = emit.CNPJ.padStart(14, '0');
+                    const modelo = String(ide.mod).padStart(2, '0');
+                    const serie = String(ide.serie).padStart(3, '0');
+                    const numero = String(ide.nNF).padStart(9, '0');
+                    const tpEmis = String(ide.tpEmis || '1').padStart(1, '0');
+                    const codNumerico = String(ide.cNF).padStart(8, '0');
+                    const dv = String(ide.cDV).padStart(1, '0');
+                    
+                    chaveNFCe = `${ide.cUF}${aamm}${cnpj}${modelo}${serie}${numero}${tpEmis}${codNumerico}${dv}`;
+                } else {
+                    console.warn('⚠️ [NuvemFiscal] Campos insuficientes para montar chave da NFC-e');
                 }
-                if (docAnterior && docAnterior.status === 'cancelado') {
-                    throw new Error(`❌ NFC-e com chave ${chaveNFCe} já foi CANCELADA anteriormente. Não é possível reemitir um documento cancelado.`);
-                }
-                if (docAnterior && docAnterior.status === 'rejeitado') {
-                    console.warn('⚠️ [NuvemFiscal] NFC-e anterior foi rejeitada, permitindo nova tentativa...');
-                }
-            } catch (erroConsulta) {
-                // Se não encontrar (erro 404), é normal - documento novo
-                if (!erroConsulta.message?.includes('404') && !erroConsulta.message?.includes('não encontrado')) {
-                    console.warn('⚠️ [NuvemFiscal] Não foi possível validar documento anterior:', erroConsulta.message);
+            }
+            
+            // Se não conseguiu extrair a chave, apenas avisa mas permite continuar
+            // (a API pode gerar/validar a chave internamente)
+            if (!chaveNFCe || chaveNFCe.length !== 44) {
+                console.warn('⚠️ [NuvemFiscal] Chave da NFC-e não encontrada ou inválida:', chaveNFCe);
+                console.warn('⚠️ [NuvemFiscal] Continuando sem validação prévia (a API fará a validação)');
+                // NÃO lançar erro aqui, permitir que a API processe
+            } else {
+                console.log('🔍 [NuvemFiscal] Chave da NFC-e extraída:', chaveNFCe);
+                
+                // Tentar consultar documento anterior
+                try {
+                    const docAnterior = await this.consultarNFCe(chaveNFCe);
+                    if (docAnterior && docAnterior.status === 'autorizado') {
+                        throw new Error(`❌ NFC-e com chave ${chaveNFCe} já foi AUTORIZADA anteriormente (Status: ${docAnterior.status}). Não é possível emitir novamente. Verifique o número sequencial da NFC-e.`);
+                    }
+                    if (docAnterior && docAnterior.status === 'cancelado') {
+                        throw new Error(`❌ NFC-e com chave ${chaveNFCe} já foi CANCELADA anteriormente. Não é possível reemitir um documento cancelado.`);
+                    }
+                    if (docAnterior && docAnterior.status === 'rejeitado') {
+                        console.warn('⚠️ [NuvemFiscal] NFC-e anterior foi rejeitada, permitindo nova tentativa...');
+                    }
+                } catch (erroConsulta) {
+                    // Se não encontrar (erro 404), é normal - documento novo
+                    if (!erroConsulta.message?.includes('404') && !erroConsulta.message?.includes('não encontrado')) {
+                        console.warn('⚠️ [NuvemFiscal] Não foi possível validar documento anterior:', erroConsulta.message);
+                    }
                 }
             }
 

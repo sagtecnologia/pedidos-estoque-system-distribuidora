@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="../css/styles.css">
     
     <!-- Serviço Centralizado de Estoque -->
-    <script src="../js/services/estoque-central.js"></script>
+    <script src="../js/services/estoque-central.js?v=20260207"></script>
 </head>
 <body class="bg-gray-100">
     <div id="navbar"></div>
@@ -250,9 +250,18 @@
                             <input type="number" id="item-quantidade" step="1" min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço Unitário (R$)*</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Custo (R$)*</label>
                             <input type="number" id="item-preco" step="0.01" min="0.01" value="0.00" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
                         </div>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Preço de Venda (R$)
+                            <span class="text-xs text-gray-500 font-normal">(opcional - será atualizado no cadastro do produto)</span>
+                        </label>
+                        <input type="number" id="item-preco-venda" step="0.01" min="0.01" value="0.00" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
+                        <p class="text-xs text-gray-500 mt-1">💡 Se não informado, manterá o preço de venda atual do produto</p>
                     </div>
                 </div>
 
@@ -408,6 +417,7 @@
                 const produtoId = document.getElementById('item-produto').value;
                 const quantidade = parseFloat(document.getElementById('item-quantidade').value);
                 const precoUnitario = parseFloat(document.getElementById('item-preco').value);
+                const precoVenda = parseFloat(document.getElementById('item-preco-venda').value) || 0;
 
                 // Validações
                 if (!produtoId) {
@@ -463,7 +473,23 @@
                 }
 
                 console.log('✅ Item adicionado com sucesso!', data);
-                console.log('✅ Item salvo com pedido_id:', itemData.pedido_id);
+                
+                // ✅ Atualizar preço de venda no produto se foi informado
+                if (precoVenda > 0) {
+                    console.log('💰 Atualizando preço de venda do produto:', precoVenda);
+                    const { error: errPreco } = await supabase
+                        .from('produtos')
+                        .update({ preco_venda: precoVenda })
+                        .eq('id', produtoId);
+                    
+                    if (errPreco) {
+                        console.warn('⚠️ Erro ao atualizar preço de venda:', errPreco);
+                        // Não bloqueia a operação, apenas avisa
+                    } else {
+                        console.log('✅ Preço de venda atualizado no produto');
+                    }
+                }
+                
                 showToast('Item adicionado com sucesso!', 'success');
 
                 // Recalcular total do pedido
@@ -491,6 +517,7 @@
             document.getElementById('item-produto').innerHTML = '<option value="">Selecione o produto...</option>';
             document.getElementById('item-quantidade').value = '1';
             document.getElementById('item-preco').value = '0.00';
+            document.getElementById('item-preco-venda').value = '0.00';
         }
 
         async function loadPedido() {
@@ -599,18 +626,33 @@
                 const acoesEl = document.getElementById('acoes-pedido');
                 let botoesHTML = '<button onclick="imprimirPedidoCompra(\'' + pedidoId + '\')" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 text-sm">🖨️ Imprimir</button>';
                 
-                if (pedido.status === 'PENDENTE') {
+                if (pedido.status === 'RASCUNHO') {
                     botoesHTML += ' <button onclick="aprovarPedido()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 text-sm">✅ Aprovar</button>';
-                    botoesHTML += ' <button onclick="cancelarPedido()" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 text-sm">❌ Cancelar</button>';
+                    botoesHTML += ' <button onclick="excluirPedido()" class="bg-red-800 text-white px-6 py-2 rounded-lg hover:bg-red-900 text-sm">🗑️ Excluir</button>';
+                } else if (pedido.status === 'PENDENTE') {
+                    botoesHTML += ' <button onclick="aprovarPedido()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 text-sm">✅ Aprovar</button>';
                     botoesHTML += ' <button onclick="excluirPedido()" class="bg-red-800 text-white px-6 py-2 rounded-lg hover:bg-red-900 text-sm">🗑️ Excluir</button>';
                 } else if (pedido.status === 'APROVADO') {
                     botoesHTML += ' <button onclick="receberPedido()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 text-sm">📦 Receber</button>';
                     botoesHTML += ' <button onclick="reverterAprovacao()" class="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 text-sm">↩️ Reverter Aprovação</button>';
                 } else if (pedido.status === 'RECEBIDO') {
+                    botoesHTML += ' <button onclick="openModal(\'modal-cancelar\')" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 text-sm">❌ Cancelar</button>';
                     botoesHTML += ' <button onclick="reverterRecebimento()" class="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 text-sm">↩️ Reverter Recebimento</button>';
                 }
                 
                 acoesEl.innerHTML = botoesHTML;
+                
+                // Controlar visibilidade de botões de adicionar/editar itens
+                const btnAddItem = document.getElementById('btn-add-item');
+                const btnEditarObs = document.getElementById('btn-editar-obs');
+                if (pedido.status === 'CANCELADO') {
+                    // Desabilitar adição/edição em pedidos cancelados
+                    if (btnAddItem) btnAddItem.style.display = 'none';
+                    if (btnEditarObs) btnEditarObs.style.display = 'none';
+                } else {
+                    if (btnAddItem) btnAddItem.style.display = 'block';
+                    if (btnEditarObs) btnEditarObs.style.display = 'block';
+                }
 
             } catch (error) {
                 console.error('❌ Erro ao carregar pedido:', error);
@@ -673,22 +715,58 @@
         }
 
         async function editarItem(itemId, quantidadeAtual, precoAtual) {
-            // Preencher o modal de edição
-            document.getElementById('editar-item-id').value = itemId;
-            document.getElementById('editar-item-quantidade').value = quantidadeAtual;
-            document.getElementById('editar-item-preco').value = precoAtual;
+            // Verificar se o pedido está cancelado
+            if (pedido.status === 'CANCELADO') {
+                showToast('❌ Não é possível editar itens de um pedido cancelado', 'error');
+                return;
+            }
             
-            // Calcular e mostrar subtotal
-            const quantidade = parseFloat(quantidadeAtual) || 0;
-            const preco = parseFloat(precoAtual) || 0;
-            const subtotal = quantidade * preco;
-            document.getElementById('editar-item-subtotal').textContent = formatCurrency(subtotal);
-            
-            // Abrir modal
-            openModal('modal-editar-item');
+            // Buscar informações do item para obter o nome do produto
+            try {
+                const { data: item, error } = await supabase
+                    .from('pedido_compra_itens')
+                    .select('produto_id')
+                    .eq('id', itemId)
+                    .single();
+                
+                if (error) throw error;
+                
+                // Buscar nome do produto
+                const { data: produto, error: errProduto } = await supabase
+                    .from('produtos')
+                    .select('nome')
+                    .eq('id', item.produto_id)
+                    .single();
+                
+                if (errProduto) throw errProduto;
+                
+                // Preencher o modal de edição
+                document.getElementById('editar-item-id').value = itemId;
+                document.getElementById('editar-item-nome').value = produto.nome || 'Produto não encontrado';
+                document.getElementById('editar-item-quantidade').value = quantidadeAtual;
+                document.getElementById('editar-item-preco').value = precoAtual;
+                
+                // Calcular e mostrar subtotal
+                const quantidade = parseFloat(quantidadeAtual) || 0;
+                const preco = parseFloat(precoAtual) || 0;
+                const subtotal = quantidade * preco;
+                document.getElementById('editar-item-subtotal').textContent = formatCurrency(subtotal);
+                
+                // Abrir modal
+                openModal('modal-editar-item');
+            } catch (error) {
+                console.error('Erro ao buscar dados do item:', error);
+                showToast('Erro ao carregar dados do item', 'error');
+            }
         }
 
         async function removeItem(itemId) {
+            // Verificar se o pedido está cancelado
+            if (pedido.status === 'CANCELADO') {
+                showToast('❌ Não é possível remover itens de um pedido cancelado', 'error');
+                return;
+            }
+            
             if (!confirm('Deseja remover este item?')) return;
             
             try {
@@ -1076,63 +1154,75 @@
             
             // ⚠️ VALIDAÇÃO PRÉVIA: Verificar estoque antes de cancelar/reabrir COMPRA que tem estoque
             const statusComEstoque = ['FINALIZADO', 'APROVADO', 'RECEBIDO'];
-            if (statusComEstoque.includes(pedido.status) && pedido.tipo_pedido === 'COMPRA') {
+            if (statusComEstoque.includes(pedido.status)) {
                 try {
                     console.log('🔍 Validando estoque antes de cancelar/reabrir compra...');
-                    const itensPedido = await getItensPedido(pedidoId);
-                    const problemas = [];
                     
-                    for (const item of itensPedido) {
-                        // Buscar estoque atual do produto
-                        const { data: produtoAtual, error } = await supabase
-                            .from('produtos')
-                            .select('estoque_atual, nome, codigo')
-                            .eq('id', item.produto_id)
-                            .single();
-                        
-                        console.log('📊 Item do pedido:', {
-                            produto: produtoAtual?.codigo,
-                            nome: produtoAtual?.nome,
-                            quantidade_pedido: item.quantidade,
-                            estoque_atual: produtoAtual?.estoque_atual,
-                            erro: error
-                        });
-                        
-                        if (error) {
-                            console.error('❌ Erro ao buscar estoque:', error);
-                            throw new Error(`Erro ao verificar estoque: ${error.message}`);
-                        }
-                        
-                        if (produtoAtual && produtoAtual.estoque_atual < item.quantidade) {
-                            const faltam = item.quantidade - produtoAtual.estoque_atual;
-                            console.warn('⚠️ Estoque insuficiente detectado:', {
-                                produto: produtoAtual.codigo,
-                                nome: produtoAtual.nome,
-                                necessario: item.quantidade,
-                                disponivel: produtoAtual.estoque_atual,
-                                faltam: faltam
-                            });
-                            problemas.push(
-                                `• ${produtoAtual.codigo} (${produtoAtual.nome}): ` +
-                                `Necessário: ${item.quantidade}, Disponível: ${produtoAtual.estoque_atual}, Faltam: ${faltam}`
-                            );
-                        } else {
-                            console.log('✅ Estoque OK para este item');
-                        }
+                    // Buscar itens ATUAIS do pedido (pode ter sido alterado)
+                    const { data: itensPedido, error: errItens } = await supabase
+                        .from('pedido_compra_itens')
+                        .select('id, produto_id, quantidade')
+                        .eq('pedido_id', pedidoId);
+                    
+                    if (errItens) {
+                        console.error('❌ Erro ao buscar itens do pedido:', errItens);
+                        throw new Error(`Erro ao verificar itens: ${errItens.message}`);
                     }
                     
-                    if (problemas.length > 0) {
-                        const acao = novoStatus === 'CANCELADO' ? 'CANCELAR' : 'REABRIR';
-                        alert(
-                            `⚠️ NÃO É POSSÍVEL ${acao} ESTA COMPRA!\n\n` +
-                            'Os produtos já foram vendidos e não há estoque suficiente:\n\n' +
-                            problemas.join('\n') +
-                            '\n\n💡 OPÇÕES:\n' +
-                            '1. Aguarde receber mais produtos\n' +
-                            '2. Faça um ajuste manual no estoque (com cuidado!)'
-                        );
-                        closeModal('modal-cancelar');
-                        return;
+                    if (!itensPedido || itensPedido.length === 0) {
+                        console.log('ℹ️ Pedido sem itens, prosseguindo...');
+                    } else {
+                        const problemas = [];
+                        
+                        for (const item of itensPedido) {
+                            // Buscar estoque atual do produto
+                            const { data: produtoAtual, error } = await supabase
+                                .from('produtos')
+                                .select('estoque_atual, nome, codigo')
+                                .eq('id', item.produto_id)
+                                .single();
+                            
+                            console.log('📊 Item do pedido:', {
+                                produto: produtoAtual?.codigo,
+                                nome: produtoAtual?.nome,
+                                quantidade_pedido: item.quantidade,
+                                estoque_atual: produtoAtual?.estoque_atual,
+                                erro: error
+                            });
+                            
+                            if (error) {
+                                console.error('❌ Erro ao buscar estoque:', error);
+                                throw new Error(`Erro ao verificar estoque: ${error.message}`);
+                            }
+                            
+                            if (produtoAtual && produtoAtual.estoque_atual < item.quantidade) {
+                                const faltam = item.quantidade - produtoAtual.estoque_atual;
+                                console.warn('⚠️ Estoque insuficiente detectado:', {
+                                    produto: produtoAtual.codigo,
+                                    nome: produtoAtual.nome,
+                                    necessario: item.quantidade,
+                                    disponivel: produtoAtual.estoque_atual,
+                                    faltam: faltam
+                                });
+                                problemas.push(
+                                    `• ${produtoAtual.nome}: estoque atual ${produtoAtual.estoque_atual}, necessário ${item.quantidade}, faltam ${faltam}`
+                                );
+                            } else {
+                                console.log('✅ Estoque OK para este item');
+                            }
+                        }
+                        
+                        if (problemas.length > 0) {
+                            const acao = novoStatus === 'CANCELADO' ? 'CANCELAR' : 'REABRIR';
+                            alert(
+                                `❌ NÃO É POSSÍVEL ${acao} ESTE PEDIDO!\n\n` +
+                                'Os produtos já foram vendidos e não há estoque suficiente:\n\n' +
+                                problemas.join('\n') +
+                                '\n\n💡 As vendas devem ser desfeitas primeiro ou aguardar nova entrada.'
+                            );
+                            closeModal('modal-cancelar');
+                            return;
+                        }
                     }
                 } catch (error) {
                     console.error('Erro ao validar estoque:', error);
@@ -1153,89 +1243,78 @@
             
             showLoading(true);
             try {
-                // ✅ USAR FUNÇÃO SQL COM PROTEÇÕES COMPLETAS
-                // A função cancelar_pedido_definitivo tem:
-                // - Validação de estoque ANTES de qualquer mudança
-                // - Locks de transação (FOR UPDATE)
-                // - Atomicidade garantida (tudo ou nada)
+                // ✅ IDENTIFICAR SE PRECISA REVERTER ESTOQUE
+                // Pedidos que tiveram entrada de estoque: APROVADO, RECEBIDO, FINALIZADO
+                const statusComEstoque = ['APROVADO', 'RECEBIDO', 'FINALIZADO'];
+                const precisaReverterEstoque = statusComEstoque.includes(pedido.status);
                 
-                if (novoStatus === 'CANCELADO' && pedido.status === 'FINALIZADO') {
-                    // Cancelamento definitivo usando função SQL protegida
-                    const { data, error } = await supabase.rpc('cancelar_pedido_definitivo', {
-                        p_pedido_id: pedidoId,
-                        p_usuario_id: currentUser.id
-                    });
+                console.log('🔍 Status atual:', pedido.status);
+                console.log('🔍 Novo status:', novoStatus);
+                console.log('🔍 Precisa reverter estoque:', precisaReverterEstoque);
+                
+                // ⚠️ IMPORTANTE: Atualizar status ANTES de reverter estoque
+                // Se falhar na atualização, não mexe no estoque
+                // Se reverter estoque primeiro e falhar no status, fica inconsistente
+                
+                const updateData = { status: novoStatus };
+                
+                // Se está reabrindo, limpar datas de finalização/aprovação
+                if (novoStatus === 'RASCUNHO') {
+                    updateData.data_recebimento = null;
+                }
+                
+                console.log('💾 Atualizando status do pedido para:', novoStatus);
+                const { error } = await supabase
+                    .from('pedidos_compra')
+                    .update(updateData)
+                    .eq('id', pedidoId);
+                
+                if (error) {
+                    console.error('❌ Erro ao atualizar status:', error);
+                    throw error;
+                }
+                
+                console.log('✅ Status do pedido atualizado com sucesso');
+                
+                // Agora sim, reverter estoque se necessário
+                if (precisaReverterEstoque) {
+                    console.log('🔄 Revertendo estoque após atualização de status...');
+                    console.log('📋 Chamando EstoqueService.reverterEntradaCompra com pedidoId:', pedidoId);
                     
-                    if (error) {
-                        console.error('❌ Erro ao cancelar pedido:', error);
-                        
-                        // Mensagem amigável para erro de estoque
-                        if (error.message.includes('BLOQUEIO') || error.message.includes('Estoque')) {
-                            throw new Error(
-                                `❌ ${error.message}\n\n` +
-                                `O cancelamento foi BLOQUEADO para proteger a integridade do estoque.\n` +
-                                `Nenhuma alteração foi realizada no sistema.`
-                            );
-                        }
-                        
-                        throw error;
-                    }
-                    
-                    console.log('✅ Pedido cancelado com sucesso via função SQL');
-                    
-                } else if (novoStatus === 'RASCUNHO' && (pedido.status === 'FINALIZADO' || pedido.status === 'APROVADO' || pedido.status === 'RECEBIDO')) {
-                    // ⚠️ CRÍTICO: SEMPRE reverter estoque ao sair de status com estoque processado
-                    // Se não reverter, ao refinalizar vai DUPLICAR a entrada!
-                    // 
-                    // LÓGICA CORRETA:
-                    // 1. Reabrir → Reverter estoque (desfazer a entrada)
-                    // 2. Editar o pedido se necessário
-                    // 3. Refinalizar → Faz nova entrada de estoque (com valores atualizados)
-                    
-                    console.log('🔄 Reabrindo pedido como RASCUNHO - REVERTENDO ESTOQUE');
-                    
-                    // ✅ REVERTER ESTOQUE antes de mudar status
                     const resultado = await EstoqueService.reverterEntradaCompra(pedidoId);
                     
+                    console.log('📊 Resultado da reversão:', resultado);
+                    
                     if (!resultado.sucesso) {
-                        throw new Error(resultado.mensagem || 'Erro ao reverter estoque');
+                        // Se falhar ao reverter estoque, avisar mas não bloquear
+                        // O status já foi alterado, então precisa de intervenção manual
+                        console.error('❌ Erro ao reverter estoque:', resultado.mensagem);
+                        showToast(
+                            `⚠️ Pedido ${novoStatus === 'CANCELADO' ? 'cancelado' : 'reaberto'} mas ERRO ao reverter estoque!\n\n` +
+                            `${resultado.mensagem}\n\n` +
+                            `⚠️ ATENÇÃO: Faça ajuste manual no estoque!`,
+                            'error'
+                        );
+                        closeModal('modal-cancelar');
+                        await loadPedido();
+                        return;
                     }
                     
                     console.log(`✅ [PEDIDO] ${resultado.itens_processados} produtos revertidos do estoque`);
                     
-                    // Agora sim, mudar status para RASCUNHO
-                    const { error } = await supabase
-                        .from('pedidos_compra')
-                        .update({ 
-                            status: 'RASCUNHO',
-                            data_finalizacao: null,
-                            data_aprovacao: null
-                        })
-                        .eq('id', pedidoId);
+                    // Mensagem de sucesso detalhada com quantidade
+                    const msgDetalhado = novoStatus === 'CANCELADO' 
+                        ? `✅ Pedido cancelado!\n📦 ${resultado.itens_processados} produto(s) revertido(s) do estoque.` 
+                        : `✅ Pedido reaberto como rascunho!\n📦 ${resultado.itens_processados} produto(s) revertido(s) do estoque.`;
                     
-                    if (error) throw error;
-                    
-                    console.log('✅ Pedido reaberto como RASCUNHO. Estoque revertido corretamente.');
-                    
+                    showToast(msgDetalhado, 'success');
                 } else {
-                    // Outros casos (ex: APROVADO → RASCUNHO sem reverter estoque)
-                    const { error } = await supabase
-                        .from('pedidos_compra')
-                        .update({ 
-                            status: novoStatus
-                        })
-                        .eq('id', pedidoId);
-                    
-                    if (error) throw error;
+                    // Sem estoque para reverter
+                    const msgSimples = novoStatus === 'CANCELADO' 
+                        ? '✅ Pedido cancelado!' 
+                        : '✅ Pedido reaberto como rascunho!';
+                    showToast(msgSimples, 'success');
                 }
-                
-                console.log('✅ Pedido atualizado com sucesso');
-                
-                const msgSucesso = novoStatus === 'CANCELADO' 
-                    ? 'Pedido cancelado definitivamente! Estoque ajustado.' 
-                    : 'Pedido reaberto como rascunho!';
-                
-                showToast(msgSucesso, 'success');
                 closeModal('modal-cancelar');
                 
                 // Recarregar dados do pedido para exibir novo status

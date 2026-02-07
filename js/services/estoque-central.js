@@ -330,45 +330,33 @@ class EstoqueService {
      */
     static async reverterEntradaCompra(pedidoCompraId) {
         try {
-            console.log('🔄 [ESTOQUE] Iniciando reversão de entrada:', pedidoCompraId);
+            console.log('');
+            console.log('═══════════════════════════════════════════════════════════════');
+            console.log('🔄 [ESTOQUE] REVERSÃO DE ENTRADA DE COMPRA INICIADA');
+            console.log('═══════════════════════════════════════════════════════════════');
+            console.log('📋 Pedido ID:', pedidoCompraId);
+            console.log('');
 
-            // 1. VERIFICAR STATUS ATUAL DO PEDIDO (fonte de verdade)
-            const { data: pedido, error: errPedido } = await supabase
-                .from('pedidos_compra')
-                .select('id, status')
-                .eq('id', pedidoCompraId)
-                .single();
-            
-            if (errPedido || !pedido) {
-                console.error('❌ [ESTOQUE] Pedido não encontrado:', errPedido);
-                throw new Error('Pedido não encontrado');
-            }
-            
-            const statusAtual = pedido.status?.toUpperCase() || '';
-            console.log('🔍 [ESTOQUE] Status atual do pedido:', statusAtual);
-            
-            // Se o pedido NÃO está APROVADO/RECEBIDO, não há nada para reverter
-            const statusComEstoque = ['APROVADO', 'RECEBIDO', 'FINALIZADO'];
-            if (!statusComEstoque.includes(statusAtual)) {
-                console.warn('⚠️ [ESTOQUE] Pedido não tem estoque processado, status atual:', statusAtual);
-                return { 
-                    sucesso: true, 
-                    itens_processados: 0,
-                    mensagem: `Pedido com status ${statusAtual} - nenhuma movimentação de estoque para reverter`
-                };
-            }
+            // ⚠️ NÃO VERIFICAR STATUS DO PEDIDO!
+            // O status pode ter sido alterado antes da reversão (ex: já CANCELADO)
+            // A decisão de reverter é de quem chama este método
+            // Aqui apenas verificamos se há movimentações para reverter
 
-            // 2. Buscar movimentações relacionadas ao pedido (SEM JOIN)
+            // 1. Buscar movimentações relacionadas ao pedido (SEM JOIN)
             const { data: movimentacoes, error: errMov } = await supabase
                 .from('estoque_movimentacoes')
-                .select('id, produto_id, quantidade')
+                .select('id, produto_id, quantidade, unidade_medida, preco_unitario, usuario_id')
                 .eq('referencia_id', pedidoCompraId)
                 .eq('referencia_tipo', 'PEDIDO_COMPRA')
                 .eq('tipo_movimento', this.TIPOS.ENTRADA_COMPRA);
 
             if (errMov || !movimentacoes || movimentacoes.length === 0) {
                 console.warn('⚠️ [ESTOQUE] Nenhuma movimentação encontrada para reverter');
-                return { sucesso: true, mensagem: 'Nenhuma movimentação para reverter' };
+                return { 
+                    sucesso: true, 
+                    itens_processados: 0,
+                    mensagem: 'Nenhuma movimentação de entrada encontrada para este pedido' 
+                };
             }
 
             console.log(`📊 [ESTOQUE] ${movimentacoes.length} movimentações para reverter`);
@@ -443,7 +431,14 @@ class EstoqueService {
                 }
 
                 // Criar movimentação de reversão (saída de ajuste)
-                const { error: errNewMov } = await supabase
+                console.log(`🔄 [ESTOQUE] Criando movimentação SAIDA_AJUSTE para ${produto.nome}:`, {
+                    produto_id: produto.id,
+                    tipo_movimento: this.TIPOS.SAIDA_AJUSTE,
+                    quantidade: quantidadeReverter,
+                    referencia_id: pedidoCompraId
+                });
+                
+                const { data: movCriada, error: errNewMov } = await supabase
                     .from('estoque_movimentacoes')
                     .insert({
                         id: crypto.randomUUID(),
@@ -457,14 +452,23 @@ class EstoqueService {
                         referencia_tipo: 'PEDIDO_COMPRA_REVERSAO',
                         usuario_id: mov.usuario_id,
                         created_at: new Date().toISOString()
-                    });
+                    })
+                    .select();
 
                 if (errNewMov) {
                     console.error('❌ [ESTOQUE] Erro ao criar movimentação de reversão:', errNewMov);
+                    throw new Error(`Erro ao criar movimentação de reversão: ${errNewMov.message}`);
                 }
+                
+                console.log('✅ [ESTOQUE] Movimentação SAIDA_AJUSTE criada:', movCriada);
             }
 
-            console.log('✅ [ESTOQUE] Reversão concluída com sucesso!');
+            console.log('');
+            console.log('═══════════════════════════════════════════════════════════════');
+            console.log('✅ [ESTOQUE] REVERSÃO CONCLUÍDA COM SUCESSO!');
+            console.log('═══════════════════════════════════════════════════════════════');
+            console.log('📊 Itens processados:', movimentacoes.length);
+            console.log('');
 
             return {
                 sucesso: true,
@@ -473,7 +477,13 @@ class EstoqueService {
             };
 
         } catch (error) {
-            console.error('❌ [ESTOQUE] Erro na reversão:', error);
+            console.log('');
+            console.log('═══════════════════════════════════════════════════════════════');
+            console.error('❌ [ESTOQUE] ERRO NA REVERSÃO!');
+            console.log('═══════════════════════════════════════════════════════════════');
+            console.error('Erro:', error);
+            console.error('Stack:', error.stack);
+            console.log('');
             throw error;
         }
     }
