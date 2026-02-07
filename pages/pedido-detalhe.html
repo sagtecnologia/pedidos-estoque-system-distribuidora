@@ -219,58 +219,76 @@
 
     <!-- Modal Adicionar Item -->
     <div id="modal-item" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center px-6 py-4 border-b sticky top-0 bg-white z-10">
-                <h3 class="text-lg font-semibold text-gray-900">Adicionar Itens</h3>
+                <h3 class="text-lg font-semibold text-gray-900">Adicionar Itens por Categoria</h3>
                 <button onclick="closeModal('modal-item')" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
             <div class="px-6 py-4">
-                <!-- Seleção de Marca e Produto -->
-                <div class="space-y-4">
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Marca*</label>
-                            <select id="item-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="carregarProdutosPorMarca()">
-                                <option value="">Selecione a marca...</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Produto*</label>
-                            <select id="item-produto" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="preencherPrecoAutomatico()" disabled>
-                                <option value="">Selecione o produto...</option>
-                            </select>
+                <!-- Seleção de Categoria -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-tag mr-1"></i>Selecione a Categoria*
+                    </label>
+                    <select id="item-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="carregarProdutosPorCategoria()">
+                        <option value="">Escolha uma categoria...</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">💡 Selecione a categoria para visualizar todos os produtos disponíveis</p>
+                </div>
+
+                <!-- Lista de Produtos da Categoria -->
+                <div id="produtos-categoria-container" class="hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-sm font-semibold text-gray-700">
+                            <i class="fas fa-boxes mr-1"></i>Produtos Disponíveis
+                            <span id="contador-produtos" class="text-blue-600"></span>
+                        </h4>
+                        <button type="button" onclick="limparTodosItens()" class="text-xs text-red-600 hover:text-red-700">
+                            <i class="fas fa-eraser mr-1"></i>Limpar Todos
+                        </button>
+                    </div>
+
+                    <!-- Tabela de Produtos -->
+                    <div class="border border-gray-200 rounded-lg overflow-hidden">
+                        <div class="max-h-96 overflow-y-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Produto</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Estoque</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase w-28">Quantidade</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase w-32">Preço Compra</th>
+                                        <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase w-32">Preço Venda</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="produtos-lista" class="divide-y divide-gray-200 bg-white">
+                                    <!-- Produtos serão inseridos aqui -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Quantidade*</label>
-                            <input type="number" id="item-quantidade" step="1" min="1" value="1" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Preço de Custo (R$)*</label>
-                            <input type="number" id="item-preco" step="0.01" min="0.01" value="0.00" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
-                        </div>
-                    </div>
-                    
-                    <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            Preço de Venda (R$)
-                            <span class="text-xs text-gray-500 font-normal">(opcional - será atualizado no cadastro do produto)</span>
-                        </label>
-                        <input type="number" id="item-preco-venda" step="0.01" min="0.01" value="0.00" class="w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="0.00">
-                        <p class="text-xs text-gray-500 mt-1">💡 Se não informado, manterá o preço de venda atual do produto</p>
-                    </div>
+                    <p class="text-xs text-gray-500 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i>
+                        Informe quantidade, preço de compra e preço de venda. Apenas produtos com quantidade serão adicionados ao pedido.
+                    </p>
                 </div>
 
                 <!-- Botões de Ação -->
-                <div class="flex justify-end space-x-3 mt-6 pt-4 border-t">
-                    <button type="button" onclick="closeModal('modal-item')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Cancelar</button>
-                    <button type="button" onclick="adicionarItemPedido()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        <i class="fas fa-plus mr-2"></i>Adicionar Item
-                    </button>
+                <div class="flex justify-between items-center mt-6 pt-4 border-t">
+                    <div class="text-sm text-gray-600">
+                        <span id="contador-selecionados" class="font-medium">0 produtos</span> com quantidade informada
+                    </div>
+                    <div class="flex space-x-3">
+                        <button type="button" onclick="closeModal('modal-item')" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Cancelar
+                        </button>
+                        <button type="button" onclick="salvarItensMassa()" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            <i class="fas fa-save mr-2"></i>Salvar Itens
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -316,88 +334,286 @@
             }
 
             await loadPedido();
-            await loadMarcasSelect();
+            await loadCategoriasSelect();
         })();
 
         // Carregar marcas no select
-        async function loadMarcasSelect() {
+        // Carregar categorias no select do modal
+        async function loadCategoriasSelect() {
             try {
                 showLoading(true);
-                const marcas = await getMarcas();
-                console.log('🔍 Marcas recebidas:', marcas);
-                const selectMarca = document.getElementById('item-marca');
-                selectMarca.innerHTML = '<option value="">Selecione a marca...</option>';
-                marcas.forEach(marca => {
-                    console.log('  → Adicionando marca:', marca);
+                const { data: categorias, error } = await supabase
+                    .from('categorias')
+                    .select('id, nome')
+                    .order('nome');
+
+                if (error) throw error;
+
+                const selectCategoria = document.getElementById('item-categoria');
+                selectCategoria.innerHTML = '<option value="">Escolha uma categoria...</option>';
+                
+                categorias.forEach(cat => {
                     const option = document.createElement('option');
-                    option.value = marca.id;
-                    option.textContent = marca.nome;
-                    selectMarca.appendChild(option);
+                    option.value = cat.id;
+                    option.textContent = cat.nome;
+                    selectCategoria.appendChild(option);
                 });
-                console.log('✅ Total de marcas carregadas:', marcas.length);
+                
+                console.log('✅ Categorias carregadas:', categorias.length);
+            } catch (error) {
+                console.error('Erro ao carregar categorias:', error);
+                showToast('Erro ao carregar categorias', 'error');
             } finally {
                 showLoading(false);
             }
         }
 
-        // Carregar produtos ao selecionar marca
-        async function carregarProdutosPorMarca() {
-            const marcaId = document.getElementById('item-marca').value;
-            const selectProduto = document.getElementById('item-produto');
-            const areaSabores = document.getElementById('area-adicionar-sabor');
+        // Carregar produtos da categoria selecionada
+        async function carregarProdutosPorCategoria() {
+            const categoriaId = document.getElementById('item-categoria').value;
+            const container = document.getElementById('produtos-categoria-container');
+            const tbody = document.getElementById('produtos-lista');
             
-            console.log('🔍 carregarProdutosPorMarca() chamada');
-            console.log('   marcaId recuperado do select:', marcaId);
-            console.log('   Tipo de marcaId:', typeof marcaId);
-            
-            // Resetar select de produto
-            selectProduto.innerHTML = '<option value="">Selecione o produto...</option>';
-            
-            // Ocultar área de sabores e limpar tabela
-            if (areaSabores) {
-                areaSabores.classList.add('hidden');
-                const tbody = document.getElementById('tbody-sabores-lista');
-                if (tbody) tbody.innerHTML = '';
-            }
-            
-            if (!marcaId) {
-                selectProduto.disabled = true;
+            // Ocultar lista se não tiver categoria
+            if (!categoriaId) {
+                container.classList.add('hidden');
+                tbody.innerHTML = '';
                 return;
             }
             
             try {
                 showLoading(true);
-                console.log('📞 Chamando getProdutosPorMarca com:', marcaId);
-                const produtos = await getProdutosPorMarca(marcaId);
-                console.log('Produtos encontrados:', produtos);
                 
+                // Buscar produtos da categoria
+                const { data: produtos, error } = await supabase
+                    .from('produtos')
+                    .select('id, nome, codigo, estoque_atual, unidade, preco_custo, preco_venda')
+                    .eq('categoria_id', categoriaId)
+                    .order('nome');
+
+                if (error) throw error;
+
                 if (produtos.length === 0) {
-                    showToast('Nenhum produto encontrado para esta marca', 'warning');
-                    selectProduto.disabled = true;
+                    showToast('Nenhum produto encontrado nesta categoria', 'warning');
+                    container.classList.add('hidden');
+                    return;
+                }
+
+                // Renderizar produtos na tabela
+                tbody.innerHTML = '';
+                produtos.forEach(produto => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-gray-50';
+                    tr.dataset.produtoId = produto.id;
+                    
+                    tr.innerHTML = `
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-gray-900">${produto.nome}</div>
+                            <div class="text-xs text-gray-500">Cód: ${produto.codigo || 'N/A'} • ${produto.unidade || 'UN'}</div>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                (produto.estoque_atual || 0) > 0 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                            }">
+                                ${(produto.estoque_atual || 0).toFixed(2)}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <input 
+                                type="number" 
+                                step="1" 
+                                min="0" 
+                                value="0"
+                                placeholder="0"
+                                class="w-full px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500"
+                                data-field="quantidade"
+                                oninput="atualizarContadorSelecionados()"
+                            >
+                        </td>
+                        <td class="px-4 py-3">
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                min="0.01" 
+                                value="${(produto.preco_custo || 0).toFixed(2)}"
+                                placeholder="0.00"
+                                class="w-full px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500"
+                                data-field="preco_compra"
+                            >
+                        </td>
+                        <td class="px-4 py-3">
+                            <input 
+                                type="number" 
+                                step="0.01" 
+                                min="0.01" 
+                                value="${(produto.preco_venda || 0).toFixed(2)}"
+                                placeholder="0.00"
+                                class="w-full px-2 py-1 border border-gray-300 rounded text-center focus:ring-2 focus:ring-blue-500"
+                                data-field="preco_venda"
+                            >
+                        </td>
+                    `;
+                    
+                    tbody.appendChild(tr);
+                });
+
+                // Mostrar container e atualizar contador
+                container.classList.remove('hidden');
+                document.getElementById('contador-produtos').textContent = `(${produtos.length})`;
+                atualizarContadorSelecionados();
+
+                console.log(`✅ ${produtos.length} produtos carregados da categoria`);
+                
+            } catch (error) {
+                console.error('Erro ao carregar produtos:', error);
+                showToast('Erro ao carregar produtos: ' + error.message, 'error');
+                container.classList.add('hidden');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Atualizar contador de produtos com quantidade informada
+        function atualizarContadorSelecionados() {
+            const tbody = document.getElementById('produtos-lista');
+            const rows = tbody.querySelectorAll('tr');
+            
+            let count = 0;
+            rows.forEach(row => {
+                const qtdInput = row.querySelector('[data-field="quantidade"]');
+                const qtd = parseFloat(qtdInput.value) || 0;
+                
+                if (qtd > 0) {
+                    count++;
+                    row.classList.add('bg-blue-50');
+                } else {
+                    row.classList.remove('bg-blue-50');
+                }
+            });
+            
+            document.getElementById('contador-selecionados').textContent = `${count} produto${count !== 1 ? 's' : ''}`;
+        }
+
+        // Limpar todos os campos de quantidade
+        function limparTodosItens() {
+            const tbody = document.getElementById('produtos-lista');
+            const qtdInputs = tbody.querySelectorAll('[data-field="quantidade"]');
+            
+            qtdInputs.forEach(input => {
+                input.value = '0';
+            });
+            
+            atualizarContadorSelecionados();
+        }
+
+        // Salvar itens em massa
+        async function salvarItensMassa() {
+            try {
+                const tbody = document.getElementById('produtos-lista');
+                const rows = tbody.querySelectorAll('tr');
+                
+                // Coletar produtos com quantidade > 0
+                const itensParaSalvar = [];
+                const produtosParaAtualizar = []; // Produtos que terão preço de venda atualizado
+                
+                rows.forEach(row => {
+                    const produtoId = row.dataset.produtoId;
+                    const qtdInput = row.querySelector('[data-field="quantidade"]');
+                    const precoCompraInput = row.querySelector('[data-field="preco_compra"]');
+                    const precoVendaInput = row.querySelector('[data-field="preco_venda"]');
+                    
+                    const quantidade = parseFloat(qtdInput.value) || 0;
+                    const precoCompra = parseFloat(precoCompraInput.value) || 0;
+                    const precoVenda = parseFloat(precoVendaInput.value) || 0;
+                    
+                    if (quantidade > 0 && precoCompra > 0) {
+                        // Item para inserir em pedido_compra_itens
+                        itensParaSalvar.push({
+                            produto_id: produtoId,
+                            quantidade: quantidade,
+                            preco_unitario: precoCompra,
+                            subtotal: quantidade * precoCompra
+                        });
+                        
+                        // Guardar preço de venda para atualizar depois
+                        if (precoVenda > 0) {
+                            produtosParaAtualizar.push({
+                                produto_id: produtoId,
+                                preco_venda: precoVenda
+                            });
+                        }
+                    }
+                });
+                
+                if (itensParaSalvar.length === 0) {
+                    showToast('⚠️ Informe a quantidade e preço para pelo menos um produto', 'warning');
                     return;
                 }
                 
-                produtos.forEach(p => {
-                    const precoCompra = p.preco_custo || p.preco || 0;
-                    const option = document.createElement('option');
-                    option.value = p.id;
-                    option.textContent = `${p.nome}`;
-                    option.dataset.preco = precoCompra;
-                    selectProduto.appendChild(option);
-                });
+                showLoading(true);
+                console.log(`💾 Salvando ${itensParaSalvar.length} itens...`);
                 
-                selectProduto.disabled = false;
-                console.log('Select produto habilitado');
+                // 1. Inserir itens no pedido (SEM preco_venda)
+                const itensComId = itensParaSalvar.map(item => ({
+                    id: crypto.randomUUID(),
+                    pedido_id: pedidoId,
+                    ...item
+                }));
+                
+                const { error: errInsert } = await supabase
+                    .from('pedido_compra_itens')
+                    .insert(itensComId);
+
+                if (errInsert) {
+                    console.error('❌ Erro ao inserir itens:', errInsert);
+                    throw errInsert;
+                }
+                
+                console.log('✅ Itens inseridos no pedido');
+
+                // 2. Atualizar preço de venda dos produtos (em paralelo)
+                if (produtosParaAtualizar.length > 0) {
+                    console.log(`💰 Atualizando preço de venda de ${produtosParaAtualizar.length} produtos...`);
+                    
+                    const updates = produtosParaAtualizar.map(item => 
+                        supabase
+                            .from('produtos')
+                            .update({ preco_venda: item.preco_venda })
+                            .eq('id', item.produto_id)
+                    );
+                    
+                    await Promise.all(updates);
+                    console.log('✅ Preços de venda atualizados');
+                }
+
+                // 3. Recalcular total do pedido
+                await recalcularTotalPedido(pedidoId);
+
+                showToast(`✅ ${itensParaSalvar.length} item(ns) adicionado(s) com sucesso!`, 'success');
+                closeModal('modal-item');
+                
+                // Recarregar pedido
+                await loadPedido();
+                
             } catch (error) {
-                console.error('Erro ao carregar produtos:', error);
-                showToast('Erro ao carregar produtos', 'error');
-                selectProduto.disabled = true;
+                console.error('Erro ao salvar itens:', error);
+                showToast('Erro ao salvar itens: ' + error.message, 'error');
             } finally {
                 showLoading(false);
             }
         }
 
         // Preencher preço automaticamente quando selecionar produto
+        // ============================================================================
+        // ⚠️ FUNÇÕES ANTIGAS - NÃO MAIS USADAS COM A NOVA DINÂMICA DE CATEGORIA
+        // ============================================================================
+        // Mantidas para compatibilidade, mas substituídas por:
+        // - carregarProdutosPorCategoria()
+        // - salvarItensMassa()
+        // ============================================================================
+        
         function preencherPrecoAutomatico() {
             const selectProduto = document.getElementById('item-produto');
             const precoInput = document.getElementById('item-preco');
