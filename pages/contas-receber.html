@@ -536,6 +536,12 @@
                                         <i class="fas fa-check"></i>
                                     </button>
                                 ` : ''}
+                                ${conta.status === 'RECEBIDO' ? `
+                                    <button onclick="reverterRecebimento('${conta.id}')" 
+                                            class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs" title="Reverter Recebimento">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                ` : ''}
                                 <button onclick="editarConta('${conta.id}')" 
                                         class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs" title="Editar">
                                     <i class="fas fa-edit"></i>
@@ -784,6 +790,34 @@
             } catch (error) {
                 console.error('Erro ao cancelar conta:', error);
                 showToast('Erro ao cancelar conta: ' + error.message, 'error');
+            }
+        }
+
+        async function reverterRecebimento(id) {
+            if (!confirm('Tem certeza que deseja reverter o recebimento desta conta para PENDENTE?')) return;
+
+            try {
+                const conta = contas.find(c => c.id === id);
+                if (!conta) return;
+
+                const { error } = await supabase
+                    .from('contas_receber')
+                    .update({ 
+                        status: 'PENDENTE',
+                        data_recebimento: null,
+                        valor_recebido: 0,
+                        forma_recebimento: null,
+                        valor_pendente: conta.valor_original
+                    })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                showToast('Recebimento revertido para PENDENTE com sucesso!', 'success');
+                await carregarContas();
+            } catch (error) {
+                console.error('Erro ao reverter recebimento:', error);
+                showToast('Erro ao reverter recebimento: ' + error.message, 'error');
             }
         }
 

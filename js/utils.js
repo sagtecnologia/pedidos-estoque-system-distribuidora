@@ -381,7 +381,28 @@ function handleError(error, customMessage = 'Ocorreu um erro') {
         showToast('Não é possível excluir este registro pois está sendo usado em outro lugar.', 'error');
         return;
     }
-    
+
+    // Categoria duplicada
+    if (errorMessage.includes('categorias_nome_key') || 
+        (errorMessage.includes('duplicate key') && errorMessage.includes('nome'))) {
+        showToast('❌ Esta categoria já existe no sistema. Use um nome diferente.', 'error');
+        return;
+    }
+
+    // Produto duplicado
+    if (errorMessage.includes('produtos_nome_key') || 
+        (errorMessage.includes('duplicate key') && errorMessage.includes('produtos'))) {
+        showToast('❌ Este produto já existe no sistema. Use um nome diferente.', 'error');
+        return;
+    }
+
+    // Marca duplicada
+    if (errorMessage.includes('marcas_nome_key') || 
+        (errorMessage.includes('duplicate key') && errorMessage.includes('marcas'))) {
+        showToast('❌ Esta marca já existe no sistema. Use um nome diferente.', 'error');
+        return;
+    }
+
     // Network error
     if (errorMessage.includes('Failed to fetch') ||
         errorMessage.includes('NetworkError')) {

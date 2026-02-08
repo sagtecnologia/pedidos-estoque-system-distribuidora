@@ -526,6 +526,12 @@
                                         <i class="fas fa-check"></i>
                                     </button>
                                 ` : ''}
+                                ${conta.status === 'PAGO' ? `
+                                    <button onclick="reverterPagamento('${conta.id}')" 
+                                            class="bg-orange-500 hover:bg-orange-600 text-white px-2 py-1 rounded text-xs" title="Reverter Pagamento">
+                                        <i class="fas fa-undo"></i>
+                                    </button>
+                                ` : ''}
                                 <button onclick="editarConta('${conta.id}')" 
                                         class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs" title="Editar">
                                     <i class="fas fa-edit"></i>
@@ -762,6 +768,30 @@
             } catch (error) {
                 console.error('Erro ao cancelar conta:', error);
                 showToast('Erro ao cancelar conta: ' + error.message, 'error');
+            }
+        }
+
+        async function reverterPagamento(id) {
+            if (!confirm('Tem certeza que deseja reverter o pagamento desta conta para PENDENTE?')) return;
+
+            try {
+                const { error } = await supabase
+                    .from('contas_pagar')
+                    .update({ 
+                        status: 'PENDENTE',
+                        data_pagamento: null,
+                        valor_pago: 0,
+                        forma_pagamento: null
+                    })
+                    .eq('id', id);
+
+                if (error) throw error;
+
+                showToast('Pagamento revertido para PENDENTE com sucesso!', 'success');
+                await carregarContas();
+            } catch (error) {
+                console.error('Erro ao reverter pagamento:', error);
+                showToast('Erro ao reverter pagamento: ' + error.message, 'error');
             }
         }
 
