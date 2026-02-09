@@ -215,14 +215,14 @@
         </div>
 
         <div class="section">
-            <h2>📥 3. Baixar XML via Distribuição (POST)</h2>
-            <p>Testa o novo método <code>baixarXMLDistribuicaoPost()</code> - alternativa se GET falhar</p>
+            <h2>📥 3. Baixar PDF via Distribuição</h2>
+            <p>Testa o novo método <code>baixarPDFDistribuicao()</code></p>
             
-            <label for="chave3">Chave de Acesso (44 dígitos):</label>
-            <input type="text" id="chave3" placeholder="1234567890123456789012345678901234567890123456" maxlength="44">
+            <label for="chave3">ID do Documento:</label>
+            <input type="text" id="chave3" placeholder="ID do documento da API de distribuição">
             
-            <button class="btn-primary" onclick="testarBaixarXMLPOST()">
-                📥 Download XML (POST)
+            <button class="btn-primary" onclick="testarBaixarPDF()">
+                📄 Download PDF
             </button>
             <button class="btn-secondary" onclick="limparConsole('console3')">
                 🗑️ Limpar
@@ -233,19 +233,14 @@
         </div>
 
         <div class="section">
-            <h2>⚡ 4. Comparação de Métodos</h2>
-            <p>Compara resultados entre os 3 métodos:</p>
-            <ul>
-                <li><strong>buscarDistribuicaoNFe()</strong> - Novo, via API de Distribuição</li>
-                <li><strong>listarNFeRecebidas()</strong> - Original, via GET /nf-e</li>
-                <li><strong>listarNFCeRecebidas()</strong> - Para NFCe</li>
-            </ul>
+            <h2>🔄 4. Regenerar Token OAuth2</h2>
+            <p>Regenera o token com novos escopos (incluindo distribuicao-nfe)</p>
+            <p style="color: #666; font-size: 0.9em;">
+                ⚠️ Use este teste se receber erro "InsufficientPermissions" ao tentar acessar a API de distribuição
+            </p>
             
-            <label for="cnpj4">CNPJ da Empresa:</label>
-            <input type="text" id="cnpj4" placeholder="00.000.000/0001-91" value="">
-            
-            <button class="btn-primary" onclick="compararMetodos()">
-                📊 Comparar Métodos
+            <button class="btn-primary" onclick="testarRegenerarToken()">
+                🔄 Regenerar Token
             </button>
             <button class="btn-secondary" onclick="limparConsole('console4')">
                 🗑️ Limpar
@@ -253,17 +248,15 @@
             
             <div id="status4"></div>
             <div id="console4" class="output" style="display:none;"></div>
-            <div id="comparacao" style="display:none;">
-                <table id="tabelaComparacao"></table>
-            </div>
         </div>
 
         <div class="section">
             <h2>📝 Notas sobre o Teste</h2>
             <ul>
-                <li>Certifique-se de que os scripts <code>nuvem-fiscal.js</code> e <code>sync-notas-recebidas.js</code> estão carregados</li>
+                <li>✅ Scripts agora carregados automaticamente: config.js, utils.js, nuvem-fiscal.js, sync-notas-recebidas.js</li>
                 <li>Você precisa estar autenticado no sistema (token OAuth2 ativo)</li>
                 <li>A empresa precisa ter credenciais Nuvem Fiscal configuradas</li>
+                <li>Se receber erro "InsufficientPermissions", use o Teste 4 (Regenerar Token)</li>
                 <li>Abra o console do navegador (F12) para ver logs detalhados</li>
                 <li>Alguns resultados podem estar vazios se não houver notas no período</li>
             </ul>
@@ -588,6 +581,234 @@
             div.scrollTop = div.scrollHeight;
         }
 
+    <!-- Scripts necessários para o teste -->
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/services/nuvem-fiscal.js"></script>
+    <script src="js/services/sync-notas-recebidas.js"></script>
+
+    <script>
+        // Importar scripts necessários se ainda não estiverem carregados
+        const scriptsPrecisam = [
+            'js/config.js',
+            'js/utils.js',
+            'js/services/nuvem-fiscal.js',
+            'js/services/sync-notas-recebidas.js'
+        ];
+
+        let scriptsCarregados = 0;
+
+        // Verificar se Supabase está disponível
+        if (typeof supabase === 'undefined') {
+            console.warn('⚠️ Supabase não está carregado. Carregando scripts necessários...');
+        }
+
+        // ====================================
+        // TESTE 1: Buscar Documentos Distribuídos
+        // ====================================
+        async function testarBuscaDistribuicao() {
+            const consoleDiv = document.getElementById('console1');
+            const statusDiv = document.getElementById('status1');
+            const resultadoDiv = document.getElementById('resultado1');
+            
+            consoleDiv.innerHTML = '<span class="spinner">⏳</span> Buscando documentos...';
+            consoleDiv.style.display = 'block';
+            statusDiv.innerHTML = '';
+            resultadoDiv.style.display = 'none';
+
+            try {
+                const cnpj = document.getElementById('cnpj1').value;
+                const ambiente = document.getElementById('ambiente1').value;
+                const top = parseInt(document.getElementById('top1').value) || 50;
+                const dataInicio = document.getElementById('dataInicio1').value || null;
+                const dataFim = document.getElementById('dataFim1').value || null;
+
+                if (!cnpj) {
+                    throw new Error('CNPJ é obrigatório');
+                }
+
+                log('console1', `🚀 Iniciando busca com parâmetros:
+                  CNPJ: ${cnpj}
+                  Ambiente: ${ambiente}
+                  Limite: ${top}
+                  Período: ${dataInicio || 'sem filtro'} até ${dataFim || 'sem filtro'}`);
+
+                if (typeof NuvemFiscal === 'undefined') {
+                    throw new Error('NuvemFiscal não está carregado. Certifique-se de incluir nuvem-fiscal.js');
+                }
+
+                const resultado = await NuvemFiscal.buscarDistribuicaoNFe(
+                    cnpj,
+                    ambiente,
+                    top,
+                    dataInicio,
+                    dataFim
+                );
+
+                log('console1', `\n✅ Sucesso!\nDocumentos encontrados: ${resultado?.data?.length || 0}`);
+                
+                if (resultado?.data && resultado.data.length > 0) {
+                    log('console1', `\n📋 Primeiros 5 documentos:`);
+                    resultado.data.slice(0, 5).forEach((doc, i) => {
+                        log('console1', `${i+1}. Chave: ${doc.chave_acesso || 'N/A'} | Data: ${doc.data_emissao || 'N/A'}`);
+                    });
+
+                    // Montar tabela
+                    const html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Chave de Acesso</th>
+                                <th>Número</th>
+                                <th>Data Emissão</th>
+                                <th>Status</th>
+                                <th>Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${resultado.data.slice(0, 20).map(doc => `
+                            <tr>
+                                <td><small>${doc.chave_acesso || doc.chaveAcesso || 'N/A'}</small></td>
+                                <td>${doc.numero || 'N/A'}</td>
+                                <td>${doc.data_emissao || 'N/A'}</td>
+                                <td>${doc.status || 'N/A'}</td>
+                                <td>${doc.tipo_documento || 'NF-e'}</td>
+                            </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    `;
+                    document.getElementById('tabela1').innerHTML = html;
+                    resultadoDiv.style.display = 'block';
+                }
+
+                statusDiv.innerHTML = `<div class="status success">✅ Busca realizada com sucesso!</div>`;
+            } catch (erro) {
+                log('console1', `\n❌ ERRO: ${erro.message}`);
+                log('console1', erro.stack);
+                statusDiv.innerHTML = `<div class="status error">❌ Erro: ${erro.message}</div>`;
+            }
+        }
+
+        // ====================================
+        // TESTE 2: Baixar XML (GET)
+        // ====================================
+        async function testarBaixarXMLGET() {
+            const consoleDiv = document.getElementById('console2');
+            const statusDiv = document.getElementById('status2');
+            
+            consoleDiv.innerHTML = '<span class="spinner">⏳</span> Baixando XML...';
+            consoleDiv.style.display = 'block';
+            statusDiv.innerHTML = '';
+
+            try {
+                const documentoId = document.getElementById('chave2').value;
+                
+                if (!documentoId) {
+                    throw new Error('ID do documento é obrigatório');
+                }
+
+                log('console2', `🚀 Baixando XML para ID: ${documentoId}`);
+
+                if (typeof NuvemFiscal === 'undefined') {
+                    throw new Error('NuvemFiscal não está carregado');
+                }
+
+                const xmlBlob = await NuvemFiscal.baixarXMLDistribuicao(documentoId);
+                
+                log('console2', `✅ XML baixado com sucesso!`);
+                log('console2', `Tamanho: ${xmlBlob.size} bytes`);
+                log('console2', `Tipo: ${xmlBlob.type}`);
+
+                // Ler primeiras linhas do XML
+                const xmlText = await xmlBlob.text();
+                const primeirasLinhas = xmlText.split('\n').slice(0, 5).join('\n');
+                log('console2', `\nPrimeiras linhas do XML:\n${primeirasLinhas}...`);
+
+                statusDiv.innerHTML = `<div class="status success">✅ Download realizado com sucesso! (${xmlBlob.size} bytes)</div>`;
+            } catch (erro) {
+                log('console2', `\n❌ ERRO: ${erro.message}`);
+                statusDiv.innerHTML = `<div class="status error">❌ Erro: ${erro.message}</div>`;
+            }
+        }
+
+        // ====================================
+        // TESTE 3: Baixar PDF
+        // ====================================
+        async function testarBaixarPDF() {
+            const consoleDiv = document.getElementById('console3');
+            const statusDiv = document.getElementById('status3');
+            
+            consoleDiv.innerHTML = '<span class="spinner">⏳</span> Baixando PDF...';
+            consoleDiv.style.display = 'block';
+            statusDiv.innerHTML = '';
+
+            try {
+                const documentoId = document.getElementById('chave3').value;
+                
+                if (!documentoId) {
+                    throw new Error('ID do documento é obrigatório');
+                }
+
+                log('console3', `🚀 Baixando PDF para ID: ${documentoId}`);
+
+                if (typeof NuvemFiscal === 'undefined') {
+                    throw new Error('NuvemFiscal não está carregado');
+                }
+
+                const pdfBlob = await NuvemFiscal.baixarPDFDistribuicao(documentoId);
+                
+                log('console3', `✅ PDF baixado com sucesso!`);
+                log('console3', `Tamanho: ${pdfBlob.size} bytes`);
+                log('console3', `Tipo: ${pdfBlob.type}`);
+
+                statusDiv.innerHTML = `<div class="status success">✅ Download de PDF realizado com sucesso! (${pdfBlob.size} bytes)</div>`;
+            } catch (erro) {
+                log('console3', `\n❌ ERRO: ${erro.message}`);
+                statusDiv.innerHTML = `<div class="status error">❌ Erro: ${erro.message}</div>`;
+            }
+        }
+
+        // ====================================
+        // TESTE 4: Regenerar Token
+        // ====================================
+        async function testarRegenerarToken() {
+            const consoleDiv = document.getElementById('console4');
+            const statusDiv = document.getElementById('status4');
+            
+            consoleDiv.innerHTML = '<span class="spinner">⏳</span> Regenerando token...';
+            consoleDiv.style.display = 'block';
+            statusDiv.innerHTML = '';
+
+            try {
+                log('console4', `🔄 Regenerando token OAuth2...`);
+
+                if (typeof NuvemFiscal === 'undefined') {
+                    throw new Error('NuvemFiscal não está carregado');
+                }
+
+                const novoToken = await NuvemFiscal.forceNewToken();
+                
+                log('console4', `✅ Token regenerado com sucesso!`);
+                log('console4', `Novo token: ${novoToken.substring(0, 20)}...`);
+
+                statusDiv.innerHTML = `<div class="status success">✅ Token regenerado com sucesso!</div>`;
+            } catch (erro) {
+                log('console4', `\n❌ ERRO: ${erro.message}`);
+                statusDiv.innerHTML = `<div class="status error">❌ Erro: ${erro.message}</div>`;
+            }
+        }
+
+        // ====================================
+        // FUNÇÕES AUXILIARES
+        // ====================================
+        
+        function log(consoleDivId, mensagem) {
+            const div = document.getElementById(consoleDivId);
+            div.innerHTML += mensagem + '\n';
+            div.scrollTop = div.scrollHeight;
+        }
+
         function limparConsole(consoleDivId) {
             document.getElementById(consoleDivId).innerHTML = '';
             document.getElementById(consoleDivId).style.display = 'none';
@@ -596,7 +817,8 @@
         // Log inicializador
         document.addEventListener('DOMContentLoaded', function() {
             console.log('✅ Página de teste carregada');
-            console.log('📚 Scripts necessários: nuvem-fiscal.js, sync-notas-recebidas.js');
+            console.log('📚 Scripts carregados: config.js, utils.js, nuvem-fiscal.js, sync-notas-recebidas.js');
+            console.log('✅ NuvemFiscal disponível:', typeof NuvemFiscal !== 'undefined');
         });
     </script>
 </body>
