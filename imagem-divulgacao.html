@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema PDV & ERP - Distribuidora</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 1920px;
+            height: 1080px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 60px;
+            position: relative;
+        }
+
+        .background-shape {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.1;
+        }
+
+        .shape1 {
+            width: 600px;
+            height: 600px;
+            background: white;
+            bottom: -200px;
+            right: -200px;
+        }
+
+        .shape2 {
+            width: 400px;
+            height: 400px;
+            background: white;
+            top: -100px;
+            left: -100px;
+        }
+
+        .content {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            color: white;
+            padding-right: 60px;
+        }
+
+        .logo {
+            font-size: 18px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            margin-bottom: 40px;
+            opacity: 0.9;
+        }
+
+        .main-title {
+            font-size: 72px;
+            font-weight: 700;
+            line-height: 1.1;
+            margin-bottom: 30px;
+            text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .highlight {
+            color: #00d4ff;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            font-weight: 300;
+            line-height: 1.6;
+            margin-bottom: 50px;
+            opacity: 0.95;
+            max-width: 500px;
+        }
+
+        .features-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 50px;
+            max-width: 550px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 16px;
+        }
+
+        .feature-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 212, 255, 0.2);
+            border: 2px solid #00d4ff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .cta-button {
+            background: #00d4ff;
+            color: #764ba2;
+            padding: 16px 50px;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 50px rgba(0, 212, 255, 0.4);
+        }
+
+        .right-section {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            position: relative;
+            z-index: 15;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            padding: 30px;
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-5px);
+        }
+
+        .feature-card-icon {
+            font-size: 40px;
+            margin-bottom: 15px;
+        }
+
+        .feature-card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .feature-card-desc {
+            font-size: 14px;
+            opacity: 0.9;
+            line-height: 1.5;
+        }
+
+        .stats {
+            position: absolute;
+            bottom: 60px;
+            right: 60px;
+            display: flex;
+            gap: 60px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 42px;
+            font-weight: 700;
+            color: #00d4ff;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .badge {
+            display: inline-block;
+            background: rgba(0, 212, 255, 0.2);
+            border: 1px solid #00d4ff;
+            color: #00d4ff;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 40px;
+        }
+
+        @media print {
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            .container {
+                width: 100%;
+                height: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="background-shape shape1"></div>
+        <div class="background-shape shape2"></div>
+
+        <div class="content">
+            <div class="badge">🚀 Solução Completa</div>
+            <h1 class="main-title">
+                ERP <span class="highlight">&</span> PDV<br>para Distribuidoras
+            </h1>
+            <p class="subtitle">
+                Gerencie pedidos, estoque, vendas, finanças e documentos fiscais em uma plataforma integrada
+            </p>
+
+            <div class="features-list">
+                <div class="feature">
+                    <div class="feature-icon">📊</div>
+                    <div>Controle Financeiro</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📦</div>
+                    <div>Gestão de Estoque</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📄</div>
+                    <div>NFC-e Integrada</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">👥</div>
+                    <div>Controle de Acessos</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📞</div>
+                    <div>Gestão de Clientes</div>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔐</div>
+                    <div>Segurança Avançada</div>
+                </div>
+            </div>
+
+            <button class="cta-button">Solicitar Demonstração</button>
+        </div>
+
+        <div class="right-section">
+            <div class="feature-card">
+                <div class="feature-card-icon">🛒</div>
+                <div class="feature-card-title">PDV Moderno</div>
+                <div class="feature-card-desc">
+                    Checkout rápido com emissão automática de documentos fiscais
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-card-icon">📊</div>
+                <div class="feature-card-title">Análise Financeira</div>
+                <div class="feature-card-desc">
+                    Visualize receitas, custos e margens em tempo real
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-card-icon">📦</div>
+                <div class="feature-card-title">Importação XML</div>
+                <div class="feature-card-desc">
+                    Cadastre fornecedores e produtos direto de NF-e
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-card-icon">⚡</div>
+                <div class="feature-card-title">Automação</div>
+                <div class="feature-card-desc">
+                    Sincronização automática e relatórios inteligentes
+                </div>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat">
+                <div class="stat-number">30+</div>
+                <div class="stat-label">Funcionalidades</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">100%</div>
+                <div class="stat-label">Integrado</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">24/7</div>
+                <div class="stat-label">Disponível</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
