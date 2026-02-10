@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distribuição de NFC-e - Notas de Saída</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-100">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16 pb-8">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- HEADER -->
+            <div class="mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">
+                    <i class="fas fa-cube mr-3 text-blue-600"></i>Distribuição de NFC-e
+                </h2>
+                <p class="text-gray-600 mt-1">Emitir notas de saída para produtos que chegaram com NF-e</p>
+            </div>
+
+            <!-- FILTROS -->
+            <div class="bg-white rounded-lg shadow p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
+                        <input type="date" id="filtro_data_inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+                        <input type="date" id="filtro_data_fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Fornecedor</label>
+                        <input type="text" id="filtro_fornecedor" placeholder="Buscar por nome..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div class="flex items-end">
+                        <button onclick="buscarEntradas()" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                            <i class="fas fa-search mr-2"></i>Buscar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MENSAGENS -->
+            <div id="msg_info_container" class="hidden mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
+                <span id="msg_info_text"></span>
+            </div>
+
+            <!-- AREA DE CARREGAMENTO -->
+            <div id="area_carregando" class="hidden mb-6 p-8 bg-white rounded-lg shadow text-center">
+                <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mb-4"></div>
+                <p class="text-gray-600">Carregando entradas...</p>
+            </div>
+
+            <!-- ENTRADAS -->
+            <div id="area_entradas" class="hidden mb-6">
+                <div id="entradas_grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Pedidos de compra serão renderizados aqui -->
+                </div>
+            </div>
+
+            <!-- RESUMO E BOTÕES -->
+            <div id="area_resumo" class="hidden bg-white rounded-lg shadow p-6 mb-6 sticky bottom-0 z-10 border-t-4 border-blue-600">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div>
+                        <p class="text-sm text-gray-600">Itens Selecionados</p>
+                        <p class="text-2xl font-bold text-gray-900" id="resumo_itens">0</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Quantidade Total</p>
+                        <p class="text-2xl font-bold text-gray-900" id="resumo_quantidade">0</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-600">Valor Total</p>
+                        <p class="text-2xl font-bold text-green-600" id="resumo_valor">R$ 0,00</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                        <input type="text" id="descricao_nota" placeholder="Distribuição" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                        <input type="text" id="observacoes_nota" placeholder="Opcional" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button class="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed" id="btn_emitir" onclick="emitirNFCe()">
+                        <i class="fas fa-check mr-2"></i>Emitir NFC-e
+                    </button>
+                    <button class="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium" onclick="limparSelecoes()">
+                        <i class="fas fa-times mr-2"></i>Limpar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- MODAL SUCESSO -->
+    <div id="modal_sucesso" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <div class="text-center mb-6">
+                <div class="inline-block p-3 bg-green-100 rounded-full mb-4">
+                    <i class="fas fa-check text-3xl text-green-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">NFC-e Emitida!</h3>
+            </div>
+            <div class="space-y-3 text-sm mb-6 bg-gray-50 p-4 rounded-lg">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Número:</span>
+                    <span class="font-mono font-bold" id="sucesso_numero">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Chave:</span>
+                    <span class="font-mono text-xs" id="sucesso_chave">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Protocolo:</span>
+                    <span class="font-mono font-bold" id="sucesso_protocolo">-</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Itens:</span>
+                    <span class="font-bold" id="sucesso_itens">0</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">Valor:</span>
+                    <span class="font-bold text-green-600" id="sucesso_valor">R$ 0,00</span>
+                </div>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="fecharModal('modal_sucesso'); location.reload();" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">
+                    Nova Emissão
+                </button>
+                <button onclick="fecharModal('modal_sucesso')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ERRO -->
+    <div id="modal_erro" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full p-6">
+            <div class="text-center mb-6">
+                <div class="inline-block p-3 bg-red-100 rounded-full mb-4">
+                    <i class="fas fa-exclamation text-3xl text-red-600"></i>
+                </div>
+                <h3 class="text-2xl font-bold text-gray-900">Erro na Emissão</h3>
+            </div>
+            <div class="bg-red-50 p-4 rounded-lg mb-6 max-h-40 overflow-y-auto">
+                <p class="text-sm text-red-800" id="erro_mensagem">-</p>
+            </div>
+            <button onclick="fecharModal('modal_erro')" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                Fechar
+            </button>
+        </div>
+    </div>
+
+    <!-- SUPABASE E CONFIG -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+
+    <!-- SERVIÇOS -->
+    <script src="../js/services/distribuicao-nfe.js"></script>
+    <script src="../js/services/fiscal.js"></script>
+    <script src="../js/services/nuvem-fiscal.js"></script>
+    <script src="../js/services/focus-nfe.js"></script>
+    <script src="../js/services/empresa.js"></script>
+
+    <!-- COMPONENTES -->
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+
+    <script>
+        let currentUser = null;
+
+        (async () => {
+            try {
+                await checkAuth();
+                currentUser = await getCurrentUser();
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+            } catch (error) {
+                console.error('Erro ao inicializar distribuição:', error);
+                document.getElementById('navbar').innerHTML = createNavbar();
+                document.getElementById('sidebar-container').innerHTML = createSidebar();
+            }
+            
+            // Definir datas padrão (últimos 30 dias)
+            const dataFim = new Date();
+            const dataInicio = new Date(dataFim.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+            document.getElementById('filtro_data_inicio').value = dataInicio.toISOString().split('T')[0];
+            document.getElementById('filtro_data_fim').value = dataFim.toISOString().split('T')[0];
+        })();
+
+        // Estado global
+        let estadoGlobal = {
+            entradas: [],
+            itensSelecionados: new Map()
+        };
+
+        // BUSCAR ENTRADAS
+        async function buscarEntradas() {
+            try {
+                const dataInicio = new Date(document.getElementById('filtro_data_inicio').value);
+                const dataFim = new Date(document.getElementById('filtro_data_fim').value);
+                const filtroFornecedor = document.getElementById('filtro_fornecedor').value.toLowerCase();
+
+                if (!dataInicio || !dataFim) {
+                    alert('Selecione as datas para buscar');
+                    return;
+                }
+
+                mostrarCarregando(true);
+                estadoGlobal.itensSelecionados.clear();
+
+                // Buscar entradas
+                const entradas = await DistribuicaoNFCe.buscarEntradasPeriodo(dataInicio, dataFim);
+
+                // Filtrar por fornecedor se informado
+                let entradasFiltradas = entradas;
+                if (filtroFornecedor) {
+                    entradasFiltradas = entradas.filter(e =>
+                        e.fornecedores?.nome?.toLowerCase().includes(filtroFornecedor) ||
+                        e.nf_numero?.includes(filtroFornecedor)
+                    );
+                }
+
+                estadoGlobal.entradas = entradasFiltradas;
+
+                if (entradasFiltradas.length === 0) {
+                    mostrarMensagem('Nenhuma entrada de compra encontrada para o período selecionado.', 'warning');
+                    mostrarCarregando(false);
+                    document.getElementById('area_entradas').classList.add('hidden');
+                    document.getElementById('area_resumo').classList.add('hidden');
+                    return;
+                }
+
+                renderizarEntradas(entradasFiltradas);
+                mostrarCarregando(false);
+                mostrarMensagem(`${entradasFiltradas.length} pedido(s) encontrado(s) com itens disponíveis para distribuição.`);
+
+            } catch (erro) {
+                console.error('Erro ao buscar entradas:', erro);
+                mostrarCarregando(false);
+                mostrarErro('Erro ao buscar entradas: ' + erro.message);
+            }
+        }
+
+        // RENDERIZAR ENTRADAS
+        function renderizarEntradas(entradas) {
+            const grid = document.getElementById('entradas_grid');
+            grid.innerHTML = '';
+
+            entradas.forEach(pedido => {
+                const valorTotal = pedido.pedido_compra_itens.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-lg shadow overflow-hidden';
+                card.innerHTML = `
+                    <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <h3 class="font-bold text-gray-900">Pedido #${pedido.numero}</h3>
+                        <div class="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-600">
+                            <div>📅 ${new Date(pedido.data_recebimento).toLocaleDateString('pt-BR')}</div>
+                            <div>💼 ${pedido.fornecedores?.nome || 'Sem fornecedor'}</div>
+                            <div>📄 NF: ${pedido.nf_numero}</div>
+                            <div>💰 R$ ${valorTotal.toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="p-4 space-y-2 max-h-96 overflow-y-auto" id="itens_${pedido.id}">
+                        ${renderizarItens(pedido.pedido_compra_itens, pedido.id)}
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+
+            document.getElementById('area_entradas').classList.remove('hidden');
+            document.getElementById('area_resumo').classList.remove('hidden');
+        }
+
+        // RENDERIZAR ITENS
+        function renderizarItens(itens, pedidoId) {
+            return itens.map(item => {
+                const precoVenda = item.preco_venda_nfe || item.produtos?.preco_venda || (item.subtotal / item.quantidade);
+                const totalItem = precoVenda * item.quantidade;
+
+                return `
+                    <div class="flex gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 text-sm">
+                        <input type="checkbox" 
+                               class="item-checkbox w-5 h-5 text-blue-600 rounded cursor-pointer"
+                               data-item-id="${item.id}"
+                               data-quantidade="${item.quantidade}"
+                               data-preco-inicial="${precoVenda}"
+                               onchange="atualizarSelecao('${item.id}', this.checked, ${item.quantidade}, ${precoVenda})">
+                        <div class="flex-1 min-w-0">
+                            <p class="font-medium text-gray-900">${item.produtos?.nome || 'Produto'}</p>
+                            <p class="text-gray-500">${item.quantidade} ${item.produtos?.unidade_medida_padrao || 'UN'}</p>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <input type="number" 
+                                   step="0.01" 
+                                   value="${precoVenda.toFixed(2)}"
+                                   data-input-preco="${item.id}"
+                                   onchange="atualizarPrecoItem('${item.id}', this.value)"
+                                   disabled
+                                   class="w-20 px-2 py-1 border border-gray-300 rounded text-right disabled:bg-gray-200 disabled:cursor-not-allowed">
+                            <p class="text-green-600 font-bold mt-1" id="total_${item.id}">R$ ${totalItem.toFixed(2)}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ATUALIZAR PREÇO
+        function atualizarPrecoItem(itemId, novoPreco) {
+            const precoNum = parseFloat(novoPreco) || 0;
+            if (estadoGlobal.itensSelecionados.has(itemId)) {
+                const item = estadoGlobal.itensSelecionados.get(itemId);
+                item.preco = precoNum;
+                const total = item.quantidade * precoNum;
+                document.getElementById(`total_${itemId}`).textContent = `R$ ${total.toFixed(2)}`;
+                atualizarResumo();
+            }
+        }
+
+        // ATUALIZAR SELEÇÃO
+        function atualizarSelecao(itemId, selecionado, quantidade, preco) {
+            const precoNum = parseFloat(preco) || 0;
+            const inputPreco = document.querySelector(`input[data-input-preco="${itemId}"]`);
+
+            if (selecionado) {
+                estadoGlobal.itensSelecionados.set(itemId, { quantidade, preco: precoNum });
+                if (inputPreco) inputPreco.disabled = false;
+            } else {
+                estadoGlobal.itensSelecionados.delete(itemId);
+                if (inputPreco) inputPreco.disabled = true;
+            }
+
+            atualizarResumo();
+        }
+
+        // ATUALIZAR RESUMO
+        function atualizarResumo() {
+            let totalItens = 0, totalQuantidade = 0, totalValor = 0;
+
+            estadoGlobal.itensSelecionados.forEach(item => {
+                totalItens++;
+                totalQuantidade += item.quantidade;
+                totalValor += item.quantidade * item.preco;
+            });
+
+            document.getElementById('resumo_itens').textContent = totalItens;
+            document.getElementById('resumo_quantidade').textContent = totalQuantidade.toFixed(3);
+            document.getElementById('resumo_valor').textContent = 'R$ ' + totalValor.toFixed(2);
+            document.getElementById('btn_emitir').disabled = totalItens === 0;
+        }
+
+        // EMITIR NFC-e
+        async function emitirNFCe() {
+            try {
+                if (estadoGlobal.itensSelecionados.size === 0) {
+                    alert('Selecione pelo menos um item');
+                    return;
+                }
+
+                const itensCliente = Array.from(estadoGlobal.itensSelecionados).map(([itemId, dados]) => ({
+                    pedido_item_id: itemId,
+                    quantidade: dados.quantidade,
+                    preco_venda: dados.preco
+                }));
+
+                document.getElementById('btn_emitir').disabled = true;
+                document.getElementById('btn_emitir').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Emitindo...';
+
+                const resultado = await DistribuicaoNFCe.emitirNFCeDistribuicao({
+                    itensCliente,
+                    descricaoNota: document.getElementById('descricao_nota').value || 'Distribuição de Produtos',
+                    observacoes: document.getElementById('observacoes_nota').value
+                });
+
+                document.getElementById('sucesso_numero').textContent = resultado.numero_nfce;
+                document.getElementById('sucesso_chave').textContent = resultado.chave_nfe || 'N/A';
+                document.getElementById('sucesso_protocolo').textContent = resultado.protocolo || 'Processando...';
+                document.getElementById('sucesso_itens').textContent = resultado.total_itens;
+                document.getElementById('sucesso_valor').textContent = resultado.valor_total.toFixed(2);
+                abrirModal('modal_sucesso');
+
+            } catch (erro) {
+                console.error('Erro ao emitir:', erro);
+                document.getElementById('btn_emitir').disabled = false;
+                document.getElementById('btn_emitir').innerHTML = '<i class="fas fa-check mr-2"></i>Emitir NFC-e';
+                mostrarErro(erro.message);
+            }
+        }
+
+        // LIMPAR SELEÇÕES
+        function limparSelecoes() {
+            estadoGlobal.itensSelecionados.clear();
+            document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = false);
+            atualizarResumo();
+        }
+
+        // UTILIDADES
+        function mostrarCarregando(ativo) {
+            document.getElementById('area_carregando').classList.toggle('hidden', !ativo);
+        }
+
+        function mostrarMensagem(texto, tipo = 'info') {
+            const container = document.getElementById('msg_info_container');
+            document.getElementById('msg_info_text').textContent = texto;
+            container.classList.remove('hidden');
+        }
+
+        function mostrarErro(mensagem) {
+            document.getElementById('erro_mensagem').textContent = mensagem;
+            abrirModal('modal_erro');
+        }
+
+        function abrirModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function fecharModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

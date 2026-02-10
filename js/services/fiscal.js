@@ -52,66 +52,97 @@ class FiscalSystem {
                     clientes: clienteData
                 };
 
-                // Montar payload para Nuvem Fiscal
+                // 🔢 ===== INCREMENTAR NÚMERO ATOMICAMENTE ANTES DA EMISSÃO =====
+                let numeroObtido = null;
+                try {
+                    numeroObtido = await this.obterProximoNumerNFCeComIncremento(empresa, 'nuvem_fiscal');
+                    console.log('✅ [FiscalSystem] Número NFC-e reservado atomicamente:', numeroObtido);
+                } catch (erroIncremento) {
+                    console.error('❌ [FiscalSystem] Falha ao obter/incrementar número NFC-e:', erroIncremento.message);
+                    throw new Error(`Falha ao gerar número de NFC-e: ${erroIncremento.message}`);
+                }
+
+                // Montar payload para Nuvem Fiscal (agora com número já sincronizado)
                 const payload = await NuvemFiscal.montarPayloadNFCe(venda, empresa);
 
                 // Emitir via Nuvem Fiscal
-                resultado = await NuvemFiscal.emitirNFCe(payload);
+                try {
+                    resultado = await NuvemFiscal.emitirNFCe(payload);
 
-                // Validar resultado
-                NuvemFiscal.validarResposta(resultado);
+                    // Validar resultado
+                    NuvemFiscal.validarResposta(resultado);
 
-                console.log('✅ [FiscalSystem] Resposta Nuvem Fiscal:', resultado);
+                    console.log('✅ [FiscalSystem] Resposta Nuvem Fiscal:', resultado);
 
-                // Mapear resposta da Nuvem Fiscal para formato padrão
-                if (resultado.status === 'autorizado') {
-                    // ✅ Preparar dados do documento fiscal para salvar no banco
-                    const documentoFiscalData = {
-                        // venda_id será adicionado depois pelo PDV
-                        tipo_documento: 'NFCE',
-                        numero_documento: resultado.numero?.toString() || '0',
-                        serie: parseInt(resultado.serie || '1'),
-                        chave_acesso: resultado.chave_acesso || resultado.chave,
-                        protocolo_autorizacao: resultado.autorizacao?.numero_protocolo || resultado.protocolo,
-                        status_sefaz: '100', // Autorizado
-                        mensagem_sefaz: resultado.autorizacao?.mensagem || 'Autorizado o uso da NFC-e',
-                        valor_total: vendaData.total,
-                        natureza_operacao: 'VENDA',
-                        data_emissao: vendaData.data_emissao || new Date().toISOString(),
-                        data_autorizacao: new Date().toISOString(),
-                        xml_nota: resultado.caminho_xml || null,
-                        xml_retorno: JSON.stringify(resultado),
-                        tentativas_emissao: 1,
-                        ultima_tentativa: new Date().toISOString(),
-                        api_provider: 'nuvem_fiscal',
-                        nfce_id: resultado.id // ✅ ID Nuvem Fiscal para download do XML
-                    };
+                    // Mapear resposta da Nuvem Fiscal para formato padrão
+                    if (resultado.status === 'autorizado') {
+                        // ✅ Preparar dados do documento fiscal para salvar no banco
+                        const documentoFiscalData = {
+                            // venda_id será adicionado depois pelo PDV
+                            tipo_documento: 'NFCE',
+                            numero_documento: resultado.numero?.toString() || '0',
+                            serie: parseInt(resultado.serie || '1'),
+                            chave_acesso: resultado.chave_acesso || resultado.chave,
+                            protocolo_autorizacao: resultado.autorizacao?.numero_protocolo || resultado.protocolo,
+                            status_sefaz: '100', // Autorizado
+                            mensagem_sefaz: resultado.autorizacao?.mensagem || 'Autorizado o uso da NFC-e',
+                            valor_total: vendaData.total,
+                            natureza_operacao: 'VENDA',
+                            data_emissao: vendaData.data_emissao || new Date().toISOString(),
+                            data_autorizacao: new Date().toISOString(),
+                            xml_nota: resultado.caminho_xml || null,
+                            xml_retorno: JSON.stringify(resultado),
+                            tentativas_emissao: 1,
+                            ultima_tentativa: new Date().toISOString(),
+                            api_provider: 'nuvem_fiscal',
+                            nfce_id: resultado.id // ✅ ID Nuvem Fiscal para download do XML
+                        };
 
-                    return {
-                        success: true,
-                        status: 'autorizado',
-                        status_sefaz: 'autorizado',
-                        numero: resultado.numero,
-                        chave_nfe: resultado.chave_acesso || resultado.chave,
-                        protocolo: resultado.autorizacao?.numero_protocolo || resultado.protocolo,
-                        caminho_xml_nota_fiscal: resultado.caminho_xml,
-                        caminho_danfe: resultado.caminho_danfe,
-                        nfce_id: resultado.id, // ✅ ID da nota na Nuvem Fiscal
-                        ref: resultado.referencia || resultado.id, // ✅ Referência para exibição
-                        provider: 'nuvem_fiscal',
-                        mensagem: 'NFC-e autorizada pela SEFAZ via Nuvem Fiscal',
-                        documentoFiscalData // ✅ Dados para salvar na tabela documentos_fiscais
-                    };
-                    
-                    // 💾 ATUALIZAR NÚMERO NFC-e NA CONFIGURAÇÃO
-                    await this.atualizarNumerNFCeConfig(parseInt(resultado.numero));
-                } else {
-                    const mensagens = resultado.mensagens?.map(m => m.mensagem).join('; ') || 'Erro desconhecido';
-                    throw new Error('NFC-e rejeitada SEFAZ: ' + mensagens);
+                        console.log('✅ [FiscalSystem] NFC-e autorizada! Número utilizado:', resultado.numero);
+                        return {
+                            success: true,
+                            status: 'autorizado',
+                            status_sefaz: 'autorizado',
+                            numero: resultado.numero,
+                            chave_nfe: resultado.chave_acesso || resultado.chave,
+                            protocolo: resultado.autorizacao?.numero_protocolo || resultado.protocolo,
+                            caminho_xml_nota_fiscal: resultado.caminho_xml,
+                            caminho_danfe: resultado.caminho_danfe,
+                            nfce_id: resultado.id, // ✅ ID da nota na Nuvem Fiscal
+                            ref: resultado.referencia || resultado.id, // ✅ Referência para exibição
+                            provider: 'nuvem_fiscal',
+                            mensagem: 'NFC-e autorizada pela SEFAZ via Nuvem Fiscal',
+                            documentoFiscalData // ✅ Dados para salvar na tabela documentos_fiscais
+                        };
+                    } else {
+                        const mensagens = resultado.mensagens?.map(m => m.mensagem).join('; ') || 'Erro desconhecido';
+                        // ⚠️ Se rejeitada, REVOGAR o incremento do número
+                        await this.reverterIncrementoNumerNFCe(numeroObtido);
+                        throw new Error('NFC-e rejeitada SEFAZ: ' + mensagens);
+                    }
+                } catch (erroEmissao) {
+                    // ⚠️ Falha na emissão - REVOGAR o incremento do número
+                    console.error('❌ [FiscalSystem] Erro na emissão, revogando número:', erroEmissao.message);
+                    try {
+                        await this.reverterIncrementoNumerNFCe(numeroObtido);
+                    } catch (erroRollback) {
+                        console.warn('⚠️ [FiscalSystem] Não foi possível reverter incremento (manual fix needed):', erroRollback.message);
+                    }
+                    throw erroEmissao;
                 }
             } else {
                 console.log('🎯 [FiscalSystem] Usando Focus NFe para emissão...');
                 
+                // 🔢 ===== INCREMENTAR NÚMERO ATOMICAMENTE ANTES DA EMISSÃO =====
+                let numeroObtido = null;
+                try {
+                    numeroObtido = await this.obterProximoNumerNFCeComIncremento(empresa, 'focus_nfe');
+                    console.log('✅ [FiscalSystem] Número NFC-e reservado atomicamente:', numeroObtido);
+                } catch (erroIncremento) {
+                    console.error('❌ [FiscalSystem] Falha ao obter/incrementar número NFC-e:', erroIncremento.message);
+                    throw new Error(`Falha ao gerar número de NFC-e: ${erroIncremento.message}`);
+                }
+
                 // ===== EMISSÃO VIA FOCUS NFE =====
                 const venda = {
                     ...vendaData,
@@ -119,16 +150,31 @@ class FiscalSystem {
                     clientes: clienteData
                 };
 
-                resultado = await FocusNFe.emitirNFCe(venda, itensData, pagamentosData, clienteData);
+                try {
+                    resultado = await FocusNFe.emitirNFCe(venda, itensData, pagamentosData, clienteData);
 
-                console.log('✅ [FiscalSystem] Resposta Focus NFe:', resultado);
+                    console.log('✅ [FiscalSystem] Resposta Focus NFe:', resultado);
 
-                // 💾 ATUALIZAR NÚMERO NFC-e NA CONFIGURAÇÃO (Se autorizado)
-                if (resultado.success || resultado.status === 'autorizado') {
-                    await this.atualizarNumerNFCeConfig(parseInt(resultado.numero));
+                    // ✅ Se autorizado, número já foi incrementado atomicamente
+                    if ((resultado.success || resultado.status === 'autorizado') && resultado.numero) {
+                        console.log('✅ [FiscalSystem] NFC-e autorizada! Número utilizado:', resultado.numero);
+                        return resultado;
+                    } else {
+                        // ⚠️ Se não autorizada, REVOGAR o incremento do número
+                        await this.reverterIncrementoNumerNFCe(numeroObtido);
+                        console.warn('⚠️ [FiscalSystem] Emissão não foi autorizada, número revertido');
+                        throw new Error(`Emissão não autorizada: ${resultado.mensagem || resultado.status}`);
+                    }
+                } catch (erroEmissao) {
+                    // ⚠️ Falha na emissão - REVOGAR o incremento do número
+                    console.error('❌ [FiscalSystem] Erro na emissão, revogando número:', erroEmissao.message);
+                    try {
+                        await this.reverterIncrementoNumerNFCe(numeroObtido);
+                    } catch (erroRollback) {
+                        console.warn('⚠️ [FiscalSystem] Não foi possível reverter incremento (manual fix needed):', erroRollback.message);
+                    }
+                    throw erroEmissao;
                 }
-
-                return resultado;
             }
         } catch (error) {
             console.error('❌ [FiscalSystem] Erro ao emitir NFC-e:', error);
@@ -747,23 +793,48 @@ class FiscalSystem {
 
             if (provider === 'nuvem_fiscal') {
                 // Nuvem Fiscal usa ID da nota, não chave de acesso
-                // Buscar ID da nota no banco pela chave de acesso
-                const { data: venda } = await supabase
-                    .from('vendas')
-                    .select('id, nfce_id, status_fiscal')
-                    .eq('chave_acesso_nfce', chaveAcesso)
+                // Tentar buscar ID da nota em documentos_fiscais primeiro (notas de distribuição)
+                const { data: docFiscal } = await supabase
+                    .from('documentos_fiscais')
+                    .select('id, nfce_id, chave_acesso')
+                    .eq('chave_acesso', chaveAcesso)
                     .maybeSingle();
 
-                if (!venda?.nfce_id) {
+                let nfceId = docFiscal?.nfce_id;
+
+                // Se não encontrou em documentos_fiscais, tentar vendas (notas normais do PDV)
+                if (!nfceId) {
+                    const { data: venda } = await supabase
+                        .from('vendas')
+                        .select('id, nfce_id, status_fiscal')
+                        .eq('chave_acesso_nfce', chaveAcesso)
+                        .maybeSingle();
+                    
+                    nfceId = venda?.nfce_id;
+                }
+
+                if (!nfceId) {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
                 }
 
-                // Verificar status da venda antes de cancelar
-                if (venda.status_fiscal !== 'EMITIDA_NFCE') {
-                    throw new Error(`Erro ao cancelar: A venda está com status "${venda.status_fiscal}". Apenas notas EMITIDAS podem ser canceladas.`);
+                // Cancelar via Nuvem Fiscal
+                const resultado = await NuvemFiscal.cancelarNFCe(nfceId, justificativa);
+                
+                // Validar resposta da Nuvem Fiscal
+                // Status 'registrado' significa que o evento foi processado com sucesso
+                if (resultado && (resultado.status === 'registrado' || resultado.status === 'cancelado')) {
+                    console.log('✅ [FiscalSystem] Cancelamento processado com sucesso pela Nuvem Fiscal');
+                    
+                    return {
+                        sucesso: true,
+                        status: 'cancelado',
+                        status_sefaz: '135',
+                        mensagem: 'Cancelamento autorizado pela SEFAZ',
+                        resultado_nuvem: resultado
+                    };
+                } else {
+                    throw new Error('Resposta inesperada da Nuvem Fiscal ao cancelar: ' + JSON.stringify(resultado));
                 }
-
-                return await NuvemFiscal.cancelarNFCe(venda.nfce_id, justificativa);
             } else {
                 return await FocusNFe.cancelarDocumento(chaveAcesso, justificativa, tipo);
             }
@@ -778,98 +849,64 @@ class FiscalSystem {
                 console.log('📋 [FiscalSystem] Chave de acesso:', chaveAcesso);
                 
                 try {
-                    // Buscar venda por chave de acesso
-                    const { data: venda, error: erroSelect } = await supabase
-                        .from('vendas')
-                        .select('id, numero_nfce, status_fiscal')
-                        .eq('chave_acesso_nfce', chaveAcesso)
+                    // Buscar documento por chave de acesso (procura em documentos_fiscais ou vendas)
+                    let docFiscal = null;
+                    
+                    // Primeiro, tenta em documentos_fiscais (distribuição ou notas de saída)
+                    const { data: docFromFiscal } = await supabase
+                        .from('documentos_fiscais')
+                        .select('id, numero_documento, status_sefaz')
+                        .eq('chave_acesso', chaveAcesso)
                         .maybeSingle();
-
-                    console.log('🔍 [FiscalSystem] Resultado da busca:', { venda, erroSelect });
-
-                    if (erroSelect) {
-                        console.error('❌ Erro ao buscar venda:', erroSelect);
-                        throw erroSelect;
-                    }
-
-                    if (!venda?.id) {
-                        console.warn('⚠️ [FiscalSystem] Venda não encontrada com chave:', chaveAcesso);
-                        // Procurar por nfce_id se houver
-                        const { data: vendaPorId } = await supabase
+                    
+                    if (docFromFiscal?.id) {
+                        docFiscal = docFromFiscal;
+                    } else {
+                        // Tenta em vendas (vendas normais do PDV)
+                        const { data: vendaFromDB } = await supabase
                             .from('vendas')
-                            .select('id, numero_nfce')
-                            .neq('nfce_id', null)
-                            .limit(1);
+                            .select('id, numero_nfce, status_fiscal')
+                            .eq('chave_acesso_nfce', chaveAcesso)
+                            .maybeSingle();
                         
-                        if (!vendaPorId?.[0]?.id) {
-                            throw new Error('Não foi possível encontrar a venda no banco de dados para sincronização');
+                        if (vendaFromDB?.id) {
+                            docFiscal = { id: vendaFromDB.id, tipo: 'venda', ...vendaFromDB };
                         }
                     }
 
-                    const vendaId = venda?.id;
-                    console.log('📌 [FiscalSystem] Sincronizando venda ID:', vendaId);
+                    console.log('🔍 [FiscalSystem] Documento já cancelado encontrado:', { docFiscal });
 
-                    if (vendaId) {
-                        // Atualizar status para cancelado COM retry
-                        let tentativas = 0;
-                        let sucesso = false;
+                    if (docFiscal?.id) {
+                        // Atualizar status do documento
+                        const tabelaAtualizar = docFiscal.tipo === 'venda' ? 'vendas' : 'documentos_fiscais';
+                        const campoAtualizacao = docFiscal.tipo === 'venda' 
+                            ? { status_fiscal: 'CANCELADA_NFCE', data_cancelamento: new Date().toISOString() }
+                            : { status_sefaz: '135' };
                         
-                        while (tentativas < 3 && !sucesso) {
-                            tentativas++;
-                            console.log(`📝 [FiscalSystem] Tentativa ${tentativas} de atualizar status...`);
-                            
-                            const { error: erroUpdate } = await supabase
-                                .from('vendas')
-                                .update({
-                                    status_fiscal: 'CANCELADA_NFCE',
-                                    data_cancelamento: new Date().toISOString()
-                                })
-                                .eq('id', vendaId);
-
-                            if (!erroUpdate) {
-                                sucesso = true;
-                                console.log('✅ [FiscalSystem] Documento sincronizado: status_fiscal = CANCELADA_NFCE');
-                                
-                                // Retornar sucesso com informação de sincronização
-                                return {
-                                    sucesso: true,
-                                    sincronizado: true,
-                                    mensagem: '✅ Documento já estava CANCELADO na SEFAZ. Status sincronizado no banco de dados.'
-                                };
-                            } else {
-                                console.warn(`⚠️ [FiscalSystem] Erro na tentativa ${tentativas}:`, erroUpdate.message);
-                                
-                                // Aguardar um pouco antes de retry
-                                if (tentativas < 3) {
-                                    await new Promise(r => setTimeout(r, 500));
-                                }
-                            }
-                        }
+                        await supabase
+                            .from(tabelaAtualizar)
+                            .update(campoAtualizacao)
+                            .eq('id', docFiscal.id);
                         
-                        if (!sucesso) {
-                            console.error('❌ [FiscalSystem] Todas as tentativas de sincronização falharam');
-                            // Mesmo com erro, retornar sucesso porque SEFAZ confirmou que foi cancelado
-                            return {
-                                sucesso: true,
-                                sincronizado: false,
-                                aviso: true,
-                                mensagem: '⚠️ Documento já estava CANCELADO na SEFAZ, mas não conseguimos atualizar o banco. Contacte suporte.'
-                            };
-                        }
+                        return {
+                            sucesso: true,
+                            status: 'cancelado',
+                            status_sefaz: '135',
+                            sincronizado: true,
+                            mensagem: 'Documento já estava cancelado na SEFAZ. Status sincronizado no banco.'
+                        };
                     }
                 } catch (erroSync) {
-                    console.error('❌ [FiscalSystem] Erro ao sincronizar:', erroSync.message);
-                    console.error('Stack:', erroSync.stack);
-                    
-                    // Mesmo com erro de sincronização, SEFAZ confirmou que foi cancelado
-                    // Então retornar sucesso para usuário
-                    return {
-                        sucesso: true,
-                        sincronizado: false,
-                        aviso: true,
-                        mensagem: '⚠️ Documento já estava CANCELADO na SEFAZ. Banco será atualizado manualmente. Contate suporte se problema persistir.'
-                    };
+                    console.warn('⚠️ [FiscalSystem] Erro ao sincronizar após detectar cancelamento prévio:', erroSync.message);
                 }
+                
+                return {
+                    sucesso: true,
+                    status: 'cancelado',
+                    status_sefaz: '135',
+                    aviso: true,
+                    mensagem: 'Documento já estava cancelado na SEFAZ'
+                };
             }
             
             // Melhorar mensagem de erro para o usuário
@@ -1132,6 +1169,110 @@ class FiscalSystem {
             console.error('❌ Erro ao sincronizar numeração NFC-e:', erro);
             // Fallback para número configurado
             return parseInt(empresa.nfce_numero || 1);
+        }
+    }
+
+    /**
+     * 🔐 OBTER E INCREMENTAR NÚMERO NFC-e DE FORMA ATÔMICA
+     * Incrementa o número ANTES da emissão para evitar duplicidade
+     * Se a emissão falhar, deve ser revertido com reverterIncrementoNumerNFCe()
+     * 
+     * @param {Object} empresa - Dados da empresa
+     * @param {String} provider - Provider ('focus_nfe' ou 'nuvem_fiscal')
+     * @returns {Number} Número obtido (já foi incrementado no config)
+     */
+    static async obterProximoNumerNFCeComIncremento(empresa, provider = 'focus_nfe') {
+        try {
+            console.log('🔐 [FiscalSystem] Obtendo e incrementando número NFC-e atomicamente...');
+            
+            // 1️⃣ Sincronizar com último número autorizado
+            const proximoNumero = await this.obterProximoNumerNFCe(empresa, provider);
+            console.log('📊 [FiscalSystem] Próximo número sincronizado:', proximoNumero);
+            
+            // 2️⃣ INCREMENTAR ATOMICAMENTE no banco
+            // Usar validação na query para evitar race condition
+            const { data: configAtual, error: erroSelect } = await supabase
+                .from('empresa_config')
+                .select('id, nfce_numero')
+                .single();
+                
+            if (erroSelect || !configAtual) {
+                throw new Error(`Não foi possível obter configuração da empresa: ${erroSelect?.message}`);
+            }
+            
+            // Validação extra: garantir que o número está correto antes de incrementar
+            if (parseInt(configAtual.nfce_numero || 1) !== proximoNumero) {
+                console.warn('⚠️ [FiscalSystem] Número em config divergente, sincronizando...');
+            }
+            
+            // UPDATE com validação: só atualiza se o número em BD corresponde ao esperado
+            const numeroProxEsperado = proximoNumero + 1;
+            const { error: erroUpdate, data: dataUpdate } = await supabase
+                .from('empresa_config')
+                .update({ nfce_numero: numeroProxEsperado })
+                .eq('id', configAtual.id)
+                .eq('nfce_numero', proximoNumero) // ⚠️ Validação de concorrência
+                .select();
+            
+            if (erroUpdate) {
+                throw new Error(`Falha ao incrementar número: ${erroUpdate.message}`);
+            }
+            
+            if (!dataUpdate || dataUpdate.length === 0) {
+                // Verificar se o número já foi incrementado por outra requisição
+                const { data: configAtualizado } = await supabase
+                    .from('empresa_config')
+                    .select('nfce_numero')
+                    .single();
+                    
+                const numeroAtual = parseInt(configAtualizado?.nfce_numero || 1);
+                if (numeroAtual > proximoNumero) {
+                    console.warn('⚠️ [FiscalSystem] Número já foi incrementado por outra requisição, usando novo número:', numeroAtual);
+                    return await this.obterProximoNumerNFCeComIncremento(empresa, provider);
+                }
+                
+                throw new Error('Não foi possível incrementar o número (validação de concorrência falhou)');
+            }
+            
+            console.log('✅ [FiscalSystem] Número NFC-e reservado e incrementado atomicamente:', proximoNumero);
+            return proximoNumero;
+            
+        } catch (erro) {
+            console.error('❌ [FiscalSystem] Erro ao obter/incrementar número NFC-e:', erro.message);
+            throw erro;
+        }
+    }
+
+    /**
+     * ⚠️ REVOGAR INCREMENTO DE NÚMERO NFC-e
+     * Deve ser chamado se a emissão falhar após obterProximoNumerNFCeComIncremento
+     * Recua o número de volta para o anterior
+     * 
+     * @param {Number} numeroObtido - Número que foi obtido (será decrementado)
+     */
+    static async reverterIncrementoNumerNFCe(numeroObtido) {
+        try {
+            if (!numeroObtido || numeroObtido < 1) {
+                console.warn('⚠️ [FiscalSystem] Número inválido para reversão:', numeroObtido);
+                return;
+            }
+            
+            console.log('⚠️ [FiscalSystem] Revertendo incremento de número NFC-e para:', numeroObtido);
+            
+            const { error } = await supabase
+                .from('empresa_config')
+                .update({ nfce_numero: numeroObtido })
+                .eq('nfce_numero', numeroObtido + 1);
+            
+            if (error) {
+                console.error('❌ [FiscalSystem] Erro ao reverter número:', error.message);
+                throw error;
+            }
+            
+            console.log('✅ [FiscalSystem] Número NFC-e revertido com sucesso para:', numeroObtido);
+        } catch (erro) {
+            console.error('❌ [FiscalSystem] Falha ao reverter incremento:', erro.message);
+            throw erro;
         }
     }
 
