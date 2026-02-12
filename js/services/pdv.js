@@ -1003,9 +1003,9 @@ class PDVSystem {
             const usuario = await getCurrentUser();
             const numeroVenda = this.gerarNumeroVenda();
             
-            // Adicionar o acréscimo de tarifa ao total
-            const totalComAcrescimo = this.totaisAtual.total + acrescimoTarifa;
-            const troco = valorPago - totalComAcrescimo;
+            // Subtrair o desconto de tarifa do total
+            const totalComDesconto = this.totaisAtual.total - acrescimoTarifa;
+            const troco = valorPago - totalComDesconto;
 
             console.log('🔵 Estado da movimentação:', {
                 movimentacaoAtual: this.movimentacaoAtual,
@@ -1013,8 +1013,8 @@ class PDVSystem {
                 caixa_id: this.movimentacaoAtual?.caixa_id,
                 status: this.movimentacaoAtual?.status,
                 tipo: typeof this.movimentacaoAtual,
-                acrescimoTarifa: acrescimoTarifa,
-                totalComAcrescimo: totalComAcrescimo
+                descontoTarifa: acrescimoTarifa,
+                totalComDesconto: totalComDesconto
             });
 
             // Validar que temos os IDs necessários
@@ -1041,9 +1041,9 @@ class PDVSystem {
                     vendedor_id: usuario.id,
                     sessao_id: this.movimentacaoAtual.id,
                     subtotal: this.totaisAtual.subtotal,
-                    desconto_valor: this.totaisAtual.desconto,
-                    acrescimo: this.totaisAtual.acrescimo + acrescimoTarifa,
-                    total: totalComAcrescimo,
+                    desconto_valor: this.totaisAtual.desconto + acrescimoTarifa,
+                    acrescimo: this.totaisAtual.acrescimo,
+                    total: totalComDesconto,
                     valor_pago: valorPago,
                     forma_pagamento: formaPagamento,
                     troco: troco,
@@ -1515,12 +1515,12 @@ class PDVSystem {
         // Função para calcular e atualizar troco
         const atualizarTroco = (e) => {
             const acrescimo = parseFloat(acrescimoTarifaInput.value) || 0;
-            const totalComAcrescimo = total + acrescimo;
+            const totalComDesconto = total - acrescimo;
             const valorPago = parseFloat(valorPagoInput.value) || 0;
-            const troco = valorPago - totalComAcrescimo;
+            const troco = valorPago - totalComDesconto;
             trocoValor.textContent = `R$ ${troco.toFixed(2)}`;
             
-            console.log(`💰 Cálculo: R$ ${valorPago.toFixed(2)} - (R$ ${total.toFixed(2)} + R$ ${acrescimo.toFixed(2)}) = R$ ${troco.toFixed(2)}`);
+            console.log(`💰 Cálculo: R$ ${valorPago.toFixed(2)} - (R$ ${total.toFixed(2)} - R$ ${acrescimo.toFixed(2)}) = R$ ${troco.toFixed(2)}`);
             
             // Mudar cor conforme o troco
             if (troco < -0.01) {
@@ -1552,19 +1552,19 @@ class PDVSystem {
                     descricao = `Taxa de crédito: ${taxa.toFixed(2)}%`;
                 }
                 
-                // Calcular acréscimo baseado na taxa
+                // Calcular desconto (tarifa) baseado na taxa
                 const acrescimo = (total * taxa) / 100;
                 
-                // Preencher campo de acréscimo
+                // Preencher campo de desconto de tarifa
                 acrescimoTarifaInput.value = acrescimo.toFixed(2);
                 
                 // Atualizar descrição
                 container.querySelector('#taxa-percentual').textContent = `${taxa.toFixed(2)}%`;
                 container.querySelector('#taxa-descricao').textContent = descricao;
                 
-                // Atualizar valor recebido com o novo total
-                const totalComAcrescimo = total + acrescimo;
-                valorPagoInput.value = totalComAcrescimo.toFixed(2);
+                // Atualizar valor recebido com o novo total (subtraindo a tarifa)
+                const totalComDesconto = total - acrescimo;
+                valorPagoInput.value = totalComDesconto.toFixed(2);
                 
                 console.log(`💳 ${forma}: Taxa ${taxa}% = R$ ${acrescimo.toFixed(2)}`);
             } else {
