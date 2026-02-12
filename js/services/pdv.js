@@ -1415,6 +1415,28 @@ class PDVSystem {
         console.log('🔵 Abrindo modal de finalização...');
         const total = this.totaisAtual.total;
         
+        // Buscar configurações de taxa da empresa
+        let taxaDebitoEmpresa = 1.09;  // Padrão
+        let taxaCreditoEmpresa = 3.16; // Padrão
+        
+        try {
+            const { data: empresa, error } = await supabase
+                .from('empresa_config')
+                .select('taxa_cartao_debito, taxa_cartao_credito')
+                .single();
+                
+            if (!error && empresa) {
+                taxaDebitoEmpresa = parseFloat(empresa.taxa_cartao_debito) || 1.09;
+                taxaCreditoEmpresa = parseFloat(empresa.taxa_cartao_credito) || 3.16;
+                console.log('📊 Taxas carregadas da empresa:', { 
+                    debito: taxaDebitoEmpresa, 
+                    credito: taxaCreditoEmpresa 
+                });
+            }
+        } catch (error) {
+            console.warn('⚠️ Erro ao buscar taxas da empresa, usando padrão:', error);
+        }
+        
         // Criar elementos
         const overlay = document.createElement('div');
         overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
@@ -1518,16 +1540,16 @@ class PDVSystem {
             if (isCartao) {
                 secaoAcrescimo.classList.remove('hidden');
                 
-                // Definir taxa e calcular acréscimo
+                // Definir taxa e calcular acréscimo (usando taxas da empresa)
                 let taxa = 0;
                 let descricao = '';
                 
                 if (forma === 'CARTAO_DEBITO') {
-                    taxa = 1.09; // 1,09%
-                    descricao = 'Taxa de débito: 1,09%';
+                    taxa = taxaDebitoEmpresa;
+                    descricao = `Taxa de débito: ${taxa.toFixed(2)}%`;
                 } else if (forma === 'CARTAO_CREDITO') {
-                    taxa = 3.16; // 3,16%
-                    descricao = 'Taxa de crédito: 3,16%';
+                    taxa = taxaCreditoEmpresa;
+                    descricao = `Taxa de crédito: ${taxa.toFixed(2)}%`;
                 }
                 
                 // Calcular acréscimo baseado na taxa
