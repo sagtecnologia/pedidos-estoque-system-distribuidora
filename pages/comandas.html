@@ -367,6 +367,19 @@
 
         async function abrirDetalhesComanda(comandaId) {
             try {
+                // ⛔ AGUARDAR SE HOUVER SINCRONIZAÇÃO EM ANDAMENTO
+                if (sincronizandoComanda) {
+                    console.warn('⏳ Aguardando sincronização anterior terminar...');
+                    await new Promise(resolve => {
+                        const checkSync = setInterval(() => {
+                            if (!sincronizandoComanda) {
+                                clearInterval(checkSync);
+                                resolve();
+                            }
+                        }, 100);
+                    });
+                }
+
                 const inicio = performance.now();
                 
                 // 🚀 Se já temos a comanda carregada, só atualizar itens (mais rápido)
@@ -380,17 +393,24 @@
                     comandaAtual = await ServicoComandasService.buscarComandaPorId(comandaId);
                 }
                 
-                // 🚀 CARREGAR ITENS EM ARRAY LOCAL
-                itensLocaisComanda = (comandaAtual.itens || []).map(item => ({
-                    id: item.id,
-                    produto_id: item.produto_id,
-                    nome_produto: item.nome_produto,
-                    quantidade: item.quantidade,
-                    preco_unitario: item.preco_unitario,
-                    subtotal: item.subtotal,
-                    status: item.status,
-                    observacoes: item.observacoes
-                }));
+                // 🚀 CARREGAR ITENS EM ARRAY LOCAL (com dedupilcação por produto_id)
+                const itensMap = new Map(); // ✅ Usar Map para evitar duplicatas
+                (comandaAtual.itens || []).forEach(item => {
+                    const key = String(item.produto_id); // ✅ Normalizar como string
+                    if (!itensMap.has(key)) {
+                        itensMap.set(key, {
+                            id: item.id,
+                            produto_id: item.produto_id,
+                            nome_produto: item.nome_produto,
+                            quantidade: item.quantidade,
+                            preco_unitario: item.preco_unitario,
+                            subtotal: item.subtotal,
+                            status: item.status,
+                            observacoes: item.observacoes
+                        });
+                    }
+                });
+                itensLocaisComanda = Array.from(itensMap.values());
                 
                 // Mostrar Mesa X se tiver numero_mesa, senão só o numero_comanda
                 let tituloComanda = comandaAtual.numero_mesa 
@@ -439,6 +459,13 @@
             try {
                 // 🚀 MARCAR COMO PROCESSANDO
                 adicionandoItemComanda = true;
+                
+                // ⏱️ TIMEOUT DE SEGURANÇA (libera após 15s mesmo se der erro)
+                const timeoutId = setTimeout(() => {
+                    adicionandoItemComanda = false;
+                    console.warn('⚠️ Timeout de 15s atingido, liberando flag de processamento');
+                }, 15000);
+
                 const inputBusca = document.getElementById("busca-produto-comanda");
                 const inputQuantidade = document.getElementById("add-quantidade");
                 
@@ -453,7 +480,7 @@
                 // 🚀 BUSCAR PRODUTO (rápido - apenas uma query)
                 const { data: produto, error: erroP } = await supabase
                     .from('produtos')
-                    .select('id, nome, preco_venda, estoque_atual')
+                    .select('id, nome, preco_venda, exige_estoque')
                     .eq('id', produtoId)
                     .single();
 
@@ -461,30 +488,39 @@
                     throw new Error('Produto não encontrado');
                 }
 
-                // 🚀 VALIDAR ESTOQUE RAPIDAMENTE
-                const estoqueDisponivel = produto.estoque_atual || 0;
-                const quantidadeJaAdicionada = itensLocaisComanda
-                    .filter(i => i.produto_id === produtoId)
-                    .reduce((sum, i) => sum + i.quantidade, 0);
-                const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
+                // ✅ VALIDAR ESTOQUE CONSIDERANDO OUTRAS COMANDAS (mesmo padrão do backend)
+                if (produto.exige_estoque !== false) {
+                    const estoqueDisponivel = await ServicoComandasService.calcularEstoqueDisponivel(produtoId, comandaAtual.id);
+                    const quantidadeJaAdicionada = itensLocaisComanda
+                        .filter(i => i.produto_id === produtoId)
+                        .reduce((sum, i) => sum + i.quantidade, 0);
+                    const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
 
-                if (quantidadeTotalNecessaria > estoqueDisponivel) {
-                    throw new Error(
-                        `Estoque insuficiente para ${produto.nome}\n` +
-                        `Já adicionado: ${quantidadeJaAdicionada.toFixed(2)}\n` +
-                        `Novo: ${quantidade.toFixed(2)}\n` +
-                        `Total: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
-                        `Disponível: ${estoqueDisponivel.toFixed(2)}`
-                    );
+                    if (quantidadeTotalNecessaria > estoqueDisponivel) {
+                        throw new Error(
+                            `Estoque insuficiente para ${produto.nome}\n` +
+                            `Já adicionado nesta comanda: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                            `Novo: ${quantidade.toFixed(2)}\n` +
+                            `Total: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
+                            `Disponível (outras comandas descontadas): ${estoqueDisponivel.toFixed(2)}`
+                        );
+                    }
+                } else {
+                    console.log(`ℹ️ Produto ${produto.nome} não exige validação de estoque`);
                 }
 
                 // 🚀 ADICIONAR LOCALMENTE (INSTANTÂNEO!)
-                const itemExistenteIdx = itensLocaisComanda.findIndex(i => i.produto_id === produtoId);
+                const itemExistenteIdx = itensLocaisComanda.findIndex(i => 
+                    String(i.produto_id) === String(produtoId)  // ✅ Comparar como string para evitar problemas de tipagem
+                );
                 if (itemExistenteIdx >= 0) {
+                    // ✅ ITEM JÁ EXISTE - AUMENTAR QUANTIDADE
                     itensLocaisComanda[itemExistenteIdx].quantidade += quantidade;
                     itensLocaisComanda[itemExistenteIdx].subtotal = 
                         itensLocaisComanda[itemExistenteIdx].quantidade * itensLocaisComanda[itemExistenteIdx].preco_unitario;
+                    console.log(`✅ Produto aumentado: quantidade=${itensLocaisComanda[itemExistenteIdx].quantidade}`);
                 } else {
+                    // ❌ ITEM NÃO EXISTE - CRIAR NOVO
                     itensLocaisComanda.push({
                         id: `temp-${Date.now()}`,
                         produto_id: produtoId,
@@ -495,6 +531,7 @@
                         status: 'pendente',
                         observacoes: null
                     });
+                    console.log(`✅ Novo produto adicionado: ${produto.nome}`);
                 }
 
                 // 🚀 RENDERIZAR IMEDIATAMENTE (sem esperar banco)
@@ -510,6 +547,9 @@
                     console.error('Erro ao sincronizar com banco:', err);
                     mostrarMensagem('Aviso', 'Item adicionado localmente, mas erro ao sincronizar', 'aviso');
                 });
+
+                // Limpar timeout se chegou aqui sem erro
+                clearTimeout(timeoutId);
 
             } catch (erro) {
                 console.error("Erro ao adicionar item:", erro);
@@ -706,26 +746,27 @@
                     throw new Error('Item não encontrado');
                 }
 
-                // Validar estoque antes de aumentar quantidade (respeitando exige_estoque)
+                // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
                 const { data: produto } = await supabase
                     .from('produtos')
-                    .select('estoque_atual, exige_estoque')
+                    .select('nome, exige_estoque')
                     .eq('id', item.produto_id)
                     .single();
 
-                // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
                 if (produto?.exige_estoque !== false) {
-                    const estoqueDisponivel = produto?.estoque_atual || 0;
+                    // ✅ VALIDAR COM OUTRAS COMANDAS DESCONTADAS (mesmo padrão do backend)
+                    const estoqueDisponivel = await ServicoComandasService.calcularEstoqueDisponivel(item.produto_id, comandaAtual.id);
+                    
                     if (novaQuantidade > estoqueDisponivel) {
                         mostrarMensagem(
                             'Estoque Insuficiente',
-                            `Disponível: ${estoqueDisponivel.toFixed(2)}\nSolicitado: ${novaQuantidade.toFixed(2)}`,
+                            `Disponível (outras comandas descontadas): ${estoqueDisponivel.toFixed(2)}\nSolicitado: ${novaQuantidade.toFixed(2)}`,
                             'aviso'
                         );
                         return;
                     }
                 } else {
-                    console.log(`ℹ️ Produto não exige validação de estoque`);
+                    console.log(`ℹ️ Produto ${produto?.nome} não exige validação de estoque`);
                 }
 
                 alterarQuantidadeItemLocal(item.produto_id, novaQuantidade);

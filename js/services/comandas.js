@@ -10,6 +10,71 @@ class ServicoComandas {
     }
 
     /**
+     * 🔍 CALCULAR ESTOQUE REALMENTE DISPONÍVEL
+     * Considera: estoque_atual - quantidades em comandas abertas (excluindo comanda atual)
+     * @param {uuid} produtoId - ID do produto
+     * @param {uuid} comandaIdAtual - ID da comanda atual (para excluir)
+     * @returns {Promise<number>} Estoque disponível real
+     */
+    async calcularEstoqueDisponivel(produtoId, comandaIdAtual = null) {
+        try {
+            // 1️⃣ Buscar estoque atual do produto
+            const { data: produto, error: erroProduto } = await supabase
+                .from('produtos')
+                .select('estoque_atual')
+                .eq('id', produtoId)
+                .single();
+
+            if (erroProduto) throw erroProduto;
+
+            const estoqueAtual = produto?.estoque_atual || 0;
+
+            // 2️⃣ BUSCAR QUANTIDADES EM TODAS as comandas abertas com esse produto
+            // Precisa selecionar 'comandas(status)' para poder filtrar por comandas.status
+            const { data: todosItensAbertas, error: erroTodos } = await supabase
+                .from('comanda_itens')
+                .select('comanda_id, quantidade, comandas(status)')
+                .eq('produto_id', produtoId)
+                .eq('status', 'pendente')
+                .eq('comandas.status', 'aberta');
+
+            if (erroTodos) {
+                console.warn('⚠️ Erro ao buscar itens em comandas, usando estoque direto:', erroTodos);
+                return estoqueAtual;
+            }
+
+            // 3️⃣ FILTRAR apenas itens de comandas abertas (validar status)
+            let totalEmComandas = 0;
+            let quantidadeNaComandaAtual = 0;
+
+            if (todosItensAbertas && todosItensAbertas.length > 0) {
+                todosItensAbertas.forEach(item => {
+                    // ✅ Validar que a comanda está realmente aberta
+                    if (item.comandas?.status === 'aberta') {
+                        totalEmComandas += item.quantidade || 0;
+                        
+                        // Se é item da comanda atual, guardar para descontar
+                        if (comandaIdAtual && item.comanda_id === comandaIdAtual) {
+                            quantidadeNaComandaAtual += item.quantidade || 0;
+                        }
+                    }
+                });
+            }
+
+            // 4️⃣ CALCULAR: Estoque - (Total de outras comandas)
+            const quantidadeEmOutrasComandas = totalEmComandas - quantidadeNaComandaAtual;
+            const estoqueDisponivel = estoqueAtual - quantidadeEmOutrasComandas;
+
+            console.log(`📊 Produto ${produtoId}: Estoque=${estoqueAtual}, Total em Comandas=${totalEmComandas}, Nesta Comanda=${quantidadeNaComandaAtual}, Em Outras=${quantidadeEmOutrasComandas}, Disponível=${estoqueDisponivel}`);
+
+            return Math.max(0, estoqueDisponivel);
+        } catch (erro) {
+            console.error('Erro ao calcular estoque disponível:', erro);
+            throw erro;
+        }
+    }
+
+    /**
      * Buscar todas as comandas abertas
      */
     async buscarComandasAbertas() {
@@ -219,18 +284,18 @@ class ServicoComandas {
                 supabase.auth.getUser()
             ]);
 
-            // ✅ VALIDAR ESTOQUE CONSIDERANDO O QUE JÁ ESTÁ NA COMANDA
-            const estoqueDisponivel = produto.estoque_atual || 0;
+            // ✅ VALIDAR ESTOQUE CONSIDERANDO COMANDAS ABERTAS (NÃO SÓ ESSA COMANDA)
+            const estoqueDisponivel = await this.calcularEstoqueDisponivel(produtoId, comandaId);
             const quantidadeJaAdicionada = itemExistente ? itemExistente.quantidade : 0;
             const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
 
             if (quantidadeTotalNecessaria > estoqueDisponivel) {
                 throw new Error(
                     `Estoque insuficiente para ${produto.nome}\n` +
-                    `Já adicionado: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                    `Já adicionado nesta comanda: ${quantidadeJaAdicionada.toFixed(2)}\n` +
                     `Novo: ${quantidade.toFixed(2)}\n` +
                     `Total solicitado: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
-                    `Disponível: ${estoqueDisponivel.toFixed(2)}`
+                    `Disponível (outras comandas descontadas): ${estoqueDisponivel.toFixed(2)}`
                 );
             }
 
@@ -344,20 +409,15 @@ class ServicoComandas {
 
             if (erroItem) throw erroItem;
 
-            // ✅ VALIDAR ESTOQUE antes de alterar (respeitando exige_estoque)
-            const { data: produto } = await supabase
-                .from('produtos')
-                .select('nome, estoque_atual, exige_estoque')
-                .eq('id', item.produto_id)
-                .single();
-
+            // ✅ VALIDAR ESTOQUE CONSIDERANDO COMANDAS ABERTAS
+            const estoqueDisponivel = await this.calcularEstoqueDisponivel(item.produto_id, item.comanda_id);
+            
             // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
             if (produto?.exige_estoque !== false) {
-                const estoqueDisponivel = produto?.estoque_atual || 0;
                 if (novaQuantidade > estoqueDisponivel) {
                     throw new Error(
                         `Estoque insuficiente para ${produto.nome}\n` +
-                        `Disponível: ${estoqueDisponivel.toFixed(2)}\n` +
+                        `Disponível (outras comandas descontadas): ${estoqueDisponivel.toFixed(2)}\n` +
                         `Solicitado: ${novaQuantidade.toFixed(2)}`
                     );
                 }
@@ -519,14 +579,14 @@ class ServicoComandas {
             const caixaId = movimentacao.caixa_id;
             const movimentacaoId = movimentacao.id;
 
-            // ✅ VALIDAR ESTOQUE ANTES DE FINALIZAR (mesma lógica do PDV)
-            console.log('🔍 [COMANDA] Validando estoque disponível...');
+            // ✅ VALIDAR ESTOQUE ANTES DE FINALIZAR (considerando TODAS as comandas abertas)
+            console.log('🔍 [COMANDA] Validando estoque disponível (outras comandas descontadas)...');
             for (const item of comanda.itens) {
                 if (item.status === 'cancelado') continue;
 
                 const { data: produto } = await supabase
                     .from('produtos')
-                    .select('nome, estoque_atual, exige_estoque')
+                    .select('nome, exige_estoque')
                     .eq('id', item.produto_id)
                     .single();
                 
@@ -540,16 +600,17 @@ class ServicoComandas {
                     continue;
                 }
                 
-                const estoqueDisponivel = produto.estoque_atual || 0;
+                // ✅ CALCULAR ESTOQUE DISPONÍVEL (DESCONTANDO OUTRAS COMANDAS)
+                const estoqueDisponivel = await this.calcularEstoqueDisponivel(item.produto_id, comandaId);
                 if (item.quantidade > estoqueDisponivel) {
                     throw new Error(
                         `Estoque insuficiente para ${produto.nome}\n` +
-                        `Disponível: ${estoqueDisponivel.toFixed(2)}\n` +
-                        `Solicitado: ${item.quantidade.toFixed(2)}`
+                        `Disponível (outras comandas descontadas): ${estoqueDisponivel.toFixed(2)}\n` +
+                        `Solicitado nesta comanda: ${item.quantidade.toFixed(2)}`
                     );
                 }
             }
-            console.log('✅ [COMANDA] Estoque validado - todos os itens com exige_estoque=true estão disponíveis');
+            console.log('✅ [COMANDA] Estoque validado - todos os itens com estoque disponível');
 
             // Criar venda
             const valorTotal = comanda.valor_total;
