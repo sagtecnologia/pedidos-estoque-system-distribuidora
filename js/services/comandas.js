@@ -562,9 +562,12 @@ class ServicoComandas {
             if (!movimentacaoId) throw new Error('Movimentação ID não encontrado');
             if (!user?.id) throw new Error('Usuário não autenticado');
 
+            // Gerar número da venda usando o mesmo padrão do PDV
+            const numeroVenda = this.gerarNumeroVenda();
+
             // Preparar dados da venda - SÓ CAMPOS COM VALOR (como no PDV)
             const vendaData = {
-                numero: comanda.numeracao, // ✅ USAR COLUNA 'numero' QUE JÁ EXISTE NO SCHEMA
+                numero: numeroVenda, // ✅ USAR MESMO PADRÃO QUE O PDV (PED-YYYYMMDD-000001)
                 caixa_id: caixaId,
                 movimentacao_caixa_id: movimentacaoId,
                 sessao_id: movimentacaoId,
@@ -822,6 +825,15 @@ class ServicoComandas {
             console.error('Erro ao contar comandas:', erro);
             return { total: 0, mesa: 0, balcao: 0, delivery: 0 };
         }
+    }
+
+    /**
+     * Gerar número de venda no mesmo padrão do PDV
+     * Formato: PED-YYYYMMDD-000001
+     */
+    gerarNumeroVenda() {
+        const sequencia = Math.floor(Math.random() * 999999).toString().padStart(6, '0');
+        return `PED-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-${sequencia}`;
     }
 }
 
