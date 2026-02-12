@@ -564,7 +564,7 @@ class ServicoComandas {
 
             // Preparar dados da venda - SÓ CAMPOS COM VALOR (como no PDV)
             const vendaData = {
-                numero_venda: comanda.numeracao, // ✅ ADICIONAR NÚMERO DA COMANDA COMO NÚMERO DA VENDA
+                numero: comanda.numeracao, // ✅ USAR COLUNA 'numero' QUE JÁ EXISTE NO SCHEMA
                 caixa_id: caixaId,
                 movimentacao_caixa_id: movimentacaoId,
                 sessao_id: movimentacaoId,
