@@ -261,6 +261,7 @@
         let comandaAtual = null;
         let tipoFiltroAtual = "todas";
         let adicionandoItemComanda = false; // ✅ Flag para evitar race condition
+        let sincronizandoComanda = false; // ✅ Flag para evitar múltiplas sincronizações simultâneas
         let itensLocaisComanda = []; // 🚀 Array local para operações instantâneas (como PDV)
 
         document.addEventListener("DOMContentLoaded", async () => {
@@ -531,14 +532,19 @@
         function renderizarItensComandaLocal() {
             const container = document.getElementById("lista-itens-comanda");
             
-            if (!itensLocaisComanda || itensLocaisComanda.length === 0) {
+            // ✅ FILTRAR ITENS VÁLIDOS (com produto_id e nome_produto)
+            const itensValidos = itensLocaisComanda.filter(item => 
+                item.status !== "cancelado" && 
+                item.produto_id && 
+                item.nome_produto
+            );
+            
+            if (!itensValidos || itensValidos.length === 0) {
                 container.innerHTML = '<p class="text-gray-500 text-center">Nenhum item adicionado</p>';
                 return;
             }
 
-            container.innerHTML = itensLocaisComanda.map(item => {
-                if (item.status === "cancelado") return "";
-                
+            container.innerHTML = itensValidos.map(item => {
                 return `
                     <div class="flex justify-between items-center py-3 border-b border-gray-200 gap-3">
                         <div class="flex-grow min-w-0">
@@ -570,7 +576,14 @@
 
         // 🚀 ATUALIZAR TOTAIS LOCALMENTE
         function atualizarTotaisLocal() {
-            const subtotal = itensLocaisComanda.reduce((sum, item) => sum + item.subtotal, 0);
+            // ✅ CONSIDERAR APENAS ITENS VÁLIDOS (com produto_id e nome_produto)
+            const itensValidos = itensLocaisComanda.filter(item => 
+                item.status !== "cancelado" && 
+                item.produto_id && 
+                item.nome_produto
+            );
+            
+            const subtotal = itensValidos.reduce((sum, item) => sum + (item.subtotal || 0), 0);
             const desconto = (comandaAtual?.desconto || 0);
             const acrescimo = (comandaAtual?.acrescimo || 0);
             const total = subtotal - desconto + acrescimo;
@@ -609,20 +622,36 @@
         // 🚀 SINCRONIZAR ITENS LOCAIS COM BANCO (background)
         async function sincronizarItensBanco(comandaId) {
             try {
+                // ⛔ EVITAR MÚLTIPLAS SINCRONIZAÇÕES SIMULTÂNEAS (CAUSA DUPLICAÇÃO!)
+                if (sincronizandoComanda) {
+                    console.warn('⚠️ Sincronização já em andamento, ignorando nova chamada');
+                    return;
+                }
+
+                sincronizandoComanda = true;
                 console.log('🔄 Sincronizando itens com banco...');
                 
-                // Limpar itens antigos desta comanda
-                await supabase
+                const { data: { user } } = await supabase.auth.getUser();
+
+                // ✅ FILTRAR APENAS ITENS VÁLIDOS (com produto_id e nome_produto)
+                const itensValidos = itensLocaisComanda.filter(item => 
+                    item.status !== "cancelado" && 
+                    item.produto_id && 
+                    item.nome_produto
+                );
+
+                // ❌ DELETAR TODOS OS ITENS PENDENTES ANTIGOS
+                const { error: erroDelete } = await supabase
                     .from('comanda_itens')
                     .delete()
                     .eq('comanda_id', comandaId)
                     .eq('status', 'pendente');
 
-                // Inserir todos os itens locais
-                if (itensLocaisComanda.length > 0) {
-                    const { data: { user } } = await supabase.auth.getUser();
-                    
-                    const itensParaSalvar = itensLocaisComanda.map(item => ({
+                if (erroDelete) throw erroDelete;
+
+                // ✅ INSERIR TODOS OS ITENS VÁLIDOS
+                if (itensValidos.length > 0) {
+                    const itensParaSalvar = itensValidos.map(item => ({
                         comanda_id: comandaId,
                         produto_id: item.produto_id,
                         nome_produto: item.nome_produto,
@@ -634,17 +663,18 @@
                         status: 'pendente'
                     }));
 
-                    await supabase
+                    const { error: erroInsert } = await supabase
                         .from('comanda_itens')
                         .insert(itensParaSalvar);
+
+                    if (erroInsert) throw erroInsert;
                 }
 
-                // Recalcular totais da comanda
-                const subtotal = itensLocaisComanda.reduce((sum, item) => sum + item.subtotal, 0);
+                // 📊 Recalcular totais da comanda
+                const subtotal = itensValidos.reduce((sum, item) => sum + (item.subtotal || 0), 0);
                 const { error: errorUpdate } = await supabase
                     .from('comandas')
                     .update({
-                        total_itens: itensLocaisComanda.length,
                         subtotal: subtotal,
                         valor_total: subtotal + (comandaAtual?.acrescimo || 0) - (comandaAtual?.desconto || 0),
                         updated_at: new Date().toISOString()
@@ -656,6 +686,9 @@
                 console.log('✅ Sincronização concluída');
             } catch (erro) {
                 console.error('Erro ao sincronizar:', erro);
+                mostrarMensagem('Aviso', 'Erro ao sincronizar: ' + erro.message, 'aviso');
+            } finally {
+                sincronizandoComanda = false;
             }
         }
 
@@ -1250,16 +1283,36 @@
                 }
             });
 
-            // Enter para buscar por codigo
+            // Enter para buscar por codigo (com proteção contra múltiplos eventos)
+            let processandoBarras = false;
             inputBusca.addEventListener("keypress", async (e) => {
                 if (e.key === "Enter") {
-                    dropdownSugestoes.classList.add("hidden");
-                    const produto = await buscarProdutoPorCodigo(e.target.value);
-                    if (produto) {
-                        await adicionarProdutoPorId(produto.id);
-                        e.target.value = "";
-                    } else {
-                        mostrarMensagem('Aviso', 'Produto não encontrado', 'aviso');
+                    // ⛔ EVITAR MÚLTIPLAS CHAMADAS SIMULTÂNEAS DO LEITOR
+                    if (processandoBarras) {
+                        console.warn('⚠️ Já está processando código de barras, aguarde...');
+                        return;
+                    }
+
+                    try {
+                        processandoBarras = true;
+                        dropdownSugestoes.classList.add("hidden");
+                        const codigo = e.target.value.trim();
+                        
+                        if (codigo.length === 0) {
+                            processandoBarras = false;
+                            return;
+                        }
+
+                        const produto = await buscarProdutoPorCodigo(codigo);
+                        if (produto) {
+                            await adicionarProdutoPorId(produto.id);
+                            e.target.value = "";
+                        } else {
+                            mostrarMensagem('Aviso', 'Produto não encontrado', 'aviso');
+                            e.target.value = "";
+                        }
+                    } finally {
+                        processandoBarras = false;
                     }
                 }
             });
