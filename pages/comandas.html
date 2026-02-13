@@ -680,7 +680,14 @@
                     item.nome_produto
                 );
 
-                // ❌ DELETAR TODOS OS ITENS PENDENTES ANTIGOS
+                // ⚠️ PROTEÇÃO: Se não há itens válidos, não deletar tudo (evita comanda vazia)
+                if (itensValidos.length === 0) {
+                    console.warn('⚠️ Nenhum item válido para sincronizar. Mantendo comanda intacta.');
+                    sincronizandoComanda = false;
+                    return;
+                }
+
+                // ❌ DELETAR TODOS OS ITENS PENDENTES ANTIGOS (APENAS se há novas items para salvar)
                 const { error: erroDelete } = await supabase
                     .from('comanda_itens')
                     .delete()
@@ -690,25 +697,23 @@
                 if (erroDelete) throw erroDelete;
 
                 // ✅ INSERIR TODOS OS ITENS VÁLIDOS
-                if (itensValidos.length > 0) {
-                    const itensParaSalvar = itensValidos.map(item => ({
-                        comanda_id: comandaId,
-                        produto_id: item.produto_id,
-                        nome_produto: item.nome_produto,
-                        quantidade: item.quantidade,
-                        preco_unitario: item.preco_unitario,
-                        subtotal: item.subtotal,
-                        observacoes: item.observacoes,
-                        usuario_id: user?.id,
-                        status: 'pendente'
-                    }));
+                const itensParaSalvar = itensValidos.map(item => ({
+                    comanda_id: comandaId,
+                    produto_id: item.produto_id,
+                    nome_produto: item.nome_produto,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.preco_unitario,
+                    subtotal: item.subtotal,
+                    observacoes: item.observacoes,
+                    usuario_id: user?.id,
+                    status: 'pendente'
+                }));
 
-                    const { error: erroInsert } = await supabase
-                        .from('comanda_itens')
-                        .insert(itensParaSalvar);
+                const { error: erroInsert } = await supabase
+                    .from('comanda_itens')
+                    .insert(itensParaSalvar);
 
-                    if (erroInsert) throw erroInsert;
-                }
+                if (erroInsert) throw erroInsert;
 
                 // 📊 Recalcular totais da comanda
                 const subtotal = itensValidos.reduce((sum, item) => sum + (item.subtotal || 0), 0);
@@ -723,10 +728,10 @@
 
                 if (errorUpdate) throw errorUpdate;
                 
-                console.log('✅ Sincronização concluída');
+                console.log('✅ Sincronização concluída com sucesso');
             } catch (erro) {
-                console.error('Erro ao sincronizar:', erro);
-                mostrarMensagem('Aviso', 'Erro ao sincronizar: ' + erro.message, 'aviso');
+                console.error('❌ Erro ao sincronizar:', erro);
+                mostrarMensagem('Erro', 'Erro ao sincronizar com banco: ' + erro.message, 'erro');
             } finally {
                 sincronizandoComanda = false;
             }
@@ -1379,11 +1384,29 @@
         }
 
         function formatarHora(data) {
-            return new Date(data).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+            const d = new Date(data);
+            // Subtrair 3 horas (Brasília é UTC-3)
+            const horarioBrasil = new Date(d.getTime() - (3 * 60 * 60 * 1000));
+            return horarioBrasil.toLocaleTimeString("pt-BR", { 
+                hour: "2-digit", 
+                minute: "2-digit",
+                hour12: false
+            });
         }
 
         function formatarDataHora(data) {
-            return new Date(data).toLocaleString("pt-BR");
+            const d = new Date(data);
+            // Subtrair 3 horas (Brasília é UTC-3)
+            const horarioBrasil = new Date(d.getTime() - (3 * 60 * 60 * 1000));
+            return horarioBrasil.toLocaleString("pt-BR", {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            });
         }
     </script>
 </body>
