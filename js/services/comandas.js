@@ -19,15 +19,15 @@ class ServicoComandas {
     async calcularEstoqueDisponivel(produtoId, comandaIdAtual = null) {
         try {
             // 1️⃣ Buscar estoque atual do produto
-            const { data: produto, error: erroProduto } = await supabase
+            const { data: produtos, error: erroProduto } = await supabase
                 .from('produtos')
                 .select('estoque_atual')
                 .eq('id', produtoId)
-                .single();
+                .limit(1);
 
             if (erroProduto) throw erroProduto;
 
-            const estoqueAtual = produto?.estoque_atual || 0;
+            const estoqueAtual = produtos && produtos.length > 0 ? produtos[0].estoque_atual : 0;
 
             // 2️⃣ BUSCAR QUANTIDADES EM TODAS as comandas abertas com esse produto
             // Precisa selecionar 'comandas(status)' para poder filtrar por comandas.status
@@ -121,7 +121,7 @@ class ServicoComandas {
      */
     async buscarComandaPorId(comandaId) {
         try {
-            const { data: comanda, error } = await supabase
+            const { data: comandas, error } = await supabase
                 .from('comandas')
                 .select(`
                     *,
@@ -146,9 +146,15 @@ class ServicoComandas {
                     )
                 `)
                 .eq('id', comandaId)
-                .single();
+                .limit(1);
 
             if (error) throw error;
+            
+            if (!comandas || comandas.length === 0) {
+                throw new Error(`Comanda com ID ${comandaId} não encontrada`);
+            }
+            
+            const comanda = comandas[0];
 
             return {
                 ...comanda,
@@ -166,14 +172,14 @@ class ServicoComandas {
      */
     async buscarComandaPorNumero(numeroComanda) {
         try {
-            const { data: comanda, error } = await supabase
+            const { data: comandas, error } = await supabase
                 .from('comandas')
                 .select(`
                     *,
                     comanda_itens (*)
                 `)
                 .eq('numero_comanda', numeroComanda)
-                .single();
+                .limit(1);
 
             if (error) {
                 // Se não encontrar, retornar null sem logar erro
@@ -182,7 +188,7 @@ class ServicoComandas {
                 }
                 throw error;
             }
-            return comanda;
+            return comandas && comandas.length > 0 ? comandas[0] : null;
         } catch (erro) {
             console.error('Erro ao buscar comanda por número:', erro);
             return null;
@@ -230,12 +236,14 @@ class ServicoComandas {
                     data_abertura: new Date().toISOString()
                 })
                 .select()
-                .single();
+                .limit(1);
 
             if (error) throw error;
+            
+            const comandaInserida = comanda && comanda.length > 0 ? comanda[0] : null;
 
-            console.log('✅ Comanda aberta:', comanda);
-            return comanda;
+            console.log('✅ Comanda aberta:', comandaInserida);
+            return comandaInserida;
         } catch (erro) {
             console.error('Erro ao abrir comanda:', erro);
             throw erro;
@@ -255,15 +263,17 @@ class ServicoComandas {
             let produto = this.cacheProdutos?.[produtoId];
             
             if (!produto) {
-                const { data: p, error: erroProduto } = await supabase
+                const { data: produtos, error: erroProduto } = await supabase
                     .from('produtos')
                     .select('id, nome, preco_venda, estoque_atual')
                     .eq('id', produtoId)
-                    .single();
+                    .limit(1);
 
                 if (erroProduto) throw erroProduto;
                 
-                produto = p;
+                produto = produtos && produtos.length > 0 ? produtos[0] : null;
+                if (!produto) throw new Error('Produto não encontrado');
+                
                 // Armazenar em cache
                 if (!this.cacheProdutos) this.cacheProdutos = {};
                 this.cacheProdutos[produtoId] = produto;
@@ -309,7 +319,7 @@ class ServicoComandas {
                 const novaQuantidade = itemExistente.quantidade + quantidade;
                 const novoSubtotal = novaQuantidade * precoUnitario;
 
-                const { data: itemAtualizado, error: erroUpdate } = await supabase
+                const { data: itensAtualizados, error: erroUpdate } = await supabase
                     .from('comanda_itens')
                     .update({
                         quantidade: novaQuantidade,
@@ -318,17 +328,17 @@ class ServicoComandas {
                     })
                     .eq('id', itemExistente.id)
                     .select()
-                    .single();
+                    .limit(1);
 
                 if (erroUpdate) throw erroUpdate;
-                result = itemAtualizado;
+                result = itensAtualizados && itensAtualizados.length > 0 ? itensAtualizados[0] : null;
             } else {
                 // Se NÃO existe, CRIAR NOVO ITEM
                 console.log('✅ Produto novo. Criando item...');
 
                 const subtotal = precoUnitario * quantidade;
 
-                const { data: item, error } = await supabase
+                const { data: itens, error } = await supabase
                     .from('comanda_itens')
                     .insert({
                         comanda_id: comandaId,
@@ -342,10 +352,10 @@ class ServicoComandas {
                         status: 'pendente'
                     })
                     .select()
-                    .single();
+                    .limit(1);
 
                 if (error) throw error;
-                result = item;
+                result = itens && itens.length > 0 ? itens[0] : null;
             }
 
             // 🚀 OTIMIZAÇÃO 3: Recalcular totais em background (não bloqueia UX)
@@ -369,13 +379,19 @@ class ServicoComandas {
     async removerItem(itemId) {
         try {
             // Buscar o item para pegar o comanda_id antes de deletar
-            const { data: item, error: errorItem } = await supabase
+            const { data: itens, error: errorItem } = await supabase
                 .from('comanda_itens')
                 .select('comanda_id')
                 .eq('id', itemId)
-                .single();
+                .limit(1);
 
             if (errorItem) throw errorItem;
+            
+            if (!itens || itens.length === 0) {
+                throw new Error('Item não encontrado');
+            }
+            
+            const item = itens[0];
 
             const { error } = await supabase
                 .from('comanda_itens')
@@ -401,13 +417,19 @@ class ServicoComandas {
     async alterarQuantidadeItem(itemId, novaQuantidade) {
         try {
             // Buscar item atual
-            const { data: item, error: erroItem } = await supabase
+            const { data: itens, error: erroItem } = await supabase
                 .from('comanda_itens')
                 .select('produto_id, preco_unitario, comanda_id')
                 .eq('id', itemId)
-                .single();
+                .limit(1);
 
             if (erroItem) throw erroItem;
+            
+            if (!itens || itens.length === 0) {
+                throw new Error('Item não encontrado');
+            }
+            
+            const item = itens[0];
 
             // ✅ VALIDAR ESTOQUE CONSIDERANDO COMANDAS ABERTAS
             const estoqueDisponivel = await this.calcularEstoqueDisponivel(item.produto_id, item.comanda_id);
@@ -464,13 +486,19 @@ class ServicoComandas {
             if (errorItens) throw errorItens;
 
             // Buscar valores atuais de desconto e acréscimo
-            const { data: comanda, error: errorComanda } = await supabase
+            const { data: comandas, error: errorComanda } = await supabase
                 .from('comandas')
                 .select('desconto, acrescimo')
                 .eq('id', comandaId)
-                .single();
+                .limit(1);
 
             if (errorComanda) throw errorComanda;
+            
+            if (!comandas || comandas.length === 0) {
+                throw new Error('Comanda não encontrada');
+            }
+            
+            const comanda = comandas[0];
 
             // Calcular subtotal somando todos os itens
             const subtotal = itens.reduce((sum, item) => sum + (item.subtotal || 0), 0);
@@ -563,19 +591,26 @@ class ServicoComandas {
 
             // ✅ EXIGIR CAIXA ABERTO (mesma regra do PDV)
             // Buscar sessão de caixa aberta do usuário (operador_id)
-            const { data: movimentacao, error: erroMovimentacao } = await supabase
+            console.log('🔍 [COMANDA] Buscando caixa aberto para operador:', user?.id);
+            const { data: movimentacoes, error: erroMovimentacao } = await supabase
                 .from('caixa_sessoes')
                 .select('id, caixa_id')
                 .eq('operador_id', user?.id)
                 .eq('status', 'ABERTO')
-                .maybeSingle();
+                .order('data_abertura', { ascending: false })
+                .limit(1);
 
-            if (erroMovimentacao) throw erroMovimentacao;
+            if (erroMovimentacao) {
+                console.error('❌ Erro ao buscar caixa:', erroMovimentacao);
+                throw erroMovimentacao;
+            }
 
-            if (!movimentacao) {
+            if (!movimentacoes || movimentacoes.length === 0) {
                 throw new Error('Nenhum caixa aberto. Abra um caixa antes de fechar a comanda.');
             }
 
+            const movimentacao = movimentacoes[0];
+            console.log('✅ Caixa encontrado:', movimentacao.id);
             const caixaId = movimentacao.caixa_id;
             const movimentacaoId = movimentacao.id;
 
@@ -584,11 +619,13 @@ class ServicoComandas {
             for (const item of comanda.itens) {
                 if (item.status === 'cancelado') continue;
 
-                const { data: produto } = await supabase
+                const { data: produtos } = await supabase
                     .from('produtos')
                     .select('nome, exige_estoque')
                     .eq('id', item.produto_id)
-                    .single();
+                    .limit(1);
+                
+                const produto = produtos && produtos.length > 0 ? produtos[0] : null;
                 
                 if (!produto) {
                     throw new Error(`Produto não encontrado: ${item.nome_produto}`);
@@ -614,9 +651,27 @@ class ServicoComandas {
 
             // Criar venda
             const valorTotal = comanda.valor_total;
-            const acrescimoTotal = (comanda.acrescimo || 0) + acrescimoTarifa;
-            const valorTotalComAcrescimo = valorTotal + acrescimoTarifa;
-            const troco = valorPago > valorTotalComAcrescimo ? valorPago - valorTotalComAcrescimo : 0;
+            const troco = valorPago > valorTotal ? valorPago - valorTotal : 0;
+
+            // ✅ CALCULAR TAXA NO BACKEND (apenas informativo na tela, debitada ao gravar)
+            let acrescimoTarifa_Calculado = 0;
+            if (formaPagamento === 'CARTAO_CREDITO') {
+                acrescimoTarifa_Calculado = (valorTotal * 3.16) / 100; // 3,16% para crédito
+            } else if (formaPagamento === 'CARTAO_DEBITO') {
+                acrescimoTarifa_Calculado = (valorTotal * 1.09) / 100; // 1,09% para débito
+            }
+            
+            console.log(`💳 Taxa de ${formaPagamento}: R$ ${acrescimoTarifa_Calculado.toFixed(2)}`);
+
+            // ✅ CALCULAR VALOR FINAL DA VENDA
+            // Se é cartão: SUBTRAIR a taxa do valor gravado
+            // Se não é cartão: manter o valor normal
+            let valorFinalVenda = valorTotal;
+            if (formaPagamento === 'CARTAO_CREDITO' || formaPagamento === 'CARTAO_DEBITO') {
+                // Taxa é debitada ao gravar (reduz o valor da venda)
+                valorFinalVenda = valorTotal - acrescimoTarifa_Calculado;
+                console.log(`💳 Valor da venda após debitar taxa: R$ ${valorFinalVenda.toFixed(2)}`);
+            }
 
             // ✅ VALIDAR DADOS OBRIGATÓRIOS
             if (!caixaId) throw new Error('Caixa ID não encontrado');
@@ -637,8 +692,8 @@ class ServicoComandas {
                 subtotal: comanda.subtotal,
                 desconto: comanda.desconto || 0,
                 desconto_valor: comanda.desconto || 0,
-                acrescimo: acrescimoTotal,
-                total: valorTotalComAcrescimo,
+                acrescimo: acrescimoTarifa_Calculado,
+                total: valorFinalVenda,
                 forma_pagamento: formaPagamento,
                 valor_pago: valorPago,
                 troco: troco,
@@ -655,17 +710,23 @@ class ServicoComandas {
 
             console.log('💾 Inserindo venda com dados:', vendaData);
 
-            const { data: venda, error: erroVenda } = await supabase
+            // ✅ GERAR UUID ANTES para evitar problemas com .select()
+            const vendaId = crypto.randomUUID();
+            vendaData.id = vendaId;
+
+            // Inserir APENAS, sem fazer select() para evitar PGRST116
+            const { error: erroVenda } = await supabase
                 .from('vendas')
-                .insert([vendaData])
-                .select()
-                .single();
+                .insert([vendaData]);
 
             if (erroVenda) {
                 console.error('❌ Erro ao inserir venda:', erroVenda);
                 console.error('📋 Dados tentados:', vendaData);
                 throw erroVenda;
             }
+
+            // Usar o ID que geramos
+            const venda = { id: vendaId };
 
             console.log('✅ Venda criada:', venda.id);
             console.log('📦 Comanda tem', comanda.itens.length, 'itens para processar');
@@ -681,13 +742,13 @@ class ServicoComandas {
                 console.log('🔄 Processando item:', { id: item.id, produto: item.nome_produto, qtd: item.quantidade });
 
                 // Buscar preço de custo atual do produto (para análise financeira)
-                const { data: produto } = await supabase
+                const { data: produtos } = await supabase
                     .from('produtos')
                     .select('preco_custo')
                     .eq('id', item.produto_id)
-                    .single();
+                    .limit(1);
                 
-                const precoCusto = produto?.preco_custo || 0;
+                const precoCusto = produtos && produtos.length > 0 ? produtos[0].preco_custo : 0;
 
                 const itemData = {
                     venda_id: venda.id,
@@ -737,7 +798,7 @@ class ServicoComandas {
             console.log(`✅ [COMANDA] ${resultado.itens_processados} produtos baixados do estoque`);
 
             // ✅ ATUALIZAR COMANDA COM VENDA_ID (simples como no PDV)
-            const { data: comandaAtualizada, error: erroFechar } = await supabase
+            const { error: erroFechar } = await supabase
                 .from('comandas')
                 .update({
                     status: 'fechada',
@@ -746,9 +807,7 @@ class ServicoComandas {
                     venda_id: venda.id,
                     updated_at: new Date().toISOString()
                 })
-                .eq('id', comandaId)
-                .select()
-                .single();
+                .eq('id', comandaId);
 
             if (erroFechar) {
                 console.error('❌ Erro ao atualizar comanda:', erroFechar);

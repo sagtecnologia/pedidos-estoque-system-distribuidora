@@ -162,18 +162,20 @@ class EstoqueService {
             }
 
             // Buscar pedido
-            const { data: pedido, error: errPedido } = await supabase
+            const { data: pedidos, error: errPedido } = await supabase
                 .from('pedidos_compra')
                 .select('id, numero, status, usuario_id')
                 .eq('id', pedidoCompraId)
-                .single();
+                .limit(1);
 
-            console.log('🔍 [ESTOQUE] Pedido encontrado:', { pedido, errPedido });
+            console.log('🔍 [ESTOQUE] Pedido encontrado:', { pedidos, errPedido });
 
-            if (errPedido || !pedido) {
+            if (errPedido || !pedidos || pedidos.length === 0) {
                 console.error('❌ [ESTOQUE] Erro ao buscar pedido:', errPedido);
                 throw new Error('Pedido de compra não encontrado');
             }
+            
+            const pedido = pedidos[0];
 
             // 2. Buscar itens do pedido (SEM JOIN porque não há FK para produto_id)
             const { data: itens, error: errItens } = await supabase
@@ -524,16 +526,18 @@ class EstoqueService {
             console.log('🔄 [ESTOQUE] Iniciando reversão de venda:', vendaId);
 
             // 1. VERIFICAR STATUS ATUAL DA VENDA (fonte de verdade)
-            const { data: venda, error: errVenda } = await supabase
+            const { data: vendas, error: errVenda } = await supabase
                 .from('vendas')
                 .select('id, status')
                 .eq('id', vendaId)
-                .single();
+                .limit(1);
             
-            if (errVenda || !venda) {
+            if (errVenda || !vendas || vendas.length === 0) {
                 console.error('❌ [ESTOQUE] Venda não encontrada:', errVenda);
                 throw new Error('Venda não encontrada');
             }
+            
+            const venda = vendas[0];
             
             const statusAtual = venda.status?.toUpperCase() || '';
             console.log('🔍 [ESTOQUE] Status atual da venda:', statusAtual);
@@ -707,15 +711,17 @@ class EstoqueService {
             }
 
             // 1. Buscar venda
-            const { data: venda, error: errVenda } = await supabase
+            const { data: vendas, error: errVenda } = await supabase
                 .from('vendas')
                 .select('id, numero, operador_id')
                 .eq('id', vendaId)
-                .single();
+                .limit(1);
 
-            if (errVenda || !venda) {
+            if (errVenda || !vendas || vendas.length === 0) {
                 throw new Error('Venda não encontrada');
             }
+            
+            const venda = vendas[0];
 
             // 2. Buscar itens da venda
             const { data: itens, error: errItens } = await supabase
@@ -857,15 +863,17 @@ class EstoqueService {
             }
 
             // Buscar produto
-            const { data: produto, error: errProd } = await supabase
+            const { data: produtos, error: errProd } = await supabase
                 .from('produtos')
                 .select('id, nome, estoque_atual, unidade')
                 .eq('id', produtoId)
-                .single();
+                .limit(1);
 
-            if (errProd || !produto) {
+            if (errProd || !produtos || produtos.length === 0) {
                 throw new Error('Produto não encontrado');
             }
+            
+            const produto = produtos[0];
 
             const qtd = Math.abs(parseFloat(quantidade));
             const estoqueAtual = parseFloat(produto.estoque_atual) || 0;

@@ -25,6 +25,20 @@
             border-color: #10b981;
             background: linear-gradient(135deg, #f9fafb 0%, #d1fae5 100%);
         }
+        .tab-abas {
+            padding: 1rem 0;
+            border-bottom: 3px solid transparent;
+            color: #6b7280;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-abas:hover {
+            color: #3b82f6;
+        }
+        .tab-abas.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
         .tab-tipo {
             padding: 1rem 1.5rem;
             border-bottom: 2px solid transparent;
@@ -100,21 +114,92 @@
                 </div>
             </div>
 
-            <!-- Tabs de Filtro -->
+            <!-- Tabs Principais: Abertos vs Histórico -->
             <div class="bg-white rounded-lg shadow-sm mb-6">
                 <div class="border-b border-gray-200">
-                    <nav class="flex space-x-4 px-6" aria-label="Tabs">
-                        <button onclick="filtrarPorTipo('todas')" class="tab-tipo active" data-tipo="todas">Todas</button>
-                        <button onclick="filtrarPorTipo('mesa')" class="tab-tipo" data-tipo="mesa">Mesas</button>
-                        <button onclick="filtrarPorTipo('balcao')" class="tab-tipo" data-tipo="balcao">Balcao</button>
-                        <button onclick="filtrarPorTipo('delivery')" class="tab-tipo" data-tipo="delivery">Delivery</button>
+                    <nav class="flex space-x-8 px-6" aria-label="Abas principais">
+                        <button onclick="mudarAbaSecao('abertos')" class="tab-abas active" data-aba="abertos" style="padding: 1rem 0; border-bottom: 3px solid transparent; font-weight: bold;">
+                            <i class="fas fa-list mr-2"></i>Comandas Abertas
+                        </button>
+                        <button onclick="mudarAbaSecao('historico')" class="tab-abas" data-aba="historico" style="padding: 1rem 0; border-bottom: 3px solid transparent; font-weight: bold;">
+                            <i class="fas fa-history mr-2"></i>Histórico
+                        </button>
                     </nav>
                 </div>
             </div>
 
-            <!-- Grid de Comandas -->
-            <div id="comandas-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <!-- Comandas serao inseridas aqui -->
+            <!-- SECAO 1: COMANDAS ABERTAS -->
+            <div id="secao-abertos" class="block">
+                <!-- Tabs de Filtro por Tipo -->
+                <div class="bg-white rounded-lg shadow-sm mb-6">
+                    <div class="border-b border-gray-200">
+                        <nav class="flex space-x-4 px-6" aria-label="Tipos de comanda">
+                            <button onclick="filtrarPorTipo('todas')" class="tab-tipo active" data-tipo="todas">Todas</button>
+                            <button onclick="filtrarPorTipo('mesa')" class="tab-tipo" data-tipo="mesa">Mesas</button>
+                            <button onclick="filtrarPorTipo('balcao')" class="tab-tipo" data-tipo="balcao">Balcao</button>
+                            <button onclick="filtrarPorTipo('delivery')" class="tab-tipo" data-tipo="delivery">Delivery</button>
+                        </nav>
+                    </div>
+                </div>
+
+                <!-- Grid de Comandas Abertas -->
+                <div id="comandas-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Comandas serao inseridas aqui -->
+                </div>
+            </div>
+
+            <!-- SECAO 2: HISTÓRICO -->
+            <div id="secao-historico" class="hidden">
+                <!-- Filtros do Histórico -->
+                <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
+                            <input 
+                                type="date" 
+                                id="filtro-data-historico" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                onchange="carregarHistoricoComandas()"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cliente (opcional)</label>
+                            <input 
+                                type="text" 
+                                id="filtro-cliente-historico" 
+                                placeholder="Buscar por nome..."
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                onkeyup="filtrarHistoricoCliente()"
+                            >
+                        </div>
+                        <div>
+                            <button onclick="carregarHistoricoComandas()" class="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition font-medium">
+                                <i class="fas fa-search mr-2"></i>Buscar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Resumo do Histórico -->
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+                        <h6 class="text-gray-600 text-sm font-medium mb-2">Fechadas</h6>
+                        <h2 class="text-2xl font-bold text-orange-600" id="count-historico-fechadas">0</h2>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
+                        <h6 class="text-gray-600 text-sm font-medium mb-2">Canceladas</h6>
+                        <h2 class="text-2xl font-bold text-red-600" id="count-historico-canceladas">0</h2>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-4 border-l-4 border-gray-500">
+                        <h6 class="text-gray-600 text-sm font-medium mb-2">Total</h6>
+                        <h2 class="text-2xl font-bold text-gray-600" id="count-historico-total">0</h2>
+                    </div>
+                </div>
+
+                <!-- Grid de Histórico -->
+                <div id="historico-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <!-- Histórico sera inserido aqui -->
+                </div>
             </div>
         </div>
     </main>
@@ -263,6 +348,8 @@
         let adicionandoItemComanda = false; // ✅ Flag para evitar race condition
         let sincronizandoComanda = false; // ✅ Flag para evitar múltiplas sincronizações simultâneas
         let itensLocaisComanda = []; // 🚀 Array local para operações instantâneas (como PDV)
+        let historicoComandas = []; // 📅 Histórico de comandas fechadas/canceladas
+        let historicoFiltrado = []; // 🔍 Histórico filtrado por cliente
 
         document.addEventListener("DOMContentLoaded", async () => {
             try {
@@ -861,12 +948,13 @@
             // Funcao para calcular e atualizar troco
             const atualizarTroco = (e) => {
                 const acrescimo = parseFloat(acrescimoTarifaInput.value) || 0;
-                const totalComAcrescimo = total + acrescimo;
+                // ✅ IMPORTANTE: Taxa NÃO afeta o troco!
+                // Cliente paga o valor total normal, taxa é desconto do estabelecimento
                 const valorPago = parseFloat(valorPagoInput.value) || 0;
-                const troco = valorPago - totalComAcrescimo;
+                const troco = valorPago - total;
                 trocoValor.textContent = `R$ ${troco.toFixed(2)}`;
                 
-                console.log(`💰 Calculo: R$ ${valorPago.toFixed(2)} - (R$ ${total.toFixed(2)} + R$ ${acrescimo.toFixed(2)}) = R$ ${troco.toFixed(2)}`);
+                console.log(`💰 Calculo: R$ ${valorPago.toFixed(2)} - R$ ${total.toFixed(2)} = R$ ${troco.toFixed(2)} (taxa ${acrescimo.toFixed(2)} é desconto do lojista, não afeta cliente)`);
                 
                 // Mudar cor conforme o troco
                 if (troco < -0.01) {
@@ -886,7 +974,7 @@
                 if (isCartao) {
                     secaoAcrescimo.classList.remove('hidden');
                     
-                    // Definir taxa e calcular acrescimo
+                    // Definir taxa
                     let taxa = 0;
                     let descricao = '';
                     
@@ -898,24 +986,26 @@
                         descricao = 'Taxa de credito: 3,16%';
                     }
                     
-                    // Calcular acrescimo baseado na taxa
-                    const acrescimo = (total * taxa) / 100;
+                    // 💡 IMPORTANTE: Taxa é apenas INFORMATIVA na tela!
+                    // Não afeta nenhum cálculo de troco ou valor a pagar
+                    const taxaValor = (total * taxa) / 100;
                     
-                    // Preencher campo de acrescimo
-                    acrescimoTarifaInput.value = acrescimo.toFixed(2);
+                    // Mostrar apenas a taxa (NÃO editar campo de acrescimo)
+                    acrescimoTarifaInput.value = taxaValor.toFixed(2);
+                    acrescimoTarifaInput.disabled = true; // Desabilitar edição
                     
                     // Atualizar descricao
                     container.querySelector('#taxa-percentual-comanda').textContent = `${taxa.toFixed(2)}%`;
                     container.querySelector('#taxa-descricao-comanda').textContent = descricao;
                     
-                    // Atualizar valor recebido com o novo total
-                    const totalComAcrescimo = total + acrescimo;
-                    valorPagoInput.value = totalComAcrescimo.toFixed(2);
+                    // ✅ MANTER valor a cobrar igual ao total (SEM adicionar taxa na tela)
+                    valorPagoInput.value = total.toFixed(2);
                     
-                    console.log(`💳 ${forma}: Taxa ${taxa}% = R$ ${acrescimo.toFixed(2)}`);
+                    console.log(`💳 ${forma}: Taxa ${taxa}% = R$ ${taxaValor.toFixed(2)} (apenas informativa)`);
                 } else {
                     secaoAcrescimo.classList.add('hidden');
                     acrescimoTarifaInput.value = '0';
+                    acrescimoTarifaInput.disabled = false;
                     valorPagoInput.value = total.toFixed(2);
                     container.querySelector('#taxa-percentual-comanda').textContent = '';
                     container.querySelector('#taxa-descricao-comanda').textContent = 'Valor da tarifa';
@@ -971,17 +1061,23 @@
                 // Chamar finalizarComandaFinal (async)
                 (async () => {
                     try {
-                        const totalComAcrescimo = total + acrescimo;
-                        const troco = valorPago - totalComAcrescimo;
+                        // 💡 Taxa é apenas INFORMATIVA - não afeta cálculos na tela
+                        // Cliente sempre paga o valor total sem taxa adicionada
+                        const totalAcobrar = total; // Valor REAL que cliente paga (sem taxa)
+                        const troco = valorPago - totalAcobrar; // Troco baseado no valor real
                         
-                        // Chamar serviço passando acrescimo de tarifa (NÃO atualizar comanda manualmente)
-                        await ServicoComandasService.fecharComanda(comandaAtual.id, forma, valorPago, acrescimo);
+                        // Chamar serviço passando:
+                        // - acrescimo: 0 (taxa NÃO é acrescimo, é apenas informativa)
+                        // - forumla: sempre será o valor real sem taxa
+                        console.log(`📊 Processando: Total=${totalAcobrar.toFixed(2)}, Pago=${valorPago.toFixed(2)}, Troco=${troco.toFixed(2)}`);
+                        
+                        await ServicoComandasService.fecharComanda(comandaAtual.id, forma, valorPago, 0);
                         
                         // Fechar overlay e exibir cupom
                         overlay.remove();
                         exibirCupomComanda({
                             numero: comandaAtual.numero_comanda,
-                            total: totalComAcrescimo,
+                            total: totalAcobrar,
                             valorPago: valorPago,
                             troco: troco,
                             forma: forma
@@ -1017,6 +1113,154 @@
             // Focus no input para facilitar digitacao
             valorPagoInput.focus();
             valorPagoInput.select();
+        }
+
+        // ===== FUNÇÕES DE HISTÓRICO =====
+
+        function mudarAbaSecao(aba) {
+            // Atualizar abas ativas
+            document.querySelectorAll('.tab-abas').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-aba="${aba}"]`).classList.add('active');
+
+            // Mostrar/esconder seções
+            document.getElementById('secao-abertos').classList.toggle('hidden', aba === 'historico');
+            document.getElementById('secao-historico').classList.toggle('hidden', aba === 'abertos');
+
+            // Carregar histórico se for a primeira vez
+            if (aba === 'historico' && historicoComandas.length === 0) {
+                const hoje = new Date().toISOString().split('T')[0];
+                document.getElementById('filtro-data-historico').value = hoje;
+                carregarHistoricoComandas();
+            }
+        }
+
+        async function carregarHistoricoComandas() {
+            try {
+                const dataStr = document.getElementById('filtro-data-historico').value;
+                if (!dataStr) {
+                    mostrarMensagem('Atenção', 'Por favor, selecione uma data', 'aviso');
+                    return;
+                }
+
+                console.log(`📅 Carregando histórico para ${dataStr}`);
+
+                // Converter data para range (início e fim do dia)
+                const dataInicio = `${dataStr}T00:00:00`;
+                const dataFim = `${dataStr}T23:59:59`;
+
+                // Buscar comandas fechadas ou canceladas do dia
+                const { data, error } = await supabase
+                    .from('comandas')
+                    .select(`
+                        id,
+                        numero_comanda,
+                        tipo,
+                        numero_mesa,
+                        cliente_nome,
+                        cliente:clientes(nome),
+                        data_abertura,
+                        data_fechamento,
+                        status,
+                        valor_total,
+                        itens:comanda_itens(count)
+                    `)
+                    .in('status', ['fechada', 'cancelada'])
+                    .gte('data_fechamento', dataInicio)
+                    .lte('data_fechamento', dataFim)
+                    .order('data_fechamento', { ascending: false });
+
+                if (error) throw error;
+
+                historicoComandas = data || [];
+                historicoFiltrado = historicoComandas;
+
+                // Atualizar contadores
+                const fechadas = historicoComandas.filter(c => c.status === 'fechada').length;
+                const canceladas = historicoComandas.filter(c => c.status === 'cancelada').length;
+
+                document.getElementById('count-historico-fechadas').textContent = fechadas;
+                document.getElementById('count-historico-canceladas').textContent = canceladas;
+                document.getElementById('count-historico-total').textContent = historicoComandas.length;
+
+                console.log(`✅ ${historicoComandas.length} comandas carregadas`);
+                renderizarHistorico();
+            } catch (error) {
+                console.error('❌ Erro ao carregar histórico:', error);
+                mostrarMensagem('Erro', 'Erro ao carregar histórico: ' + error.message, 'erro');
+            }
+        }
+
+        function filtrarHistoricoCliente() {
+            const buscaCliente = document.getElementById('filtro-cliente-historico').value.toLowerCase().trim();
+
+            if (!buscaCliente) {
+                historicoFiltrado = historicoComandas;
+            } else {
+                historicoFiltrado = historicoComandas.filter(c => {
+                    const nomeCliente = (c.cliente?.nome || c.cliente_nome || '').toLowerCase();
+                    return nomeCliente.includes(buscaCliente);
+                });
+            }
+
+            console.log(`🔍 ${historicoFiltrado.length} comandas após filtro de cliente`);
+            renderizarHistorico();
+        }
+
+        function renderizarHistorico() {
+            const container = document.getElementById('historico-container');
+
+            if (historicoFiltrado.length === 0) {
+                container.innerHTML = '<div class="col-span-4 text-center text-gray-500 py-12">Nenhuma comanda encontrada</div>';
+                return;
+            }
+
+            container.innerHTML = historicoFiltrado.map(comanda => {
+                const qtdItens = comanda.itens?.[0]?.count || 0;
+                const valorTotal = comanda.valor_total || 0;
+                const clienteNome = comanda.cliente?.nome || comanda.cliente_nome || 'Sem cliente';
+                const isCancelada = comanda.status === 'cancelada';
+                const statusClass = isCancelada ? 'bg-red-500' : 'bg-green-500';
+                const statusText = isCancelada ? 'CANCELADA' : 'FECHADA';
+
+                // Mostrar número da mesa se disponível
+                let displayInfo = '';
+                if (comanda.numero_mesa) {
+                    displayInfo = `Mesa ${comanda.numero_mesa}`;
+                } else {
+                    const tipoIcon = {
+                        'mesa': 'fa-utensils',
+                        'balcao': 'fa-store',
+                        'delivery': 'fa-motorcycle'
+                    };
+                    displayInfo = `<i class="fas ${tipoIcon[comanda.tipo] || 'fa-receipt'} mr-1"></i>${comanda.tipo}`;
+                }
+
+                return `
+                    <div class="comanda-card ${isCancelada ? 'opacity-50' : ''}" style="border-color: ${isCancelada ? '#ef4444' : '#f97316'}; background: ${isCancelada ? '#fef2f2' : '#fef3c7'};"}
+                        <span class="absolute top-3 right-3 ${statusClass} text-white text-xs px-2 py-1 rounded font-bold">
+                            ${statusText}
+                        </span>
+                        <div class="text-2xl font-bold mb-1">
+                            ${displayInfo}
+                        </div>
+                        <div class="text-sm text-gray-500 mb-2">
+                            <i class="fas fa-hashtag mr-1"></i>${comanda.numero_comanda}
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2">
+                            <i class="fas fa-user mr-2"></i>${clienteNome}
+                        </div>
+                        <div class="text-sm text-gray-600 mb-2">
+                            <i class="fas fa-clock mr-2"></i>${formatarDataHora(comanda.data_fechamento)}
+                        </div>
+                        <div class="text-sm text-gray-600 mb-3">
+                            <i class="fas fa-box mr-2"></i>${qtdItens} ${qtdItens === 1 ? 'item' : 'itens'}
+                        </div>
+                        <div class="text-xl font-bold ${isCancelada ? 'text-red-600' : 'text-green-600'}">
+                            R$ ${valorTotal.toLocaleString("pt-BR", {minimumFractionDigits: 2})}
+                        </div>
+                    </div>
+                `;
+            }).join("");
         }
 
         function exibirCupomComanda(cupom) {

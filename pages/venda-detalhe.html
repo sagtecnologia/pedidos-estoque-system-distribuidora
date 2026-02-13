@@ -1836,7 +1836,20 @@
                 
                 console.log('🗑️ [VENDA] Excluindo venda:', vendaId);
                 
-                // 1. Excluir itens da venda
+                // 1. Desassociar comandas que referenciam esta venda (remove FK)
+                const { error: errorComandas } = await supabase
+                    .from('comandas')
+                    .update({ venda_id: null, status: 'cancelada' })
+                    .eq('venda_id', vendaId);
+                
+                if (errorComandas) {
+                    console.error('❌ Erro ao desassociar comandas:', errorComandas);
+                    throw errorComandas;
+                }
+                
+                console.log('✅ Comandas desassociadas');
+                
+                // 2. Excluir itens da venda
                 const { error: errorItens } = await supabase
                     .from('venda_itens')
                     .delete()
@@ -1849,7 +1862,7 @@
                 
                 console.log('✅ Itens excluídos');
                 
-                // 2. Excluir venda
+                // 3. Excluir venda
                 const { error: errorVenda } = await supabase
                     .from('vendas')
                     .delete()
