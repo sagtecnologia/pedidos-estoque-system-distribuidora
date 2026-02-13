@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ajuste de Estoque - Sistema de Pedidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body class="bg-gray-50">
+    <div id="navbar"></div>
+    <div id="sidebar-container"></div>
+
+    <main class="lg:ml-64 pt-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Header -->
+            <div class="mb-8 flex justify-between items-center">
+                <div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">
+                        <i class="fas fa-warehouse mr-2"></i>Ajuste de Estoque
+                    </h1>
+                    <p class="text-gray-600">Faça ajustes manuais no estoque de produtos</p>
+                </div>
+                <button onclick="abrirModalAjuste()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2">
+                    <i class="fas fa-plus"></i> Novo Ajuste
+                </button>
+            </div>
+
+            <!-- Filtros -->
+            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto</label>
+                        <input type="text" id="filtro-produto" placeholder="Buscar produto..." 
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                               onkeyup="filtrarTabela()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Motivo</label>
+                        <select id="filtro-motivo" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                                onchange="filtrarTabela()">
+                            <option value="">Todos os motivos</option>
+                            <option value="CORRECAO_INVENTARIO">Correção de Inventário</option>
+                            <option value="PERDA">Perda</option>
+                            <option value="DANO">Dano</option>
+                            <option value="ROUBO">Roubo</option>
+                            <option value="OUTRO">Outro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
+                        <input type="date" id="filtro-data" 
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                               onchange="filtrarTabela()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Resumo -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-600 mb-2">Total de Ajustes</div>
+                    <div class="text-3xl font-bold text-blue-600" id="total-ajustes">0</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-600 mb-2">Aumentos</div>
+                    <div class="text-3xl font-bold text-green-600" id="total-aumentos">0</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-600 mb-2">Reduções</div>
+                    <div class="text-3xl font-bold text-red-600" id="total-reducoes">0</div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="text-sm text-gray-600 mb-2">Saldo Total</div>
+                    <div class="text-3xl font-bold text-purple-600" id="total-saldo">0</div>
+                </div>
+            </div>
+
+            <!-- Tabela de Ajustes -->
+            <div class="bg-white rounded-lg shadow overflow-hidden">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Data</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Produto</th>
+                            <th class="px-6 py-3 text-right text-sm font-medium text-gray-700">Anterior</th>
+                            <th class="px-6 py-3 text-right text-sm font-medium text-gray-700">Ajuste</th>
+                            <th class="px-6 py-3 text-right text-sm font-medium text-gray-700">Novo</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Motivo</th>
+                            <th class="px-6 py-3 text-left text-sm font-medium text-gray-700">Usuário</th>
+                            <th class="px-6 py-3 text-center text-sm font-medium text-gray-700">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ajustes-tbody" class="divide-y">
+                        <tr>
+                            <td colspan="8" class="px-6 py-8 text-center text-gray-500">
+                                Carregando ajustes...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal: Novo Ajuste -->
+    <div id="modalAjuste" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-md w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold">Novo Ajuste de Estoque</h3>
+                <button onclick="fecharModalAjuste()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+
+            <form id="form-ajuste" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Produto *</label>
+                    <div class="relative">
+                        <input type="text" id="busca-produto-modal" placeholder="Buscar produto..."
+                               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                               onkeyup="buscarProdutos()">
+                        <input type="hidden" id="produto-id-modal">
+                        <div id="dropdown-produtos" class="hidden absolute w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 max-h-64 overflow-y-auto z-10"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Estoque Atual</label>
+                    <input type="number" id="estoque-atual-modal" readonly
+                           class="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-700">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Novo Estoque *</label>
+                    <input type="number" id="novo-estoque-modal" placeholder="0" step="0.01" min="0"
+                           class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                           onchange="calcularDiferenca()">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Diferença</label>
+                    <input type="number" id="diferenca-modal" readonly
+                           class="w-full px-4 py-2 border rounded-lg bg-gray-100 text-gray-700">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Motivo *</label>
+                    <select id="motivo-modal" class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                        <option value="">Selecione um motivo...</option>
+                        <option value="CORRECAO_INVENTARIO">Correção de Inventário</option>
+                        <option value="PERDA">Perda</option>
+                        <option value="DANO">Dano</option>
+                        <option value="ROUBO">Roubo</option>
+                        <option value="OUTRO">Outro</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Observações</label>
+                    <textarea id="observacoes-modal" rows="3" placeholder="Digite observações adicionais..."
+                              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
+                <div class="flex gap-2 pt-4">
+                    <button type="button" onclick="fecharModalAjuste()" class="flex-1 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Salvar Ajuste
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/config.js"></script>
+    <script src="../js/session-manager.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../components/navbar.js"></script>
+    <script src="../components/sidebar.js"></script>
+
+    <script>
+        let todosAjustes = [];
+        let ajustesFiltrados = [];
+        let produtoSelecionado = null;
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            try {
+                await checkAuth();
+                
+                document.getElementById("navbar").innerHTML = createNavbar();
+                document.getElementById("sidebar-container").innerHTML = createSidebar();
+                await initNavbar();
+                await initSidebar();
+                
+                await carregarAjustes();
+
+                // Form submit
+                document.getElementById("form-ajuste").addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    await salvarAjuste();
+                });
+
+                setInterval(() => carregarAjustes(), 30 * 1000);
+            } catch (error) {
+                console.error("Erro ao inicializar:", error);
+                window.location.href = "/index.html";
+            }
+        });
+
+        async function carregarAjustes() {
+            try {
+                const { data, error } = await supabase
+                    .from('ajuste_estoque')
+                    .select(`
+                        id,
+                        produto_id,
+                        produto:produtos(nome, sku),
+                        quantidade_anterior,
+                        quantidade_ajustada,
+                        quantidade_diferenca,
+                        motivo,
+                        observacoes,
+                        usuario_id,
+                        usuario:users(full_name),
+                        data_ajuste
+                    `)
+                    .order('data_ajuste', { ascending: false });
+
+                if (error) throw error;
+
+                todosAjustes = data || [];
+                ajustesFiltrados = todosAjustes;
+
+                atualizarResumostente();
+                renderizarTabela();
+            } catch (error) {
+                console.error('Erro ao carregar ajustes:', error);
+                mostrarToast('Erro ao carregar ajustes: ' + error.message, 'error');
+            }
+        }
+
+        function atualizarResumostente() {
+            const total = todosAjustes.length;
+            const aumentos = todosAjustes.filter(a => a.quantidade_diferenca > 0).length;
+            const reducoes = todosAjustes.filter(a => a.quantidade_diferenca < 0).length;
+            const saldo = todosAjustes.reduce((sum, a) => sum + a.quantidade_diferenca, 0);
+
+            document.getElementById('total-ajustes').textContent = total;
+            document.getElementById('total-aumentos').textContent = aumentos;
+            document.getElementById('total-reducoes').textContent = reducoes;
+            document.getElementById('total-saldo').textContent = saldo.toFixed(2);
+        }
+
+        function renderizarTabela() {
+            const tbody = document.getElementById('ajustes-tbody');
+
+            if (ajustesFiltrados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-8 text-center text-gray-500">Nenhum ajuste encontrado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = ajustesFiltrados.map(ajuste => {
+                const isoDate = new Date(ajuste.data_ajuste);
+                const data = isoDate.toLocaleDateString('pt-BR');
+                const hora = isoDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                const diferenca = ajuste.quantidade_diferenca;
+                const corDiferenca = diferenca > 0 ? 'text-green-600' : diferenca < 0 ? 'text-red-600' : 'text-gray-600';
+                const sinoDiferenca = diferenca > 0 ? '+' : '';
+
+                const motivos = {
+                    'CORRECAO_INVENTARIO': 'Correção de Inventário',
+                    'PERDA': 'Perda',
+                    'DANO': 'Dano',
+                    'ROUBO': 'Roubo',
+                    'OUTRO': 'Outro'
+                };
+
+                return `
+                    <tr>
+                        <td class="px-6 py-4 text-sm text-gray-900">${data}<br><span class="text-xs text-gray-500">${hora}</span></td>
+                        <td class="px-6 py-4 text-sm">
+                            <div class="font-medium text-gray-900">${ajuste.produto?.nome}</div>
+                            <div class="text-xs text-gray-500">${ajuste.produto?.sku}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-right font-medium">${ajuste.quantidade_anterior.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-sm text-right font-bold ${corDiferenca}">${sinoDiferenca}${Math.abs(diferenca).toFixed(2)}</td>
+                        <td class="px-6 py-4 text-sm text-right font-medium">${ajuste.quantidade_ajustada.toFixed(2)}</td>
+                        <td class="px-6 py-4 text-sm">${motivos[ajuste.motivo] || ajuste.motivo}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600">${ajuste.usuario?.full_name || 'Sistema'}</td>
+                        <td class="px-6 py-4 text-center text-sm">
+                            <button onclick="excluirAjuste('${ajuste.id}')" class="text-red-600 hover:text-red-800">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join("");
+        }
+
+        function filtrarTabela() {
+            const produto = document.getElementById('filtro-produto').value.toLowerCase();
+            const motivo = document.getElementById('filtro-motivo').value;
+            const data = document.getElementById('filtro-data').value;
+
+            ajustesFiltrados = todosAjustes.filter(ajuste => {
+                const matchProduto = ajuste.produto?.nome.toLowerCase().includes(produto) ||
+                                    ajuste.produto?.sku.toLowerCase().includes(produto);
+                const matchMotivo = !motivo || ajuste.motivo === motivo;
+                const matchData = !data || new Date(ajuste.data_ajuste).toLocaleDateString('pt-BR') === 
+                                           new Date(data).toLocaleDateString('pt-BR');
+
+                return matchProduto && matchMotivo && matchData;
+            });
+
+            renderizarTabela();
+        }
+
+        function abrirModalAjuste() {
+            document.getElementById("form-ajuste").reset();
+            produtoSelecionado = null;
+            document.getElementById("produto-id-modal").value = '';
+            document.getElementById("estoque-atual-modal").value = '';
+            document.getElementById("novo-estoque-modal").value = '';
+            document.getElementById("diferenca-modal").value = '';
+            document.getElementById("modalAjuste").classList.remove("hidden");
+        }
+
+        function fecharModalAjuste() {
+            document.getElementById("modalAjuste").classList.add("hidden");
+            document.getElementById("dropdown-produtos").classList.add("hidden");
+        }
+
+        async function buscarProdutos() {
+            const termo = document.getElementById("busca-produto-modal").value.trim();
+            const dropdown = document.getElementById("dropdown-produtos");
+
+            if (!termo || termo.length < 2) {
+                dropdown.classList.add("hidden");
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('produtos')
+                    .select('id, nome, sku, estoque_atual')
+                    .ilike('nome', `%${termo}%`)
+                    .eq('ativo', true)
+                    .limit(10);
+
+                if (error) throw error;
+
+                if (data.length === 0) {
+                    dropdown.innerHTML = '<div class="p-4 text-gray-500">Nenhum produto encontrado</div>';
+                } else {
+                    dropdown.innerHTML = data.map(p => `
+                        <div onclick="selecionarProduto('${p.id}', '${p.nome}', '${p.sku}', ${p.estoque_atual})"
+                             class="p-3 border-b hover:bg-blue-50 cursor-pointer transition">
+                            <div class="font-medium">${p.nome}</div>
+                            <div class="text-xs text-gray-500">SKU: ${p.sku} | Estoque: ${p.estoque_atual.toFixed(2)}</div>
+                        </div>
+                    `).join("");
+                }
+
+                dropdown.classList.remove("hidden");
+            } catch (error) {
+                console.error("Erro ao buscar produtos:", error);
+            }
+        }
+
+        function selecionarProduto(id, nome, sku, estoque) {
+            document.getElementById("busca-produto-modal").value = `${nome} (${sku})`;
+            document.getElementById("produto-id-modal").value = id;
+            document.getElementById("estoque-atual-modal").value = estoque.toFixed(2);
+            document.getElementById("novo-estoque-modal").value = '';
+            document.getElementById("diferenca-modal").value = '';
+            document.getElementById("dropdown-produtos").classList.add("hidden");
+            produtoSelecionado = { id, nome, sku, estoque };
+            document.getElementById("novo-estoque-modal").focus();
+        }
+
+        function calcularDiferenca() {
+            const estoqueAtual = parseFloat(document.getElementById("estoque-atual-modal").value) || 0;
+            const novoEstoque = parseFloat(document.getElementById("novo-estoque-modal").value) || 0;
+            const diferenca = novoEstoque - estoqueAtual;
+
+            document.getElementById("diferenca-modal").value = diferenca.toFixed(2);
+        }
+
+        async function salvarAjuste() {
+            const produtoId = document.getElementById("produto-id-modal").value;
+            const estoqueAtual = parseFloat(document.getElementById("estoque-atual-modal").value);
+            const novoEstoque = parseFloat(document.getElementById("novo-estoque-modal").value);
+            const motivo = document.getElementById("motivo-modal").value;
+            const observacoes = document.getElementById("observacoes-modal").value.trim();
+
+            if (!produtoId || !motivo) {
+                mostrarToast("Preencha os campos obrigatórios", "warning");
+                return;
+            }
+
+            if (isNaN(novoEstoque) || novoEstoque < 0) {
+                mostrarToast("Estoque inválido", "warning");
+                return;
+            }
+
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                const diferenca = novoEstoque - estoqueAtual;
+
+                // Inserir ajuste
+                const { error: errAjuste } = await supabase
+                    .from('ajuste_estoque')
+                    .insert([{
+                        produto_id: produtoId,
+                        quantidade_anterior: estoqueAtual,
+                        quantidade_ajustada: novoEstoque,
+                        quantidade_diferenca: diferenca,
+                        motivo,
+                        observacoes: observacoes || null,
+                        usuario_id: user.id
+                    }]);
+
+                if (errAjuste) throw errAjuste;
+
+                // Atualizar estoque do produto
+                const { error: errUpdate } = await supabase
+                    .from('produtos')
+                    .update({ estoque_atual: novoEstoque })
+                    .eq('id', produtoId);
+
+                if (errUpdate) throw errUpdate;
+
+                mostrarToast("Ajuste salvo com sucesso!", "success");
+                fecharModalAjuste();
+                await carregarAjustes();
+            } catch (error) {
+                console.error("Erro ao salvar ajuste:", error);
+                mostrarToast("Erro ao salvar ajuste: " + error.message, "error");
+            }
+        }
+
+        async function excluirAjuste(ajusteId) {
+            if (!confirm("Deseja excluir este ajuste? Isso reverterá a mudança de estoque.")) {
+                return;
+            }
+
+            try {
+                // Buscar o ajuste
+                const { data: ajustes, error: errSelect } = await supabase
+                    .from('ajuste_estoque')
+                    .select('*')
+                    .eq('id', ajusteId)
+                    .limit(1);
+
+                if (errSelect) {
+                    console.error("Erro ao buscar ajuste:", errSelect);
+                    throw errSelect;
+                }
+
+                const ajuste = ajustes && ajustes.length > 0 ? ajustes[0] : null;
+                if (!ajuste) {
+                    throw new Error("Ajuste não encontrado");
+                }
+
+                console.log("Ajuste encontrado:", ajuste);
+
+                // Se quantidade_anterior é null, usar quantidade_diferenca para reverter
+                const estoqueAnterior = ajuste.quantidade_anterior !== null 
+                    ? ajuste.quantidade_anterior 
+                    : (ajuste.quantidade_ajustada - ajuste.quantidade_diferenca);
+
+                // Voltar estoque para o anterior (reverter ajuste)
+                const { error: errUpdate } = await supabase
+                    .from('produtos')
+                    .update({ 
+                        estoque_atual: estoqueAnterior, 
+                        updated_at: new Date().toISOString() 
+                    })
+                    .eq('id', ajuste.produto_id);
+
+                if (errUpdate) {
+                    console.error("Erro ao atualizar estoque:", errUpdate);
+                    throw errUpdate;
+                }
+
+                console.log("Estoque revertido para:", estoqueAnterior);
+
+                // Deletar ajuste
+                const { error: errDelete } = await supabase
+                    .from('ajuste_estoque')
+                    .delete()
+                    .eq('id', ajusteId);
+
+                if (errDelete) {
+                    console.error("Erro ao deletar ajuste:", errDelete);
+                    throw errDelete;
+                }
+
+                console.log("Ajuste deletado com sucesso");
+
+                mostrarToast("Ajuste revertido e removido com sucesso!", "success");
+                
+                // Recarregar ajustes
+                await new Promise(resolve => setTimeout(resolve, 800));
+                await carregarAjustes();
+            } catch (error) {
+                console.error("Erro ao excluir ajuste:", error);
+                mostrarToast("Erro ao excluir ajuste: " + error.message, "error");
+            }
+        }
+
+        function mostrarToast(mensagem, tipo) {
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-4 right-4 px-4 py-3 rounded-lg text-white font-medium z-50 ${
+                tipo === 'success' ? 'bg-green-600' :
+                tipo === 'error' ? 'bg-red-600' :
+                'bg-yellow-600'
+            }`;
+            toast.textContent = mensagem;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+    </script>
+</body>
+</html>

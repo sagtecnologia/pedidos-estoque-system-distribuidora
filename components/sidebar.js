@@ -213,6 +213,13 @@ function createSidebar() {
                 <div class="mt-6 pb-8">
                     <h3 class="px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Sistema</h3>
                     
+                    <a href="/pages/ajuste-estoque.html" id="menu-ajuste-estoque" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition mt-1">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3v8H3V3h8zm0 10v8H3v-8h8zm8-10v8h8V3h-8zm0 10v8h8v-8h-8z"></path>
+                        </svg>
+                        Ajuste de Estoque
+                    </a>
+                    
                     <a href="/pages/reprocessar-estoque.html" id="menu-reprocessar-estoque" class="sidebar-link group flex items-center px-4 py-3 text-sm font-medium rounded-md hover:bg-gray-700 transition mt-1">
                         <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -264,8 +271,15 @@ async function initSidebar() {
 
         // ADMIN: Vê tudo (não esconde nada)
         // Análise Financeira e Reprocessar Estoque são exclusivos do ADMIN
-        if (role !== 'ADMIN') {
+        // Ajuste de Estoque: ADMIN, GERENTE, ESTOQUISTA
+        if (role === 'ADMIN') {
+            // ADMIN vê tudo, não esconder nada
+        } else if (['GERENTE', 'ESTOQUISTA'].includes(role)) {
+            // GERENTE e ESTOQUISTA: só veem Ajuste de Estoque
             hideMenuItems(['menu-analise-financeira', 'menu-reprocessar-estoque']);
+        } else {
+            // Outros papéis não veem nada de Sistema
+            hideMenuItems(['menu-ajuste-estoque', 'menu-analise-financeira', 'menu-reprocessar-estoque']);
         }
     }
 

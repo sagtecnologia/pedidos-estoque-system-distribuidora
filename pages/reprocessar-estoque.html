@@ -457,6 +457,26 @@
                     addLog(`   → ${s.produto_nome}: -${s.quantidade_total}`, 'info');
                 });
 
+                // ETAPA 3.5: Processar AJUSTES MANUAIS
+                addLog('⏳ Etapa 3.5: Processando ajustes manuais de estoque...', 'process');
+                const { data: ajustes, error: ajustesError } = await supabaseClient
+                    .rpc('processar_ajustes_estoque');
+                
+                if (ajustesError) throw new Error('Erro ao processar ajustes: ' + ajustesError.message);
+                const totalAjusteAumento = ajustes?.filter(a => a.quantidade_diferenca > 0).reduce((sum, a) => sum + (a.quantidade_diferenca || 0), 0) || 0;
+                const totalAjusteReducao = ajustes?.filter(a => a.quantidade_diferenca < 0).reduce((sum, a) => sum + Math.abs(a.quantidade_diferenca || 0), 0) || 0;
+                
+                if (ajustes && ajustes.length > 0) {
+                    addLog(`✅ Processados ${ajustes.length} ajustes manuais (+${totalAjusteAumento.toFixed(2)} / -${totalAjusteReducao.toFixed(2)} unidades)`, 'success');
+                    ajustes.forEach(a => {
+                        const sinal = a.quantidade_diferenca > 0 ? '+' : '';
+                        const motivo = a.motivo.replace(/_/g, ' ');
+                        addLog(`   → ${a.produto_nome}: ${sinal}${a.quantidade_diferenca.toFixed(2)} (${motivo})`, 'info');
+                    });
+                } else {
+                    addLog(`✅ Nenhum ajuste pendente de processamento`, 'success');
+                }
+
                 // ETAPA 4: Atualizar lotes
                 addLog('⏳ Etapa 4: Atualizando quantidade de lotes...', 'process');
                 const { data: lotes, error: lotesError } = await supabaseClient

@@ -1469,12 +1469,12 @@ class PDVSystem {
             </div>
 
             <div id="secao-acrescimo" class="mb-4 hidden">
-                <label class="block text-sm font-medium mb-2">Acréscimo (Tarifa) - <span id="taxa-percentual" class="text-blue-600 text-xs font-bold"></span></label>
+                <label class="block text-sm font-medium mb-2">Taxa: <span id="taxa-percentual" class="text-blue-600 text-xs font-bold"></span></label>
                 <div class="flex gap-2">
-                    <input type="number" id="acrescimo-tarifa" class="flex-1 border rounded px-3 py-2" placeholder="0.00" step="0.01" min="0">
+                    <input type="number" id="acrescimo-tarifa" class="flex-1 border rounded px-3 py-2" placeholder="0.00" step="0.01" min="0" disabled>
                     <span class="flex items-center text-gray-600 font-medium">R$</span>
                 </div>
-                <p class="text-xs text-gray-500 mt-1"><span id="taxa-descricao">Valor da tarifa</span></p>
+                <p class="text-xs text-gray-500 mt-1"><span id="taxa-descricao">Tarifa do cartão (desconto do estabelecimento)</span></p>
             </div>
 
             <div class="mb-4">
@@ -1580,7 +1580,7 @@ class PDVSystem {
                 acrescimoTarifaInput.value = '0';
                 valorPagoInput.value = total.toFixed(2);
                 container.querySelector('#taxa-percentual').textContent = '';
-                container.querySelector('#taxa-descricao').textContent = 'Valor da tarifa';
+                container.querySelector('#taxa-descricao').textContent = 'Tarifa do cartão (desconto do estabelecimento)';
             }
             
             atualizarTroco();
