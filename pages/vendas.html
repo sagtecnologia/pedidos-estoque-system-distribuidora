@@ -51,12 +51,12 @@
                         <input type="text" id="search" placeholder="Buscar número..." class="w-full px-4 py-2 border border-gray-300 rounded-lg" onkeyup="loadVendas()">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
-                        <input type="date" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Início</label>
+                        <input type="datetime-local" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
-                        <input type="date" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Fim</label>
+                        <input type="datetime-local" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()"
                     </div>
                     <div class="flex items-end">
                         <button onclick="limparFiltros()" class="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Limpar</button>
@@ -163,10 +163,35 @@
                 document.getElementById('sidebar-container').innerHTML = createSidebar();
             }
             
-            // Definir data padrão (dia atual)
-            const hoje = new Date().toISOString().split('T')[0];
-            document.getElementById('filter-data-inicio').value = hoje;
-            document.getElementById('filter-data-fim').value = hoje;
+            // Definir data padrão (dia atual) em formato datetime-local YYYY-MM-DDTHH:mm
+            const hoje = new Date();
+            const hojeInicio = new Date(hoje);
+            const hojeFim = new Date(hoje);
+            hojeInicio.setHours(0, 0, 0, 0);   // 00:00 do dia de hoje
+            hojeFim.setHours(23, 59, 0, 0);     // 23:59 do dia de hoje
+            
+            // Formatar para datetime-local com timezone Brasília
+            const formatarDateTimeLocal = (d) => {
+                const formatter = new Intl.DateTimeFormat('pt-BR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'America/Sao_Paulo',
+                    hour12: false
+                });
+                const parts = formatter.formatToParts(d);
+                const year = parts.find(p => p.type === 'year').value;
+                const month = parts.find(p => p.type === 'month').value;
+                const day = parts.find(p => p.type === 'day').value;
+                const hour = parts.find(p => p.type === 'hour').value;
+                const minute = parts.find(p => p.type === 'minute').value;
+                return `${year}-${month}-${day}T${hour}:${minute}`;
+            };
+            
+            document.getElementById('filter-data-inicio').value = formatarDateTimeLocal(hojeInicio);
+            document.getElementById('filter-data-fim').value = formatarDateTimeLocal(hojeFim);
             
             await loadClientesSelect();
             await loadVendas();
@@ -213,6 +238,7 @@
             showLoading(true);
             
             try {
+                // 1️⃣ Carregar todas as vendas com filtros
                 let query = supabase
                     .from('vendas')
                     .select('*');
@@ -230,70 +256,74 @@
                 }
                 
                 if (dataInicio) {
-                    // Criar data no horário local (adiciona T00:00:00 para forçar interpretação local)
-                    const dataInicioObj = new Date(dataInicio + 'T00:00:00');
+                    // Converter datetime-local para ISO (Supabase espera ISO 8601)
+                    const dataInicioObj = new Date(dataInicio);
                     query = query.gte('created_at', dataInicioObj.toISOString());
                 }
                 
                 if (dataFim) {
-                    // Criar data no horário local (fim do dia)
-                    const dataFimObj = new Date(dataFim + 'T23:59:59');
+                    // Converter datetime-local para ISO e adicionar até o final do minuto
+                    const dataFimObj = new Date(dataFim);
+                    dataFimObj.setSeconds(59);
                     query = query.lte('created_at', dataFimObj.toISOString());
                 }
                 
-                const { data: vendas, error } = await query.order('created_at', { ascending: false });
+                const { data: vendas, error } = await query.order('created_at', { ascending: false }).limit(500);
                 
                 if (error) throw error;
                 
-                // Debug: Mostrar todos os campos da primeira venda
-                if (vendas && vendas.length > 0) {
-                    console.log('[DEBUG] Campos disponíveis na primeira venda:', Object.keys(vendas[0]));
-                    console.log('[DEBUG] Primeira venda completa:', vendas[0]);
-                    
-                    // Debug específico: buscar vendas com nota emitida
-                    const vendasComNota = vendas.filter(v => v.status_fiscal === 'EMITIDA_NFCE');
-                    if (vendasComNota.length > 0) {
-                        console.log('🔍 [DEBUG] Vendas com NFC-e emitida:', vendasComNota.map(v => ({
-                            numero: v.numero,
-                            status_fiscal: v.status_fiscal,
-                            numero_nfce: v.numero_nfce,
-                            chave_acesso_nfce: v.chave_acesso_nfce,
-                            protocolo_nfce: v.protocolo_nfce
-                        })));
-                    }
+                if (!vendas || vendas.length === 0) {
+                    renderVendas([]);
+                    return;
                 }
                 
-                // Carregar relacionamentos separadamente para cada venda
-                for (let venda of vendas || []) {
-                    // Carregar cliente
-                    if (venda.cliente_id) {
-                        const { data: cliente } = await supabase
-                            .from('clientes')
-                            .select('nome')
-                            .eq('id', venda.cliente_id)
-                            .single();
-                        venda.cliente = cliente;
-                    }
-                    
-                    // Carregar operador (usando vendedor_id que é o correto no schema)
-                    if (venda.vendedor_id) {
-                        const { data: operador } = await supabase
-                            .from('users')
-                            .select('full_name')
-                            .eq('id', venda.vendedor_id)
-                            .single();
-                        venda.operador = operador;
-                    }
-                    
-                    // Carregar itens para contar quantidade
-                    const { data: itens } = await supabase
-                        .from('venda_itens')
-                        .select('quantidade')
-                        .eq('venda_id', venda.id);
-                    venda.venda_itens = itens || [];
-                }
+                console.log(`📊 Vendas carregadas: ${vendas.length}`);
                 
-                renderVendas(vendas || []);
+                // 2️⃣ Batch load clientes
+                const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter(Boolean))];
+                const { data: clientes } = clienteIds.length > 0 
+                    ? await supabase
+                        .from('clientes')
+                        .select('id, nome')
+                        .in('id', clienteIds)
+                    : { data: [] };
+                const clientesMap = Object.fromEntries((clientes || []).map(c => [c.id, c]));
+                
+                // 3️⃣ Batch load operadores (users)
+                const vendedorIds = [...new Set(vendas.map(v => v.vendedor_id).filter(Boolean))];
+                const { data: operadores } = vendedorIds.length > 0
+                    ? await supabase
+                        .from('users')
+                        .select('id, full_name')
+                        .in('id', vendedorIds)
+                    : { data: [] };
+                const operadoresMap = Object.fromEntries((operadores || []).map(o => [o.id, o]));
+                
+                // 4️⃣ Batch load venda_itens
+                const vendaIds = vendas.map(v => v.id);
+                const { data: todosItens } = await supabase
+                    .from('venda_itens')
+                    .select('venda_id, quantidade')
+                    .in('venda_id', vendaIds);
+                
+                // Agrupar itens por venda
+                const itensMap = {};
+                (todosItens || []).forEach(item => {
+                    if (!itensMap[item.venda_id]) {
+                        itensMap[item.venda_id] = [];
+                    }
+                    itensMap[item.venda_id].push(item);
+                });
+                
+                // 5️⃣ Montar relacionamentos em JavaScript (muito mais rápido!)
+                vendas.forEach(venda => {
+                    venda.cliente = clientesMap[venda.cliente_id] || null;
+                    venda.operador = operadoresMap[venda.vendedor_id] || null;
+                    venda.venda_itens = itensMap[venda.id] || [];
+                });
+                
+                console.log(`✅ Dados carregados e montados: ${vendas.length} vendas com relacionamentos`);
+                renderVendas(vendas);
             } catch (error) {
                 handleError(error, 'Erro ao carregar vendas');
             } finally {
@@ -303,12 +333,26 @@
         
         // Limpar filtros
         function limparFiltros() {
-            const hoje = new Date().toISOString().split('T')[0];
+            const hoje = new Date();
+            const hojeInicio = new Date(hoje);
+            const hojeFim = new Date(hoje);
+            hojeInicio.setHours(0, 0, 0, 0);
+            hojeFim.setHours(23, 59, 0, 0);
+
+            const formatarDateTimeLocal = (d) => {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const hours = String(d.getHours()).padStart(2, '0');
+                const minutes = String(d.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+
             document.getElementById('filter-status').value = '';
             document.getElementById('filter-cliente').value = '';
             document.getElementById('search').value = '';
-            document.getElementById('filter-data-inicio').value = hoje;
-            document.getElementById('filter-data-fim').value = hoje;
+            document.getElementById('filter-data-inicio').value = formatarDateTimeLocal(hojeInicio);
+            document.getElementById('filter-data-fim').value = formatarDateTimeLocal(hojeFim);
             loadVendas();
         }
 

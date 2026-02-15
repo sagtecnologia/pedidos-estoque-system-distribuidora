@@ -310,7 +310,15 @@
             document.getElementById('filter-categoria').value = '';
             document.getElementById('filter-situacao').value = '';
             document.getElementById('filter-inativos').checked = false;
-            localStorage.removeItem('filtro-inativos');
+            
+            // Limpar localStorage de forma segura (protege contra contextos sem acesso a storage)
+            try {
+                if (typeof localStorage !== 'undefined' && localStorage) {
+                    localStorage.removeItem('filtro-inativos');
+                }
+            } catch (e) {
+                console.warn('⚠️ Não foi possível limpar localStorage:', e.message);
+            }
             
             filtroAtual = { marca: '', categoria: '', situacao: '' };
             aplicarFiltros();
@@ -323,9 +331,26 @@
             
             // Se mudou o checkbox de inativos, recarregar dados
             const incluirInativos = document.getElementById('filter-inativos')?.checked || false;
-            const estava = localStorage.getItem('filtro-inativos') === 'true';
+            
+            // Acessar localStorage de forma segura
+            let estava = false;
+            try {
+                if (typeof localStorage !== 'undefined' && localStorage) {
+                    estava = localStorage.getItem('filtro-inativos') === 'true';
+                }
+            } catch (e) {
+                console.warn('⚠️ Não foi possível ler localStorage:', e.message);
+            }
+            
             if (incluirInativos !== estava) {
-                localStorage.setItem('filtro-inativos', incluirInativos);
+                // Salvar localStorage de forma segura
+                try {
+                    if (typeof localStorage !== 'undefined' && localStorage) {
+                        localStorage.setItem('filtro-inativos', incluirInativos);
+                    }
+                } catch (e) {
+                    console.warn('⚠️ Não foi possível salvar localStorage:', e.message);
+                }
                 carregarDados();
             } else {
                 renderizarTabAtiva();

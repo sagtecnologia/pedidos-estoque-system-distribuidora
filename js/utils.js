@@ -81,7 +81,8 @@ function formatDate(date) {
     return new Intl.DateTimeFormat('pt-BR', {
         day: '2-digit',
         month: '2-digit',
-        year: 'numeric'
+        year: 'numeric',
+        timeZone: 'America/Sao_Paulo'
     }).format(new Date(date));
 }
 
@@ -92,8 +93,79 @@ function formatDateTime(date) {
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo'
     }).format(new Date(date));
+}
+
+// Formatar data e hora com fuso horário de Brasília (America/Sao_Paulo)
+function formatDateTimeBrasilia(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+    }).format(date);
+}
+
+// Obter data em formato ISO com fuso de Brasília
+function convertToTimezoneBrasilia(dateStr) {
+    if (!dateStr) return null;
+    const date = new Date(dateStr);
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+    });
+    
+    const parts = formatter.formatToParts(date);
+    const dateObj = new Date(
+        parseInt(parts.find(p => p.type === 'year').value),
+        parseInt(parts.find(p => p.type === 'month').value) - 1,
+        parseInt(parts.find(p => p.type === 'day').value),
+        parseInt(parts.find(p => p.type === 'hour').value),
+        parseInt(parts.find(p => p.type === 'minute').value),
+        parseInt(parts.find(p => p.type === 'second').value)
+    );
+    return dateObj;
+}
+
+// Obter hora (0-23) em fuso de Brasília
+function getHourBrasilia(dateStr) {
+    if (!dateStr) return 0;
+    const date = new Date(dateStr);
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+        hour: '2-digit',
+        timeZone: 'America/Sao_Paulo',
+        hour12: false
+    });
+    return parseInt(formatter.format(date));
+}
+
+// Obter data formatada (YYYY-MM-DD) em fuso de Brasília
+function getDateBrasilia(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const formatter = new Intl.DateTimeFormat('pt-BR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+    });
+    const parts = formatter.formatToParts(date);
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
 }
 
 // Formatar CNPJ

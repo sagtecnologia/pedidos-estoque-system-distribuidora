@@ -4,8 +4,8 @@
 
 class SessionManager {
     constructor(options = {}) {
-        // Tempo de inatividade em milissegundos (padrão: 15 minutos)
-        this.inactivityTimeout = options.inactivityTimeout || 15 * 60 * 1000;
+        // Tempo de inatividade em milissegundos (padrão: 30 minutos)
+        this.inactivityTimeout = options.inactivityTimeout || 30 * 60 * 1000;
         
         // Tempo de aviso antes do logout (padrão: 2 minutos)
         this.warningTime = options.warningTime || 2 * 60 * 1000;

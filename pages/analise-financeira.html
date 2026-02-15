@@ -45,12 +45,12 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
-                        <input type="date" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Início</label>
+                        <input type="datetime-local" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
-                        <input type="date" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Fim</label>
+                        <input type="datetime-local" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -212,6 +212,15 @@
                                 <i class="fas fa-chart-line text-teal-500 mr-2"></i>Variação de Preço Médio por Fornecedor
                             </h4>
                             <canvas id="chart-variacao-fornecedor"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-6 mt-6">
+                        <div class="bg-white border border-gray-200 rounded-lg p-4">
+                            <h4 class="text-md font-semibold mb-4 text-gray-700">
+                                <i class="fas fa-clock text-orange-500 mr-2"></i>Horários de Pico de Vendas
+                            </h4>
+                            <canvas id="chart-horarios-pico"></canvas>
                         </div>
                     </div>
                 </div>
@@ -401,13 +410,47 @@
             await initNavbar();
             await initSidebar();
             
-            // Definir datas padrão (último mês)
+            // Definir datas padrão (APENAS HOJE) em formato datetime-local com timezone de Brasília
             const hoje = new Date();
-            const umMesAtras = new Date();
-            umMesAtras.setMonth(hoje.getMonth() - 1);
+            const hojeInicio = new Date(hoje);
+            const hojeFim = new Date(hoje);
+            hojeInicio.setHours(0, 0, 0, 0);   // 00:00 do dia de hoje
+            hojeFim.setHours(23, 59, 0, 0);     // 23:59 do dia de hoje
             
-            document.getElementById('filter-data-inicio').value = umMesAtras.toISOString().split('T')[0];
-            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            // Formatar para datetime-local (YYYY-MM-DDTHH:mm) com timezone de Brasília
+            const formatarDateTime = (d) => {
+                const formatter = new Intl.DateTimeFormat('pt-BR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'America/Sao_Paulo',
+                    hour12: false
+                });
+                const parts = formatter.formatToParts(d);
+                const year = parts.find(p => p.type === 'year').value;
+                const month = parts.find(p => p.type === 'month').value;
+                const day = parts.find(p => p.type === 'day').value;
+                const hour = parts.find(p => p.type === 'hour').value;
+                const minute = parts.find(p => p.type === 'minute').value;
+                return `${year}-${month}-${day}T${hour}:${minute}`;
+            };
+            
+            const dataInicioFormatada = formatarDateTime(hojeInicio);
+            const dataFimFormatada = formatarDateTime(hojeFim);
+            
+            document.getElementById('filter-data-inicio').value = dataInicioFormatada;
+            document.getElementById('filter-data-fim').value = dataFimFormatada;
+            
+            // 🔥 IMPORTANTE: Inicializar o objeto filtroAtual com as datas padrão
+            filtroAtual.dataInicio = dataInicioFormatada;
+            filtroAtual.dataFim = dataFimFormatada;
+            
+            console.log('🎯 [INIT] Filtros inicializados:', {
+                dataInicio: filtroAtual.dataInicio,
+                dataFim: filtroAtual.dataFim
+            });
             
             await carregarDados();
         })();
@@ -439,13 +482,6 @@
                 const marcasMap = {};
                 (marcasData || []).forEach(m => marcasMap[m.id] = m.nome);
                 
-                // Carregar produtos
-                const { data: prods } = await supabase
-                    .from('produtos')
-                    .select('*')
-                    .eq('ativo', true);
-                produtos = prods || [];
-                
                 // Popular filtro de marcas
                 const selectMarca = document.getElementById('filter-marca');
                 selectMarca.innerHTML = '<option value="">Todas as marcas</option>';
@@ -453,7 +489,7 @@
                     selectMarca.innerHTML += `<option value="${id}">${nome}</option>`;
                 });
 
-                // Carregar vendas finalizadas
+                // 🚀 OTIMIZAÇÃO: Carregar vendas e itens em queries separadas (sem relacionamento automático)
                 const { data: vendasData, error: erroVendas } = await supabase
                     .from('vendas')
                     .select('*')
@@ -465,62 +501,55 @@
                     showToast('Erro ao carregar vendas: ' + erroVendas.message, 'error');
                     vendas = [];
                 } else {
-                    vendas = vendasData || [];
-                    
-                    // Carregar itens de cada venda separadamente
-                    for (let venda of vendas) {
-                        const { data: itensData } = await supabase
+                    // Carregar itens apenas das vendas carregadas (otimiza performance)
+                    const vendasIds = (vendasData || []).map(v => v.id);
+                    const { data: itensData } = vendasIds.length > 0 ? 
+                        await supabase
                             .from('venda_itens')
-                            .select('*')
-                            .eq('venda_id', venda.id);
-                        
-                        venda.venda_itens = itensData || [];
-                        
-                        // Para cada item, carregar produto, marca, lote e fornecedor
-                        for (let item of venda.venda_itens) {
-                            // Carregar produto
-                            const { data: prodData } = await supabase
-                                .from('produtos')
-                                .select('*')
-                                .eq('id', item.produto_id)
-                                .single();
-                            item.produtos = prodData;
-                            
-                            // Adicionar nome da marca ao produto
-                            if (prodData && prodData.marca_id && marcasMap[prodData.marca_id]) {
-                                prodData.marca_nome = marcasMap[prodData.marca_id];
-                            }
-                            
-                            // Carregar fornecedor se existir
-                            if (prodData?.fornecedor_id) {
-                                const { data: fornData } = await supabase
-                                    .from('fornecedores')
-                                    .select('id, nome')
-                                    .eq('id', prodData.fornecedor_id)
-                                    .single();
-                                if (prodData) prodData.fornecedores = fornData;
-                            }
-                            
-                            // Carregar lote se existir
-                            if (item.lote_id) {
-                                const { data: loteData } = await supabase
-                                    .from('produto_lotes')
-                                    .select('id, preco_custo')
-                                    .eq('id', item.lote_id)
-                                    .single();
-                                item.produto_lotes = loteData;
-                            }
+                            .select(`
+                                id,
+                                venda_id,
+                                produto_id,
+                                quantidade,
+                                preco_unitario,
+                                subtotal,
+                                preco_custo,
+                                lote_id
+                            `)
+                            .in('venda_id', vendasIds)
+                        : { data: [] };
+
+                    const itensPorVenda = {};
+                    (itensData || []).forEach(item => {
+                        if (!itensPorVenda[item.venda_id]) {
+                            itensPorVenda[item.venda_id] = [];
                         }
-                    }
+                        itensPorVenda[item.venda_id].push(item);
+                    });
+
+                    // Carregar produtos
+                    const { data: produtosData } = await supabase
+                        .from('produtos')
+                        .select('id, nome, codigo, preco_venda, preco_custo, categoria_id, marca_id, fornecedor_id');
+
+                    const produtosMap = {};
+                    (produtosData || []).forEach(p => {
+                        produtosMap[p.id] = p;
+                    });
+
+                    // Montar objeto vendas com itens e produtos
+                    vendas = (vendasData || []).map(venda => ({
+                        ...venda,
+                        venda_itens: (itensPorVenda[venda.id] || []).map(item => ({
+                            ...item,
+                            produtos: produtosMap[item.produto_id] ? {
+                                ...produtosMap[item.produto_id],
+                                marca_nome: marcasMap[produtosMap[item.produto_id].marca_id] || 'SEM MARCA'
+                            } : null
+                        }))
+                    }));
                     
-                    console.log('✅ Vendas carregadas:', vendas.length);
-                    console.log('📊 [DEBUG] Primeira venda:', vendas[0]);
-                    console.log('📊 [DEBUG] Total de itens na primeira venda:', vendas[0]?.venda_itens?.length || 0);
-                    if (vendas[0]?.venda_itens?.[0]) {
-                        console.log('📊 [DEBUG] Primeiro item:', vendas[0].venda_itens[0]);
-                        console.log('📊 [DEBUG] Produto do item:', vendas[0].venda_itens[0].produtos);
-                        console.log('📊 [DEBUG] Preço custo do item:', vendas[0].venda_itens[0].preco_custo);
-                    }
+                    console.log('✅ Vendas carregadas com itens e produtos:', vendas.length);
                 }
 
                 // Carregar contas a pagar (pagas no período)
@@ -537,53 +566,59 @@
                     .eq('status', 'RECEBIDO');
                 contasReceber = crData || [];
                 
-                // Carregar pedidos de compra aprovados e recebidos (para fluxo de caixa)
+                // 🚀 Carregar pedidos de compra
                 const { data: pedidosData, error: erroPedidos } = await supabase
                     .from('pedidos_compra')
-                    .select('*')
-                    .in('status', ['APROVADO', 'RECEBIDO'])
-                    .order('created_at', { ascending: false });
+                    .select(`
+                        id,
+                        numero,
+                        fornecedor_id,
+                        total,
+                        status,
+                        created_at,
+                        data_recebimento,
+                        pedido_compra_itens(
+                            id,
+                            produto_id,
+                            quantidade,
+                            produtos(
+                                id,
+                                nome,
+                                categoria_id,
+                                marca_id
+                            )
+                        )
+                    `)
+                    .order('created_at', { ascending: false })
+                    .limit(500); // Limitar a 500 para performance
                 
                 if (erroPedidos) {
                     console.error('Erro ao carregar pedidos:', erroPedidos);
                     window.pedidosCompra = [];
                 } else {
-                    // Carregar fornecedor e itens de cada pedido
-                    for (let pedido of (pedidosData || [])) {
-                        if (pedido.fornecedor_id) {
-                            const { data: fornData } = await supabase
-                                .from('fornecedores')
-                                .select('id, nome')
-                                .eq('id', pedido.fornecedor_id)
-                                .single();
-                            pedido.fornecedor = fornData;
+                    // Carregar fornecedores para mapear nomes
+                    const { data: fornecedoresData } = await supabase
+                        .from('fornecedores')
+                        .select('id, nome');
+                    const fornecedoresMap = {};
+                    (fornecedoresData || []).forEach(f => {
+                        fornecedoresMap[f.id] = f.nome;
+                    });
+                    
+                    // Montar objeto com fornecedor como objeto
+                    window.pedidosCompra = (pedidosData || []).map(pedido => ({
+                        ...pedido,
+                        fornecedor: {
+                            id: pedido.fornecedor_id,
+                            nome: fornecedoresMap[pedido.fornecedor_id] || 'Sem Fornecedor'
                         }
-                        
-                        // Carregar itens do pedido (para variação de preço)
-                        const { data: itensData } = await supabase
-                            .from('pedido_compra_itens')
-                            .select('*')
-                            .eq('pedido_id', pedido.id);
-                        pedido.pedido_compra_itens = itensData || [];
-                        
-                        // Carregar produtos dos itens
-                        for (let item of pedido.pedido_compra_itens) {
-                            const { data: prodData } = await supabase
-                                .from('produtos')
-                                .select('id, nome, categoria_id, marca_id')
-                                .eq('id', item.produto_id)
-                                .single();
-                            item.produtos = prodData;
-                        }
+                    }));
+                    console.log('✅ Pedidos de compra carregados:', window.pedidosCompra.length);
+                    if (window.pedidosCompra.length > 0) {
+                        console.log('📦 Exemplo de pedido:', window.pedidosCompra[0]);
                     }
-                    window.pedidosCompra = pedidosData || [];
                 }
                 
-                console.log('✅ Pedidos de compra carregados:', window.pedidosCompra.length);
-                if (window.pedidosCompra[0]) {
-                    console.log('📊 [DEBUG] Primeiro pedido:', window.pedidosCompra[0]);
-                }
-
                 calcularResumo();
                 renderizarTabAtiva();
             } catch (error) {
@@ -600,6 +635,13 @@
             filtroAtual.dataInicio = document.getElementById('filter-data-inicio').value;
             filtroAtual.dataFim = document.getElementById('filter-data-fim').value;
             
+            console.log('🎯 [APLICAR FILTROS] Filtros atualizados:', {
+                categoria: filtroAtual.categoria,
+                marca: filtroAtual.marca,
+                dataInicio: filtroAtual.dataInicio,
+                dataFim: filtroAtual.dataFim
+            });
+            
             calcularResumo();
             renderizarTabAtiva();
         }
@@ -608,13 +650,37 @@
             document.getElementById('filter-categoria').value = '';
             document.getElementById('filter-marca').value = '';
             
+            // Limpar para mostrar APENAS HOJE (como padrão, igual tela de vendas)
             const hoje = new Date();
-            const umMesAtras = new Date();
-            umMesAtras.setMonth(hoje.getMonth() - 1);
-            document.getElementById('filter-data-inicio').value = umMesAtras.toISOString().split('T')[0];
-            document.getElementById('filter-data-fim').value = hoje.toISOString().split('T')[0];
+            const hojeInicio = new Date(hoje);
+            const hojeFim = new Date(hoje);
+            hojeInicio.setHours(0, 0, 0, 0);   // 00:00 do dia de hoje
+            hojeFim.setHours(23, 59, 0, 0);     // 23:59 do dia de hoje
             
-            filtroAtual = { categoria: '', marca: '', dataInicio: '', dataFim: '' };
+            // Formatar para datetime-local (YYYY-MM-DDTHH:mm) com timezone de Brasília
+            const formatarDateTime = (d) => {
+                const formatter = new Intl.DateTimeFormat('pt-BR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    timeZone: 'America/Sao_Paulo',
+                    hour12: false
+                });
+                const parts = formatter.formatToParts(d);
+                const year = parts.find(p => p.type === 'year').value;
+                const month = parts.find(p => p.type === 'month').value;
+                const day = parts.find(p => p.type === 'day').value;
+                const hour = parts.find(p => p.type === 'hour').value;
+                const minute = parts.find(p => p.type === 'minute').value;
+                return `${year}-${month}-${day}T${hour}:${minute}`;
+            };
+            
+            document.getElementById('filter-data-inicio').value = formatarDateTime(hojeInicio);
+            document.getElementById('filter-data-fim').value = formatarDateTime(hojeFim);
+            
+            // 🔥 Aplicar filtros vai ler os valores dos inputs e atualizar filtroAtual
             aplicarFiltros();
         }
 
@@ -622,22 +688,16 @@
         /**
          * Calcula o custo correto de um item de venda
          * Prioridade:
-         * 1. preco_custo do item (venda_itens.preco_custo) - valor histórico da compra
-         * 2. preco_custo do lote (produto_lotes.preco_custo) - se o item tem lote
-         * 3. preco_custo do produto (produtos.preco_custo) - fallback
+         * 1. preco_custo do item (venda_itens.preco_custo) - valor histórico da compra (preenchido por trigger)
+         * 2. preco_custo do produto (produtos.preco_custo) - fallback
          */
         function getCustoItem(item) {
-            // 1. Prioridade: custo do item (já vem da movimentação/compra)
+            // 1. Prioridade: custo do item (já vem da movimentação/compra via trigger)
             if (item.preco_custo && item.preco_custo > 0) {
                 return item.preco_custo;
             }
             
-            // 2. Se tem lote, usar custo do lote
-            if (item.produto_lotes && item.produto_lotes.preco_custo && item.produto_lotes.preco_custo > 0) {
-                return item.produto_lotes.preco_custo;
-            }
-            
-            // 3. Fallback: custo do cadastro do produto
+            // 2. Fallback: custo do cadastro do produto
             if (item.produtos && item.produtos.preco_custo && item.produtos.preco_custo > 0) {
                 return item.produtos.preco_custo;
             }
@@ -648,13 +708,53 @@
         function filtrarVendas() {
             let resultado = [...vendas];
             
-            // Filtro de data
-            if (filtroAtual.dataInicio) {
-                resultado = resultado.filter(v => v.created_at >= filtroAtual.dataInicio);
+            console.log('========== [VENDAS FILTRO] ==========');
+            console.log('📊 Total de vendas no objeto:', vendas.length);
+            
+            if (vendas.length > 0) {
+                console.log('📅 Primeira venda:', {
+                    id: vendas[0].id,
+                    created_at: vendas[0].created_at,
+                    dataBrasilia: getDateBrasilia(vendas[0].created_at),
+                    total: vendas[0].total
+                });
+                console.log('📅 Última venda:', {
+                    id: vendas[vendas.length-1].id,
+                    created_at: vendas[vendas.length-1].created_at,
+                    dataBrasilia: getDateBrasilia(vendas[vendas.length-1].created_at),
+                    total: vendas[vendas.length-1].total
+                });
             }
-            if (filtroAtual.dataFim) {
-                resultado = resultado.filter(v => v.created_at <= filtroAtual.dataFim + 'T23:59:59');
+            
+            if (filtroAtual.dataInicio || filtroAtual.dataFim) {
+                const dataInicio = filtroAtual.dataInicio ? filtroAtual.dataInicio.split('T')[0] : null;
+                const dataFim = filtroAtual.dataFim ? filtroAtual.dataFim.split('T')[0] : null;
+                const dataInicioNum = dataInicio ? parseInt(dataInicio.replace(/-/g, '')) : null;
+                const dataFimNum = dataFim ? parseInt(dataFim.replace(/-/g, '')) : null;
+                
+                console.log('🔍 Filtros convertidos para números:', {
+                    dataInicio: dataInicio + ' → ' + dataInicioNum,
+                    dataFim: dataFim + ' → ' + dataFimNum
+                });
+                
+                resultado = resultado.filter(venda => {
+                    const dataBrasilia = getDateBrasilia(venda.created_at);
+                    const datNum = parseInt(dataBrasilia.replace(/-/g, ''));
+                    
+                    const passouFiltro = (dataInicioNum === null || datNum >= dataInicioNum) && 
+                                        (dataFimNum === null || datNum <= dataFimNum);
+                    
+                    if (!passouFiltro) {
+                        console.log(`❌ Venda ${venda.id}: ${dataBrasilia} (${datNum}) fora do intervalo [${dataInicioNum}, ${dataFimNum}]`);
+                    }
+                    
+                    return passouFiltro;
+                });
+                
+                console.log('✅ Vendas após filtro:', resultado.length);
             }
+            
+            console.log('========== [FIM] ==========');
             
             return resultado;
         }
@@ -687,11 +787,18 @@
             let despesasExtras = 0;
             contasPagar.forEach(cp => {
                 if (cp.status === 'PAGO') {
-                    if (!filtroAtual.dataInicio || cp.data_pagamento >= filtroAtual.dataInicio) {
-                        if (!filtroAtual.dataFim || cp.data_pagamento <= filtroAtual.dataFim) {
-                            despesasExtras += cp.valor_pago || 0;
-                        }
-                    }
+                    const dataPagamento = getDateBrasilia(cp.data_pagamento);
+                    const dataInicio = filtroAtual.dataInicio ? filtroAtual.dataInicio.split('T')[0] : null;
+                    const dataFim = filtroAtual.dataFim ? filtroAtual.dataFim.split('T')[0] : null;
+                    
+                    // Converter para números YYYYMMDD para comparação correta
+                    const datPagNum = parseInt(dataPagamento.replace(/-/g, ''));
+                    const dataInicioNum = dataInicio ? parseInt(dataInicio.replace(/-/g, '')) : null;
+                    const dataFimNum = dataFim ? parseInt(dataFim.replace(/-/g, '')) : null;
+                    
+                    if (dataInicioNum !== null && datPagNum < dataInicioNum) return;
+                    if (dataFimNum !== null && datPagNum > dataFimNum) return;
+                    despesasExtras += cp.valor_pago || 0;
                 }
             });
             
@@ -751,13 +858,14 @@
             criarGraficoDiario(vendasFiltradas);
             criarGraficoFornecedores(vendasFiltradas);
             criarGraficoVariacaoFornecedor(vendasFiltradas);
+            criarGraficoHorariosPico(vendasFiltradas);
         }
 
         function criarGraficoEvolucao(vendasFiltradas) {
             const vendasPorDia = {};
             
             vendasFiltradas.forEach(venda => {
-                const data = venda.created_at?.split('T')[0];
+                const data = getDateBrasilia(venda.created_at);
                 if (!data) return;
                 
                 if (!vendasPorDia[data]) vendasPorDia[data] = 0;
@@ -770,7 +878,7 @@
             chartInstances.evolucao = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    labels: datasOrdenadas.map(d => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date(d + 'T00:00:00'))),
                     datasets: [{
                         label: 'Vendas (R$)',
                         data: datasOrdenadas.map(d => vendasPorDia[d]),
@@ -942,7 +1050,7 @@
             const dadosPorDia = {};
             
             vendasFiltradas.forEach(venda => {
-                const data = venda.created_at?.split('T')[0];
+                const data = getDateBrasilia(venda.created_at);
                 if (!data) return;
                 
                 if (!dadosPorDia[data]) dadosPorDia[data] = { receita: 0, custo: 0 };
@@ -965,7 +1073,7 @@
             chartInstances.diario = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    labels: datasOrdenadas.map(d => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date(d + 'T00:00:00'))),
                     datasets: [
                         {
                             label: 'Receita',
@@ -1007,12 +1115,15 @@
         function criarGraficoFornecedores(vendasFiltradas) {
             const dadosPorFornecedor = {};
             
-            console.log('📊 [FORNECEDOR] Analisando pedidos de compra...');
-            console.log('📊 [FORNECEDOR] Total de pedidos:', window.pedidosCompra?.length || 0);
+            console.log('📊 [FORNECEDOR] Iniciando gráfico...');
+            console.log('📊 [FORNECEDOR] window.pedidosCompra existe?', !!window.pedidosCompra);
+            console.log('📊 [FORNECEDOR] window.pedidosCompra.length:', window.pedidosCompra?.length || 0);
             
             // Agrupar COMPRAS por fornecedor (não vendas!)
-            if (window.pedidosCompra && window.pedidosCompra.length > 0) {
-                window.pedidosCompra.forEach(pedido => {
+            if (window.pedidosCompra && Array.isArray(window.pedidosCompra) && window.pedidosCompra.length > 0) {
+                console.log('📊 [FORNECEDOR] Processando', window.pedidosCompra.length, 'pedidos');
+                window.pedidosCompra.forEach((pedido, idx) => {
+                    console.log(`📦 Pedido ${idx}:`, pedido.fornecedor);
                     const fornecedorNome = pedido.fornecedor?.nome || 'Sem Fornecedor';
                     
                     if (!dadosPorFornecedor[fornecedorNome]) {
@@ -1027,22 +1138,32 @@
                     dadosPorFornecedor[fornecedorNome].custo += pedido.total || 0;
                     dadosPorFornecedor[fornecedorNome].quantidade += 1; // Número de pedidos
                 });
+            } else {
+                console.warn('⚠️ [FORNECEDOR] window.pedidosCompra não está disponível ou vazio');
             }
             
             console.log('📊 [FORNECEDOR] Fornecedores encontrados:', Object.keys(dadosPorFornecedor).length);
+            console.log('📊 [FORNECEDOR] Dados:', dadosPorFornecedor);
 
             // Ordenar por custo (valor das compras) e pegar top 10
             const topFornecedores = Object.entries(dadosPorFornecedor)
                 .sort((a, b) => b[1].custo - a[1].custo)
                 .slice(0, 10);
             
+            console.log('📊 [FORNECEDOR] Top fornecedores:', topFornecedores.length);
+            
+            const ctx = document.getElementById('chart-fornecedores');
+            if (!ctx) {
+                console.error('❌ [FORNECEDOR] Canvas #chart-fornecedores não encontrado');
+                return;
+            }
+            
             if (topFornecedores.length === 0) {
-                const ctx = document.getElementById('chart-fornecedores');
                 if (chartInstances.fornecedores) chartInstances.fornecedores.destroy();
+                ctx.parentElement.innerHTML = '<div class="text-center text-gray-500 py-8">Nenhum pedido de compra encontrado</div>';
                 return;
             }
 
-            const ctx = document.getElementById('chart-fornecedores');
             if (chartInstances.fornecedores) chartInstances.fornecedores.destroy();
             
             chartInstances.fornecedores = new Chart(ctx, {
@@ -1100,7 +1221,7 @@
             
             // Agrupar por fornecedor e data - ANALISANDO PEDIDOS DE COMPRA
             (window.pedidosCompra || []).forEach(pedido => {
-                const data = pedido.created_at?.split('T')[0];
+                const data = getDateBrasilia(pedido.created_at);
                 if (!data) return;
                 
                 const fornecedorNome = pedido.fornecedor?.nome || 'Sem Fornecedor';
@@ -1110,7 +1231,8 @@
                     if (filtroAtual.categoria && item.produtos?.categoria_id !== filtroAtual.categoria) return;
                     if (filtroAtual.marca && item.produtos?.marca_id !== filtroAtual.marca) return;
                     
-                    const precoCusto = item.preco_custo || 0;
+                    // Usar preço de custo do produto cadastrado (não temos preço histórico do pedido)
+                    const precoCusto = item.produtos?.preco_custo || 0;
                     
                     if (!precoPorFornecedorData[fornecedorNome]) {
                         precoPorFornecedorData[fornecedorNome] = {};
@@ -1176,7 +1298,7 @@
             chartInstances.variacaoFornecedor = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    labels: datasOrdenadas.map(d => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date(d + 'T00:00:00'))),
                     datasets: datasets
                 },
                 options: {
@@ -1202,6 +1324,97 @@
                         y: {
                             beginAtZero: true,
                             ticks: { callback: v => 'R$ ' + v.toFixed(2) }
+                        }
+                    }
+                }
+            });
+        }
+
+        function criarGraficoHorariosPico(vendasFiltradas) {
+            console.log('📊 [HORARIOS] Analisando horários de pico de vendas...');
+            
+            const vendasPorHora = {};
+            for (let h = 0; h < 24; h++) {
+                vendasPorHora[h] = { quantidade: 0, valor: 0, itens: 0 };
+            }
+            
+            vendasFiltradas.forEach(venda => {
+                const hora = getHourBrasilia(venda.created_at);
+                
+                (venda.venda_itens || []).forEach(item => {
+                    const produto = item.produtos;
+                    if (!produto) return;
+                    
+                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    
+                    vendasPorHora[hora].quantidade += 1;
+                    vendasPorHora[hora].valor += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    vendasPorHora[hora].itens += (item.quantidade || 0);
+                });
+            });
+
+            const horas = Object.keys(vendasPorHora).map(h => parseInt(h));
+            const labels = horas.map(h => `${String(h).padStart(2, '0')}:00`);
+            
+            const ctx = document.getElementById('chart-horarios-pico');
+            if (chartInstances.horariosPico) chartInstances.horariosPico.destroy();
+            
+            chartInstances.horariosPico = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Valor Vendido (R$)',
+                            data: horas.map(h => vendasPorHora[h].valor),
+                            backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Quantidade de Itens',
+                            data: horas.map(h => vendasPorHora[h].itens),
+                            backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                            borderColor: 'rgba(34, 197, 94, 1)',
+                            borderWidth: 1,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { 
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(context) {
+                                    const hora = horas[context.dataIndex];
+                                    return `Nº Vendas: ${vendasPorHora[hora].quantidade}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Valor (R$)' },
+                            beginAtZero: true,
+                            ticks: { callback: v => 'R$ ' + v.toFixed(0) }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            border: { display: false },
+                            title: { display: true, text: 'Qtd Itens' },
+                            beginAtZero: true,
+                            grid: { drawOnChartArea: false },
+                            ticks: { callback: v => v.toFixed(0) }
                         }
                     }
                 }
@@ -1460,9 +1673,18 @@
             let movimentacoesFiltradas = movimentacoes;
             if (filtroAtual.dataInicio || filtroAtual.dataFim) {
                 movimentacoesFiltradas = movimentacoes.filter(m => {
-                    const dataMovimento = m.data.split('T')[0];
-                    if (filtroAtual.dataInicio && dataMovimento < filtroAtual.dataInicio) return false;
-                    if (filtroAtual.dataFim && dataMovimento > filtroAtual.dataFim) return false;
+                    const dataMovimento = getDateBrasilia(m.data);
+                    // Extrair YYYY-MM-DD dos inputs datetime-local (YYYY-MM-DDTHH:mm)
+                    const dataInicio = filtroAtual.dataInicio ? filtroAtual.dataInicio.split('T')[0] : null;
+                    const dataFim = filtroAtual.dataFim ? filtroAtual.dataFim.split('T')[0] : null;
+                    
+                    // Converter para números YYYYMMDD para comparação correta
+                    const datMovNum = parseInt(dataMovimento.replace(/-/g, ''));
+                    const dataInicioNum = dataInicio ? parseInt(dataInicio.replace(/-/g, '')) : null;
+                    const dataFimNum = dataFim ? parseInt(dataFim.replace(/-/g, '')) : null;
+                    
+                    if (dataInicioNum !== null && datMovNum < dataInicioNum) return false;
+                    if (dataFimNum !== null && datMovNum > dataFimNum) return false;
                     return true;
                 });
             }
@@ -1532,7 +1754,7 @@
             // Agrupar por dia
             const dadosPorDia = {};
             movimentacoes.forEach(mov => {
-                const data = mov.data?.split('T')[0];
+                const data = getDateBrasilia(mov.data);
                 if (!data) return;
                 
                 if (!dadosPorDia[data]) dadosPorDia[data] = { entradas: 0, saidas: 0 };
@@ -1553,7 +1775,7 @@
             chartInstances.fluxoCaixa = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: datasOrdenadas.map(d => new Date(d + 'T00:00:00').toLocaleDateString('pt-BR')),
+                    labels: datasOrdenadas.map(d => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date(d + 'T00:00:00'))),
                     datasets: [
                         {
                             label: 'Entradas',
@@ -1855,7 +2077,7 @@
 
         function formatDate(dateStr) {
             if (!dateStr) return '-';
-            return new Date(dateStr).toLocaleDateString('pt-BR');
+            return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(new Date(dateStr));
         }
     </script>
 </body>

@@ -156,7 +156,7 @@
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
                             <input 
-                                type="date" 
+                                type="datetime-local" 
                                 id="filtro-data-historico" 
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                                 onchange="carregarHistoricoComandas()"
@@ -341,6 +341,42 @@
     <script src="../js/services/comandas.js"></script>
     
     <script>
+        // ===== SISTEMA DE LOGGING PARA AUDITORIA DE PROBLEMAS =====
+        let eventosComandasLog = []; // Array para armazenar eventos em tempo real
+        
+        function registrarEvento(tipo, descricao, dados = {}) {
+            const evento = {
+                timestamp: new Date().toISOString(),
+                hora: new Date().toLocaleTimeString(),
+                tipo, // 'RELOAD', 'ACAO_USUARIO', 'SINCRONIZACAO', 'DETECCAO'
+                descricao,
+                dados
+            };
+            eventosComandasLog.push(evento);
+            
+            // Manter apenas os últimos 100 eventos
+            if (eventosComandasLog.length > 100) {
+                eventosComandasLog.shift();
+            }
+        }
+        
+        // Função global para verificar logs (DEBUG no console)
+        window.verHistoricoComandas = function() {
+            console.log('%c📊 === HISTÓRICO DE EVENTOS DAS COMANDAS (últimos 100) ===', 'color: blue; font-weight: bold; font-size: 14px;');
+            console.table(eventosComandasLog);
+            return eventosComandasLog;
+        };
+        
+        window.verUltimoEvento = function() {
+            if (eventosComandasLog.length === 0) {
+                console.log('Nenhum evento registrado');
+                return null;
+            }
+            const ultimo = eventosComandasLog[eventosComandasLog.length - 1];
+            console.log(`Último evento: ${ultimo.hora} | ${ultimo.tipo} | ${ultimo.descricao}`);
+            return ultimo;
+        };
+
         let todasComandas = [];
         let comandasFiltradas = [];
         let comandaAtual = null;
@@ -362,11 +398,23 @@
                 
                 await carregarComandas();
                 await carregarClientesSelect();
+                await inicializarHistorico();
                 
                 // Setup busca de produto com autocomplete
                 setupBuscaProduto();
 
-                setInterval(() => carregarComandas(), 30 * 1000);
+                // ⏰ Polling periódico: 30s normalmente, 10s quando comanda aberta (detecta mudanças)
+                let ultimoReload = Date.now();
+                setInterval(async () => {
+                    const agora = Date.now();
+                    const intervaloMinimo = (comandaAtual && comandaAtual.id) ? 10000 : 30000; // 10s se aberta, 30s se não
+                    
+                    if (agora - ultimoReload >= intervaloMinimo) {
+                        console.log(`🔄 [${new Date().toLocaleTimeString()}] Recarregando comandas (pool automático)...`);
+                        await carregarComandas();
+                        ultimoReload = agora;
+                    }
+                }, 5000); // Verificar a cada 5 segundos
             } catch (error) {
                 console.error("Erro ao inicializar comandas:", error);
                 window.location.href = "/index.html";
@@ -375,6 +423,10 @@
 
         async function carregarComandas() {
             try {
+                const tempoInicio = performance.now();
+                console.log(`\n📋 [${new Date().toLocaleTimeString()}] === CARREGANDO COMANDAS ===`);
+                registrarEvento('RELOAD', 'Iniciando carregamento de comandas');
+                
                 todasComandas = await ServicoComandasService.buscarComandasAbertas();
                 const contagem = await ServicoComandasService.contarComandasAbertas();
 
@@ -383,9 +435,36 @@
                 document.getElementById("count-balcao").textContent = contagem.balcao;
                 document.getElementById("count-delivery").textContent = contagem.delivery;
 
+                // 📊 Logging detalhado
+                const tempoDecorrido = (performance.now() - tempoInicio).toFixed(0);
+                console.log(`✅ Comandas carregadas: ${contagem.total} total | ${contagem.mesa} mesas | ${contagem.balcao} balcão | ${contagem.delivery} delivery`);
+                console.log(`⏱️ Tempo: ${tempoDecorrido}ms`);
+                registrarEvento('RELOAD', `Comandas carregadas: ${contagem.total} total`, { ...contagem, tempoMs: tempoDecorrido });
+                
+                // 🔍 Se há comanda aberta, monitorar mudanças de status
+                if (comandaAtual?.id) {
+                    const comandaAtualizada = todasComandas.find(c => c.id === comandaAtual.id);
+                    if (comandaAtualizada) {
+                        if (comandaAtualizada.status !== comandaAtual.status) {
+                            console.warn(`⚠️ STATUS MUDOU da comanda aberta: ${comandaAtual.status} → ${comandaAtualizada.status}`);
+                            registrarEvento('DETECCAO', `STATUS MUDOU: ${comandaAtual.status} → ${comandaAtualizada.status}`, { comandaId: comandaAtual.id });
+                        }
+                        if (JSON.stringify(comandaAtualizada.itens) !== JSON.stringify(comandaAtual.itens)) {
+                            console.warn(`⚠️ ITENS MUDARAM na comanda aberta!`);
+                            console.log(`  Antes: ${comandaAtual.itens?.length || 0} itens`);
+                            console.log(`  Depois: ${comandaAtualizada.itens?.length || 0} itens`);
+                            registrarEvento('DETECCAO', `ITENS MUDARAM: ${comandaAtual.itens?.length} → ${comandaAtualizada.itens?.length}`, { comandaId: comandaAtual.id });
+                        }
+                    } else {
+                        console.error(`🚨 COMANDA DESAPARECEU DO CARREGAMENTO: ${comandaAtual.id}`);
+                        registrarEvento('AVISO', `COMANDA DESAPARECEU: ${comandaAtual.id}`, { comandaId: comandaAtual.id });
+                    }
+                }
+
                 filtrarPorTipo(tipoFiltroAtual);
             } catch (erro) {
-                console.error("Erro ao carregar comandas:", erro);
+                console.error("❌ Erro ao carregar comandas:", erro);
+                registrarEvento('DETECCAO', 'ERRO ao carregar comandas', { erro: erro.message });
             }
         }
 
@@ -628,10 +707,12 @@
                 // 🚀 LIMPAR INPUTS
                 document.getElementById("add-quantidade").value = "1";
                 document.getElementById("busca-produto-comanda").value = "";
+                
+                console.log(`📦 [${new Date().toLocaleTimeString()}] Produto adicionado: ${produto.nome} (qty: ${quantidade})`);
 
                 // 🚀 SINCRONIZAR COM BANCO EM BACKGROUND (não bloqueia UX)
                 sincronizarItensBanco(comandaAtual.id).catch(err => {
-                    console.error('Erro ao sincronizar com banco:', err);
+                    console.error('❌ Erro ao sincronizar com banco:', err);
                     mostrarMensagem('Aviso', 'Item adicionado localmente, mas erro ao sincronizar', 'aviso');
                 });
 
@@ -816,6 +897,20 @@
                 if (errorUpdate) throw errorUpdate;
                 
                 console.log('✅ Sincronização concluída com sucesso');
+                
+                // 🔄 Reload automático após sincronização
+                console.log('⏱️ Agendando reload em 300ms para refletir mudanças...');
+                setTimeout(async () => {
+                    console.log(`🔄 [${new Date().toLocaleTimeString()}] Recarregando comandas após sincronização...`);
+                    await carregarComandas();
+                }, 300);
+                
+                // 🔄 Reload automático após sincronização
+                console.log('⏱️ Agendando reload em 500ms para refletir mudanças...');
+                setTimeout(async () => {
+                    console.log('🔄 Recarregando comandas após sincronização...');
+                    await carregarComandas();
+                }, 500);
             } catch (erro) {
                 console.error('❌ Erro ao sincronizar:', erro);
                 mostrarMensagem('Erro', 'Erro ao sincronizar com banco: ' + erro.message, 'erro');
@@ -1072,6 +1167,7 @@
                         console.log(`📊 Processando: Total=${totalAcobrar.toFixed(2)}, Pago=${valorPago.toFixed(2)}, Troco=${troco.toFixed(2)}`);
                         
                         await ServicoComandasService.fecharComanda(comandaAtual.id, forma, valorPago, 0);
+                        console.log(`✅ Comanda finalizada com sucesso: ${comandaAtual.numero_comanda}`);
                         
                         // Fechar overlay e exibir cupom
                         overlay.remove();
@@ -1084,9 +1180,17 @@
                         });
                         
                         fecharModalDetalhes();
+                        console.log(`🔄 [${new Date().toLocaleTimeString()}] Recarregando após fechar comanda...`);
                         await carregarComandas();
+                        
+                        // Extra: Reload adicional após 1 segundo para garantir sincronização
+                        setTimeout(() => {
+                            console.log(`🔄 [${new Date().toLocaleTimeString()}] Reload extra de segurança (1s)...`);
+                            carregarComandas();
+                        }, 1000);
                     } catch (erro) {
                         console.error('❌ Erro ao finalizar comanda:', erro);
+                        console.error('📋 Stack:', erro.stack);
                         mostrarMensagem('Erro', erro.message, 'erro');
                         
                         // Reabilitar botoes para retry
@@ -1117,6 +1221,31 @@
 
         // ===== FUNÇÕES DE HISTÓRICO =====
 
+        async function inicializarHistorico() {
+            try {
+                // Setar data padrão como "hoje" em formato datetime-local
+                const hoje = new Date();
+                const ano = hoje.getFullYear();
+                const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+                const dia = String(hoje.getDate()).padStart(2, '0');
+                const horas = String(hoje.getHours()).padStart(2, '0');
+                const minutos = String(hoje.getMinutes()).padStart(2, '0');
+                
+                const dataHoje = `${ano}-${mes}-${dia}T${horas}:${minutos}`;
+                
+                const inputData = document.getElementById('filtro-data-historico');
+                if (inputData) {
+                    inputData.value = dataHoje;
+                    console.log(`📅 Data padrão do histórico setada para: ${dataHoje}`);
+                    
+                    // Carregar histórico automaticamente
+                    await carregarHistoricoComandas();
+                }
+            } catch (error) {
+                console.error('❌ Erro ao inicializar histórico:', error);
+            }
+        }
+
         function mudarAbaSecao(aba) {
             // Atualizar abas ativas
             document.querySelectorAll('.tab-abas').forEach(t => t.classList.remove('active'));
@@ -1136,17 +1265,19 @@
 
         async function carregarHistoricoComandas() {
             try {
-                const dataStr = document.getElementById('filtro-data-historico').value;
-                if (!dataStr) {
+                const dataInputStr = document.getElementById('filtro-data-historico').value;
+                if (!dataInputStr) {
                     mostrarMensagem('Atenção', 'Por favor, selecione uma data', 'aviso');
                     return;
                 }
 
-                console.log(`📅 Carregando histórico para ${dataStr}`);
+                // Extrair apenas a data (YYYY-MM-DD) do datetime-local
+                const dataParte = dataInputStr.split('T')[0]; // Pega apenas YYYY-MM-DD
+                const dataInicio = `${dataParte}T00:00:00`;
+                const dataFim = `${dataParte}T23:59:59`;
 
-                // Converter data para range (início e fim do dia)
-                const dataInicio = `${dataStr}T00:00:00`;
-                const dataFim = `${dataStr}T23:59:59`;
+                console.log(`📅 Carregando histórico para ${dataParte}`);
+                console.log(`📅 Range: ${dataInicio} a ${dataFim}`);
 
                 // Buscar comandas fechadas ou canceladas do dia
                 const { data, error } = await supabase
@@ -1236,7 +1367,7 @@
                 }
 
                 return `
-                    <div class="comanda-card ${isCancelada ? 'opacity-50' : ''}" style="border-color: ${isCancelada ? '#ef4444' : '#f97316'}; background: ${isCancelada ? '#fef2f2' : '#fef3c7'};"}
+                    <div class="comanda-card ${isCancelada ? 'opacity-50' : ''}" style="border-color: ${isCancelada ? '#ef4444' : '#f97316'}; background: ${isCancelada ? '#fef2f2' : '#fef3c7'}; display: flex; flex-direction: column;">
                         <span class="absolute top-3 right-3 ${statusClass} text-white text-xs px-2 py-1 rounded font-bold">
                             ${statusText}
                         </span>
@@ -1255,12 +1386,230 @@
                         <div class="text-sm text-gray-600 mb-3">
                             <i class="fas fa-box mr-2"></i>${qtdItens} ${qtdItens === 1 ? 'item' : 'itens'}
                         </div>
-                        <div class="text-xl font-bold ${isCancelada ? 'text-red-600' : 'text-green-600'}">
+                        <div class="text-xl font-bold mb-3 ${isCancelada ? 'text-red-600' : 'text-green-600'}">
                             R$ ${valorTotal.toLocaleString("pt-BR", {minimumFractionDigits: 2})}
                         </div>
+                        ${!isCancelada ? `
+                            <button onclick="reabrirComanda('${comanda.id}')" class="mt-auto w-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition font-medium text-sm">
+                                <i class="fas fa-redo mr-1"></i> Reabrir
+                            </button>
+                        ` : ''}
                     </div>
                 `;
             }).join("");
+        }
+
+        async function reabrirComanda(comandaIdOriginal) {
+            let novaComandaId = null; // Para rollback em caso de erro
+            
+            try {
+                mostrarMensagem('Processando', 'Reabrindo comanda...', 'info');
+                console.log(`🔄 Iniciando reabertura de comanda: ${comandaIdOriginal}`);
+                
+                // ✅ PASSO 1: Buscar comanda original com seus itens
+                console.log('📋 Step 1: Buscando comanda original...');
+                const { data: comandaOriginal, error: erroComanda } = await supabase
+                    .from('comandas')
+                    .select(`
+                        id,
+                        numero_comanda,
+                        tipo,
+                        numero_mesa,
+                        cliente_id,
+                        cliente_nome,
+                        status,
+                        data_abertura,
+                        data_fechamento,
+                        subtotal,
+                        desconto,
+                        acrescimo,
+                        valor_total,
+                        comanda_itens(
+                            id,
+                            produto_id,
+                            nome_produto,
+                            quantidade,
+                            preco_unitario,
+                            subtotal,
+                            desconto,
+                            status,
+                            observacoes,
+                            usuario_id
+                        )
+                    `)
+                    .eq('id', comandaIdOriginal)
+                    .single();
+                
+                if (erroComanda || !comandaOriginal) {
+                    throw new Error(`Comanda não encontrada: ${erroComanda?.message || 'ID inválido'}`);
+                }
+                
+                const itensOriginais = comandaOriginal.comanda_itens || [];
+                console.log(`✅ Comanda encontrada com ${itensOriginais.length} itens`);
+                
+                // ✅ PASSO 2: Validar estoque para TODOS os itens ANTES de qualquer ação
+                console.log('🔍 Step 2: Validando estoque para todos os itens...');
+                for (let item of itensOriginais) {
+                    const estoqueDisponivel = await ServicoComandasService.calcularEstoqueDisponivel(item.produto_id);
+                    console.log(`  - ${item.nome_produto}: solicitado ${item.quantidade}, disponível ${estoqueDisponivel}`);
+                    
+                    if (item.quantidade > estoqueDisponivel) {
+                        throw new Error(
+                            `❌ Estoque insuficiente para ${item.nome_produto}\n` +
+                            `Solicitado: ${item.quantidade}\n` +
+                            `Disponível: ${estoqueDisponivel}\n\n` +
+                            `⚠️ Nenhuma ação foi realizada no estoque`
+                        );
+                    }
+                }
+                console.log(`✅ Estoque validado com sucesso para todos os itens`);
+                
+                // ✅ PASSO 3: Criar nova comanda (APENAS APÓS VALIDAÇÕES)
+                console.log('📝 Step 3: Criando nova comanda...');
+                const { data: { user } } = await supabase.auth.getUser();
+                
+                // 🔢 Gerar novo número de comanda único (não usar REAB- que causa duplicação)
+                const numeroComandaNovoReabertura = await ServicoComandasService.gerarNumeroComanda();
+                console.log(`🔢 Novo número gerado: ${numeroComandaNovoReabertura}`);
+                
+                const { data: novaComanda, error: erroInsert } = await supabase
+                    .from('comandas')
+                    .insert({
+                        numero_comanda: numeroComandaNovoReabertura,
+                        numero_mesa: comandaOriginal.numero_mesa,
+                        tipo: comandaOriginal.tipo,
+                        cliente_id: comandaOriginal.cliente_id,
+                        cliente_nome: comandaOriginal.cliente_nome,
+                        status: 'aberta',
+                        data_abertura: new Date().toISOString(),
+                        subtotal: 0,
+                        desconto: 0,
+                        acrescimo: 0,
+                        valor_total: 0
+                    })
+                    .select('*')
+                    .single();
+                
+                if (erroInsert || !novaComanda) {
+                    throw new Error(`Falha ao criar comanda: ${erroInsert?.message || 'Resposta inválida do servidor'}`);
+                }
+                
+                novaComandaId = novaComanda.id; // Guardar para rollback
+                console.log(`✅ Nova comanda criada: ${novaComanda.numero_comanda} (ID: ${novaComanda.id})`);
+                
+                // ✅ PASSO 4: Adicionar itens à nova comanda
+                console.log('📦 Step 4: Adicionando itens à nova comanda...');
+                const itensParaInserir = itensOriginais.map(item => ({
+                    comanda_id: novaComanda.id,
+                    produto_id: item.produto_id,
+                    nome_produto: item.nome_produto,
+                    quantidade: item.quantidade,
+                    preco_unitario: item.preco_unitario,
+                    subtotal: item.subtotal,
+                    observacoes: item.observacoes || '',
+                    usuario_id: user?.id,
+                    status: 'pendente'
+                }));
+                
+                const { error: erroItens, data: itensAdicionados } = await supabase
+                    .from('comanda_itens')
+                    .insert(itensParaInserir)
+                    .select('*');
+                
+                if (erroItens || !itensAdicionados) {
+                    // ❌ ROLLBACK: Deletar a comanda criada se items falharem
+                    console.error(`❌ Erro ao adicionar itens: ${erroItens?.message}`);
+                    console.log(`🔄 Fazendo rollback - deletando comanda ${novaComanda.id}...`);
+                    
+                    await supabase
+                        .from('comandas')
+                        .delete()
+                        .eq('id', novaComanda.id);
+                    
+                    throw new Error(`Falha ao adicionar itens: ${erroItens?.message}`);
+                }
+                
+                console.log(`✅ ${itensAdicionados.length} itens adicionados com sucesso`);
+                
+                // ✅ PASSO 5: Atualizar totais da comanda
+                console.log('💰 Step 5: Atualizando totais...');
+                const subtotal = itensOriginais.reduce((sum, item) => sum + item.subtotal, 0);
+                
+                const { error: erroUpdate } = await supabase
+                    .from('comandas')
+                    .update({
+                        subtotal: subtotal,
+                        valor_total: subtotal
+                    })
+                    .eq('id', novaComanda.id);
+                
+                if (erroUpdate) {
+                    // ❌ ROLLBACK: Deletar comanda e itens se update falhar
+                    console.error(`❌ Erro ao atualizar totais: ${erroUpdate?.message}`);
+                    console.log(`🔄 Fazendo rollback...`);
+                    
+                    await supabase
+                        .from('comanda_itens')
+                        .delete()
+                        .eq('comanda_id', novaComanda.id);
+                    
+                    await supabase
+                        .from('comandas')
+                        .delete()
+                        .eq('id', novaComanda.id);
+                    
+                    throw new Error(`Falha ao atualizar totais: ${erroUpdate?.message}`);
+                }
+                
+                console.log(`✅ Totais atualizados: R$ ${subtotal.toFixed(2)}`);
+                
+                // ✅ PASSO 6: Deletar comanda original fechada/cancelada (limpeza do BD)
+                console.log(`🗑️ Step 6: Deletando comanda original para evitar duplicação...`);
+                const { error: erroDeletarOriginal } = await supabase
+                    .from('comandas')
+                    .delete()
+                    .eq('id', comandaIdOriginal);
+                
+                if (erroDeletarOriginal) {
+                    console.warn(`⚠️ Aviso: Não conseguiu deletar comanda original: ${erroDeletarOriginal?.message}`);
+                    console.warn(`⚠️ A comanda original pode aparecer em duplicado (${comandaOriginal.numero_comanda})`);
+                    // Não fazer rollback aqui pois a nova comanda já foi criada com sucesso
+                } else {
+                    console.log(`✅ Comanda original (${comandaOriginal.numero_comanda}) deletada do BD`);
+                }
+                
+                // ✅ SUCESSO: Recarregar dados e abrir comanda
+                console.log(`🎉 Comanda reaberfa com sucesso! ${novaComanda.numero_comanda}`);
+                registrarEvento('ACAO_USUARIO', `COMANDA REABERIDA: ${comandaOriginal.numero_comanda} → ${novaComanda.numero_comanda}`, 
+                    { comandaAntigaId: comandaIdOriginal, comandaNovId: novaComanda.id });
+                mostrarMensagem('Sucesso', `Comanda reaberfa como ${novaComanda.numero_comanda}!`, 'sucesso');
+                
+                // Reload obrigatório para limpar histórico
+                console.log(`🔄 Recarregando comandas...`);
+                await carregarComandas();
+                await carregarHistoricoComandas(); // Recarregar histórico também
+                
+                // Aguardar um pouco e depois abrir a comanda
+                setTimeout(() => {
+                    console.log(`📂 Abrindo nova comanda: ${novaComanda.id}`);
+                    abrirDetalhesComanda(novaComanda.id);
+                }, 500);
+                
+            } catch (erro) {
+                console.error('❌ Erro ao reabrir comanda:', erro);
+                console.error('📋 Detalhes do erro:', {
+                    message: erro.message,
+                    stack: erro.stack,
+                    novaComandaId
+                });
+                
+                // Garantir que mensagem de erro fica clara
+                const mensagem = erro.message.includes('Estoque insuficiente') 
+                    ? erro.message  // Já tem contexto de estoque
+                    : `Erro ao reabrir comanda: ${erro.message}\n\n⚠️ Nenhuma ação foi realizada.`;
+                
+                mostrarMensagem('Erro', mensagem, 'erro');
+            }
         }
 
         function exibirCupomComanda(cupom) {
