@@ -1406,7 +1406,7 @@
                 mostrarMensagem('Processando', 'Reabrindo comanda...', 'info');
                 console.log(`🔄 Iniciando reabertura de comanda: ${comandaIdOriginal}`);
                 
-                // ✅ PASSO 1: Buscar comanda original com seus itens
+                // ✅ PASSO 1: Buscar comanda original com seus itens E VENDA_ID
                 console.log('📋 Step 1: Buscando comanda original...');
                 const { data: comandaOriginal, error: erroComanda } = await supabase
                     .from('comandas')
@@ -1424,6 +1424,7 @@
                         desconto,
                         acrescimo,
                         valor_total,
+                        venda_id,
                         comanda_itens(
                             id,
                             produto_id,
@@ -1446,6 +1447,41 @@
                 
                 const itensOriginais = comandaOriginal.comanda_itens || [];
                 console.log(`✅ Comanda encontrada com ${itensOriginais.length} itens`);
+                console.log(`📊 Status da comanda: ${comandaOriginal.status}, Venda ID: ${comandaOriginal.venda_id || 'N/A'}`);
+                
+                // ✅ PASSO 1.5: Se comanda foi FECHADA (tem venda_id), estornar estoque e cancelar venda
+                if (comandaOriginal.status === 'fechada' && comandaOriginal.venda_id) {
+                    console.log('🔄 Step 1.5: Comanda foi fechada - iniciando estorno de estoque...');
+                    
+                    try {
+                        // Reverter movimentação de estoque da venda
+                        const resultadoEstorno = await EstoqueService.reverterSaidaVenda(comandaOriginal.venda_id);
+                        console.log('✅ Estoque estornado:', resultadoEstorno);
+                        
+                        // Cancelar a venda original
+                        const { error: erroCancelarVenda } = await supabase
+                            .from('vendas')
+                            .update({
+                                status: 'CANCELADA',
+                                observacoes: `CANCELADA por reabertura de comanda ${comandaOriginal.numero_comanda}`
+                            })
+                            .eq('id', comandaOriginal.venda_id);
+                        
+                        if (erroCancelarVenda) {
+                            console.error('❌ Erro ao cancelar venda:', erroCancelarVenda);
+                            throw new Error(`Erro ao cancelar venda: ${erroCancelarVenda.message}`);
+                        }
+                        
+                        console.log('✅ Venda cancelada e estoque devolvido com sucesso');
+                    } catch (erroEstorno) {
+                        console.error('❌ Erro ao estornar estoque/venda:', erroEstorno);
+                        throw new Error(`Erro ao estornar estoque: ${erroEstorno.message}\n\n⚠️ Operação abortada para evitar inconsistências.`);
+                    }
+                } else if (comandaOriginal.status === 'cancelada') {
+                    console.log('ℹ️ Comanda foi cancelada (nunca teve venda) - não há estoque para estornar');
+                } else {
+                    console.log(`ℹ️ Status: ${comandaOriginal.status} - prosseguindo sem estorno`);
+                }
                 
                 // ✅ PASSO 2: Validar estoque para TODOS os itens ANTES de qualquer ação
                 console.log('🔍 Step 2: Validando estoque para todos os itens...');
