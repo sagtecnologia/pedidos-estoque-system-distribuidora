@@ -28,7 +28,7 @@
 
             <!-- Filtros -->
             <div class="bg-white rounded-lg shadow p-4 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-8 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
                         <select id="filter-status" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
@@ -47,16 +47,28 @@
                         </select>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                        <select id="filter-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                            <option value="">Todas as categorias</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Marca</label>
+                        <select id="filter-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
+                            <option value="">Todas as marcas</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Número</label>
                         <input type="text" id="search" placeholder="Buscar número..." class="w-full px-4 py-2 border border-gray-300 rounded-lg" onkeyup="loadVendas()">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Início</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Início</label>
                         <input type="datetime-local" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Fim</label>
-                        <input type="datetime-local" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()"
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Data Fim</label>
+                        <input type="datetime-local" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="loadVendas()">
                     </div>
                     <div class="flex items-end">
                         <button onclick="limparFiltros()" class="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Limpar</button>
@@ -194,6 +206,8 @@
             document.getElementById('filter-data-fim').value = formatarDateTimeLocal(hojeFim);
             
             await loadClientesSelect();
+            await loadCategoriasSelect();
+            await loadMarcasSelect();
             await loadVendas();
         })();
 
@@ -227,11 +241,55 @@
             }
         }
 
+        // Carregar categorias no select
+        async function loadCategoriasSelect() {
+            try {
+                const { data: categorias } = await supabase
+                    .from('categorias')
+                    .select('id, nome')
+                    .order('nome');
+                
+                const select = document.getElementById('filter-categoria');
+                select.innerHTML = '<option value="">Todas as categorias</option>';
+                (categorias || []).forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.textContent = c.nome;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar categorias:', error);
+            }
+        }
+
+        // Carregar marcas no select
+        async function loadMarcasSelect() {
+            try {
+                const { data: marcas } = await supabase
+                    .from('marcas')
+                    .select('id, nome')
+                    .order('nome');
+                
+                const select = document.getElementById('filter-marca');
+                select.innerHTML = '<option value="">Todas as marcas</option>';
+                (marcas || []).forEach(m => {
+                    const option = document.createElement('option');
+                    option.value = m.id;
+                    option.textContent = m.nome;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar marcas:', error);
+            }
+        }
+
         // Carregar vendas
         async function loadVendas() {
             const status = document.getElementById('filter-status').value;
             const search = document.getElementById('search').value;
             const clienteId = document.getElementById('filter-cliente').value;
+            const categoriaId = document.getElementById('filter-categoria').value;
+            const marcaId = document.getElementById('filter-marca').value;
             const dataInicio = document.getElementById('filter-data-inicio').value;
             const dataFim = document.getElementById('filter-data-fim').value;
             
@@ -268,7 +326,7 @@
                     query = query.lte('created_at', dataFimObj.toISOString());
                 }
                 
-                const { data: vendas, error } = await query.order('created_at', { ascending: false }).limit(500);
+                let { data: vendas, error } = await query.order('created_at', { ascending: false }).limit(500);
                 
                 if (error) throw error;
                 
@@ -279,7 +337,63 @@
                 
                 console.log(`📊 Vendas carregadas: ${vendas.length}`);
                 
-                // 2️⃣ Batch load clientes
+                // 2️⃣ Se houver filtros de categoria ou marca, fazer filtragem por produtos
+                if (categoriaId || marcaId) {
+                    const vendaIds = vendas.map(v => v.id);
+                    
+                    // Buscar todos os itens destas vendas
+                    const { data: todosItens } = await supabase
+                        .from('venda_itens')
+                        .select('venda_id, produto_id')
+                        .in('venda_id', vendaIds);
+                    
+                    if (!todosItens || todosItens.length === 0) {
+                        renderVendas([]);
+                        return;
+                    }
+                    
+                    const produtoIds = [...new Set(todosItens.map(i => i.produto_id).filter(Boolean))];
+                    
+                    // Buscar produtos com categoria e marca
+                    let produtosQuery = supabase
+                        .from('produtos')
+                        .select('id, categoria_id, marca_id');
+                    
+                    if (produtoIds.length > 0) {
+                        produtosQuery = produtosQuery.in('id', produtoIds);
+                    }
+                    
+                    const { data: produtos } = await produtosQuery;
+                    
+                    // Filtrar produtos por categoria e marca
+                    const produtosValidos = new Set();
+                    (produtos || []).forEach(p => {
+                        const passaCategoriaFiltro = !categoriaId || p.categoria_id === parseInt(categoriaId);
+                        const passaMarcaFiltro = !marcaId || p.marca_id === parseInt(marcaId);
+                        
+                        if (passaCategoriaFiltro && passaMarcaFiltro) {
+                            produtosValidos.add(p.id);
+                        }
+                    });
+                    
+                    // Filtrar vendas que têm itens com produtos válidos
+                    const vendasComProdutosValidos = new Set();
+                    (todosItens || []).forEach(item => {
+                        if (produtosValidos.has(item.produto_id)) {
+                            vendasComProdutosValidos.add(item.venda_id);
+                        }
+                    });
+                    
+                    // Manter só as vendas que têm produtos válidos
+                    vendas = vendas.filter(v => vendasComProdutosValidos.has(v.id));
+                    
+                    if (vendas.length === 0) {
+                        renderVendas([]);
+                        return;
+                    }
+                }
+                
+                // 3️⃣ Batch load clientes
                 const clienteIds = [...new Set(vendas.map(v => v.cliente_id).filter(Boolean))];
                 const { data: clientes } = clienteIds.length > 0 
                     ? await supabase
@@ -289,7 +403,7 @@
                     : { data: [] };
                 const clientesMap = Object.fromEntries((clientes || []).map(c => [c.id, c]));
                 
-                // 3️⃣ Batch load operadores (users)
+                // 4️⃣ Batch load operadores (users)
                 const vendedorIds = [...new Set(vendas.map(v => v.vendedor_id).filter(Boolean))];
                 const { data: operadores } = vendedorIds.length > 0
                     ? await supabase
@@ -299,23 +413,23 @@
                     : { data: [] };
                 const operadoresMap = Object.fromEntries((operadores || []).map(o => [o.id, o]));
                 
-                // 4️⃣ Batch load venda_itens
+                // 5️⃣ Batch load venda_itens
                 const vendaIds = vendas.map(v => v.id);
-                const { data: todosItens } = await supabase
+                const { data: itensVendas } = await supabase
                     .from('venda_itens')
                     .select('venda_id, quantidade')
                     .in('venda_id', vendaIds);
                 
                 // Agrupar itens por venda
                 const itensMap = {};
-                (todosItens || []).forEach(item => {
+                (itensVendas || []).forEach(item => {
                     if (!itensMap[item.venda_id]) {
                         itensMap[item.venda_id] = [];
                     }
                     itensMap[item.venda_id].push(item);
                 });
                 
-                // 5️⃣ Montar relacionamentos em JavaScript (muito mais rápido!)
+                // 6️⃣ Montar relacionamentos em JavaScript
                 vendas.forEach(venda => {
                     venda.cliente = clientesMap[venda.cliente_id] || null;
                     venda.operador = operadoresMap[venda.vendedor_id] || null;
@@ -350,6 +464,8 @@
 
             document.getElementById('filter-status').value = '';
             document.getElementById('filter-cliente').value = '';
+            document.getElementById('filter-categoria').value = '';
+            document.getElementById('filter-marca').value = '';
             document.getElementById('search').value = '';
             document.getElementById('filter-data-inicio').value = formatarDateTimeLocal(hojeInicio);
             document.getElementById('filter-data-fim').value = formatarDateTimeLocal(hojeFim);

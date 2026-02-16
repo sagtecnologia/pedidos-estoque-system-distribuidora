@@ -1637,6 +1637,8 @@ class PDVSystem {
                 // Se deu sucesso, fechar overlay e exibir cupom imediatamente
                 if (resultado && resultado.cupom) {
                     overlay.remove();
+                    // Armazenar dados da venda para usar em perguntarNFCe
+                    PDVSystem.vendaAtual = resultado;
                     PDVSystem.exibirCupom(resultado.cupom);
                 } else {
                     // Erro - reabilitar botões para retry
@@ -1716,16 +1718,224 @@ class PDVSystem {
     }
 
     /**
-     * Perguntar sobre NFC-e
+     * Perguntar sobre NFC-e (IMPLEMENTAÇÃO REAL)
      */
-    static perguntarNFCe() {
-        const resposta = confirm('Deseja emitir NFC-e para esta venda?\n\nA emissão de NFC-e será processada no sistema fiscal integrado.');
+    static async perguntarNFCe() {
+        // Validar se temos dados da venda
+        if (!this.vendaAtual || !this.vendaAtual.venda_id) {
+            this.exibirErro('Dados da venda não encontrados. Atualize a página e tente novamente.');
+            return;
+        }
+
+        const resposta = await showConfirm(
+            'Deseja emitir NFC-e para esta venda agora?\n\nA nota será enviada para a SEFAZ.',
+            '📄 Emitir NFC-e'
+        );
         
-        if (resposta) {
-            this.exibirSucesso('NFC-e será emitida. Aguarde confirmação no seu email ou consulte o sistema fiscal.');
-            // TODO: Implementar integração com sistema fiscal para emissão de NFC-e
-        } else {
+        if (!resposta) {
             this.exibirSucesso('NFC-e não será emitida. Você pode emitir manualmente depois se necessário.');
+            return;
+        }
+
+        try {
+            console.log('🔄 [PDV] Iniciando emissão de NFC-e da venda finalizante:', this.vendaAtual.venda_id);
+            
+            if (typeof showLoading === 'function') {
+                showLoading(true);
+            }
+            if (typeof setLoadingMessage === 'function') {
+                setLoadingMessage('Emitindo NFC-e... Aguarde até 45 segundos.');
+            }
+
+            // Buscar venda completa com itens
+            const { data: venda, error: erroVenda } = await supabase
+                .from('vendas')
+                .select('*')
+                .eq('id', this.vendaAtual.venda_id)
+                .single();
+
+            if (erroVenda || !venda) {
+                throw new Error('Erro ao buscar venda: ' + (erroVenda?.message || 'Venda não encontrada'));
+            }
+
+            // Buscar itens da venda
+            const { data: itens, error: erroItens } = await supabase
+                .from('venda_itens')
+                .select('*')
+                .eq('venda_id', this.vendaAtual.venda_id);
+
+            if (erroItens) {
+                throw new Error('Erro ao buscar itens: ' + erroItens.message);
+            }
+
+            if (!itens || itens.length === 0) {
+                throw new Error('Venda sem itens. Não é possível emitir NFC-e.');
+            }
+
+            // Enriquecer itens com dados fiscais dos produtos
+            const produtoIds = [...new Set(itens.map(i => i.produto_id).filter(Boolean))];
+            const { data: produtos } = await supabase
+                .from('produtos')
+                .select('id, nome, codigo_barras, sku, ncm, cfop, cst_icms, aliquota_icms')
+                .in('id', produtoIds);
+
+            const produtosMap = Object.fromEntries((produtos || []).map(p => [p.id, p]));
+
+            // Montar itens enriquecidos
+            const itensNFe = itens.map(item => ({
+                produto_id: item.produto_id,
+                codigo_barras: produtosMap[item.produto_id]?.codigo_barras || produtosMap[item.produto_id]?.sku || item.produto_id.substring(0, 13),
+                descricao: produtosMap[item.produto_id]?.nome || 'PRODUTO',
+                ncm: produtosMap[item.produto_id]?.ncm || '22021000',
+                cfop: produtosMap[item.produto_id]?.cfop || '5102',
+                cst_icms: produtosMap[item.produto_id]?.cst_icms || '102',
+                unidade: item.unidade_medida || 'UN',
+                quantidade: item.quantidade,
+                preco_unitario: item.preco_unitario,
+                valor_total: item.subtotal,
+                desconto_valor: item.desconto_valor || 0,
+                aliquota_icms: produtosMap[item.produto_id]?.aliquota_icms || 0
+            }));
+
+            // Preparar dados para emissão
+            const vendaNFe = {
+                numero_venda: venda.numero,
+                subtotal: venda.subtotal,
+                desconto_valor: venda.desconto_valor,
+                total: venda.total,
+                data_emissao: venda.created_at || new Date().toISOString()
+            };
+
+            const pagamentosNFe = [{
+                tipo: venda.forma_pagamento || 'DINHEIRO',
+                valor: venda.total
+            }];
+
+            // Buscar cliente se houver
+            let cliente = null;
+            if (venda.cliente_id) {
+                const { data: clienteData } = await supabase
+                    .from('clientes')
+                    .select('*')
+                    .eq('id', venda.cliente_id)
+                    .single();
+                cliente = clienteData;
+            }
+
+            console.log('📤 [PDV] Emitindo NFC-e com dados:', { vendaNFe, itensNFe });
+
+            // Emitir NFC-e via FiscalService
+            const resultado = await Promise.race([
+                FiscalService.emitirNFCeDireto(vendaNFe, itensNFe, pagamentosNFe, cliente),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout: A requisição demorou muito. Verifique sua conexão.')), 45000)
+                )
+            ]);
+
+            console.log('📦 [PDV] Resultado da emissão:', resultado);
+
+            // Verificar sucesso
+            if (resultado.success || resultado.status === 'autorizado' || resultado.status_sefaz === 'autorizado') {
+                console.log('✅ [PDV] NFC-e autorizada! Atualizando venda...');
+                
+                // Atualizar venda com dados fiscais
+                const { error: erroUpdate } = await supabase
+                    .from('vendas')
+                    .update({
+                        status_fiscal: 'EMITIDA_NFCE',
+                        numero_nfce: resultado.numero,
+                        chave_acesso_nfce: resultado.chave_nfe,
+                        protocolo_nfce: resultado.protocolo,
+                        nfce_id: resultado.nfce_id
+                    })
+                    .eq('id', this.vendaAtual.venda_id);
+
+                if (erroUpdate) {
+                    console.warn('⚠️ Erro ao atualizar dados fiscais:', erroUpdate);
+                }
+
+                // Salvar documento fiscal
+                if (resultado.documentoFiscalData) {
+                    try {
+                        resultado.documentoFiscalData.venda_id = this.vendaAtual.venda_id;
+                        
+                        const { error: erroDocFiscal } = await supabase
+                            .from('documentos_fiscais')
+                            .insert([resultado.documentoFiscalData]);
+                        
+                        if (erroDocFiscal) {
+                            console.warn('⚠️ Erro ao salvar documento fiscal:', erroDocFiscal);
+                        } else {
+                            console.log('✅ [PDV] Documento fiscal salvo');
+                        }
+                    } catch (erroDoc) {
+                        console.warn('⚠️ Erro ao salvar documento fiscal:', erroDoc);
+                    }
+                }
+
+                // Sucesso!
+                showToast('✅ NFC-e autorizada com sucesso!', 'success');
+                
+                setTimeout(() => {
+                    const ref = resultado.numero || this.vendaAtual.numero_venda;
+                    showToast(`📄 NFC-e: ${ref}`, 'info');
+                }, 500);
+
+                // Oferecer para visualizar DANFE
+                setTimeout(async () => {
+                    const visualizar = await showConfirm(
+                        'Deseja visualizar o DANFE agora?',
+                        '📄 DANFE'
+                    );
+                    if (visualizar) {
+                        try {
+                            const chaveAcesso = resultado.chave_nfe;
+                            if (!chaveAcesso) {
+                                throw new Error('Chave de acesso não disponível');
+                            }
+                            
+                            console.log('📄 [PDV] Baixando DANFE...');
+                            showToast('Gerando DANFE...', 'info');
+                            
+                            const pdfUrl = await FiscalService.baixarDANFE(chaveAcesso, 'nfce');
+                            
+                            if (pdfUrl) {
+                                let urlParaAbrir = pdfUrl;
+                                if (pdfUrl instanceof Blob) {
+                                    urlParaAbrir = URL.createObjectURL(pdfUrl);
+                                }
+                                
+                                window.open(urlParaAbrir, '_blank');
+                                showToast('✅ DANFE aberto!', 'success');
+                            } else {
+                                throw new Error('URL do DANFE não disponível');
+                            }
+                        } catch (error) {
+                            console.error('❌ Erro ao abrir DANFE:', error);
+                            showToast('❌ Erro ao gerar DANFE: ' + error.message, 'error');
+                        }
+                    }
+                }, 1000);
+
+            } else {
+                // Falha na emissão
+                const mensagemErro = resultado.mensagem_sefaz || resultado.erro || 'Erro desconhecido';
+                throw new Error(`NFC-e não autorizada: ${mensagemErro}`);
+            }
+
+        } catch (error) {
+            console.error('❌ [PDV] Erro ao emitir NFC-e:', error);
+            showToast('❌ Erro ao emitir NFC-e: ' + error.message, 'error');
+            
+            if (error.message.includes('Estoque')) {
+                setTimeout(() => {
+                    showToast('📦 Verifique a disponibilidade de estoque', 'warning');
+                }, 500);
+            }
+        } finally {
+            if (typeof showLoading === 'function') {
+                showLoading(false);
+            }
         }
     }
 
@@ -1845,18 +2055,25 @@ class PDVSystem {
                 if (typeof showLoading === 'function') showLoading(true); // Reexibir loading
             }
 
-            // ✅ VALIDAR ESTOQUE ANTES DE EMITIR
-            console.log('🔍 [PDV] Validando estoque disponível...');
+            // ✅ VALIDAR ESTOQUE ANTES DE EMITIR + CARREGAR CAMPOS FISCAIS
+            console.log('🔍 [PDV] Validando estoque e carregando campos fiscais...');
+            const produtoIds = this.itensCarrinho.map(item => item.produto_id);
+            const { data: produtosCompletos } = await supabase
+                .from('produtos')
+                .select('id, nome, estoque_atual, exige_estoque, codigo_barras, sku, ncm, cfop, cst_icms, aliquota_icms')
+                .in('id', produtoIds);
+            
+            const produtosMap = Object.fromEntries((produtosCompletos || []).map(p => [p.id, p]));
+            
             for (const item of this.itensCarrinho) {
-                const { data: produto } = await supabase
-                    .from('produtos')
-                    .select('nome, estoque_atual, exige_estoque')
-                    .eq('id', item.produto_id)
-                    .single();
+                const produto = produtosMap[item.produto_id];
                 
                 if (!produto) {
                     throw new Error(`Produto não encontrado: ${item.nome}`);
                 }
+                
+                // Atualizar item com dados completos do produto
+                item.produto = produto;
                 
                 // 🔽 Pular validação se exige_estoque = false (serviços, vouchers, etc)
                 if (produto.exige_estoque === false) {
@@ -1899,7 +2116,8 @@ class PDVSystem {
                 unidade: item.unidade_medida || 'UN',
                 quantidade: item.quantidade,
                 preco_unitario: item.preco_unitario,
-                subtotal: item.subtotal,
+                subtotal: item.quantidade * item.preco_unitario - (item.desconto || 0),
+                valor_total: item.quantidade * item.preco_unitario - (item.desconto || 0),
                 desconto_valor: item.desconto || 0,
                 aliquota_icms: item.produto?.aliquota_icms || 0
             }));
@@ -1932,7 +2150,7 @@ class PDVSystem {
             console.log('📦 [PDV] Resultado da emissão:', resultado);
 
             // ✅ SE A NOTA FOI AUTORIZADA, ENTÃO FINALIZAR A VENDA
-            if (resultado.success && (resultado.status === 'autorizado' || resultado.status_sefaz === 'autorizado')) {
+            if (resultado.success || resultado.status === 'autorizado' || resultado.status_sefaz === 'autorizado') {
                 console.log('✅ [PDV] NFC-e autorizada! Finalizando venda no sistema...');
                 if (typeof setLoadingMessage === 'function') {
                     setLoadingMessage('NFC-e autorizada! Salvando venda no sistema...');
