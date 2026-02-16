@@ -556,7 +556,7 @@ class FiscalSystem {
             await supabase
                 .from('vendas')
                 .update({
-                    status_fiscal: 'CANCELADA',
+                    status_fiscal: 'CANCELADA_NFCE',
                     status_venda: 'CANCELADA'
                 })
                 .eq('id', vendaId);
@@ -825,6 +825,29 @@ class FiscalSystem {
                 if (resultado && (resultado.status === 'registrado' || resultado.status === 'cancelado')) {
                     console.log('✅ [FiscalSystem] Cancelamento processado com sucesso pela Nuvem Fiscal');
                     
+                    // ✅ SINCRONIZAR: Atualizar vendas se o documento foi cancelado via documentos_fiscais
+                    try {
+                        console.log('🔗 [FiscalSystem] Sincronizando venda com cancelamento...');
+                        const { data: venda } = await supabase
+                            .from('vendas')
+                            .select('id, status_fiscal')
+                            .eq('chave_acesso_nfce', chaveAcesso)
+                            .maybeSingle();
+                        
+                        if (venda?.id && venda.status_fiscal !== 'CANCELADA') {
+                            console.log('📝 [FiscalSystem] Atualizando status_fiscal da venda...');
+                            await supabase
+                                .from('vendas')
+                                .update({
+                                    status_fiscal: 'CANCELADA'
+                                })
+                                .eq('id', venda.id);
+                            console.log('✅ [FiscalSystem] Venda sincronizada com sucesso');
+                        }
+                    } catch (erroSync) {
+                        console.warn('⚠️ [FiscalSystem] Aviso ao sincronizar venda:', erroSync.message);
+                    }
+                    
                     return {
                         sucesso: true,
                         status: 'cancelado',
@@ -836,7 +859,35 @@ class FiscalSystem {
                     throw new Error('Resposta inesperada da Nuvem Fiscal ao cancelar: ' + JSON.stringify(resultado));
                 }
             } else {
-                return await FocusNFe.cancelarDocumento(chaveAcesso, justificativa, tipo);
+                // Focus NFe também retorna sucesso após cancelamento
+                const resultadoFocus = await FocusNFe.cancelarDocumento(chaveAcesso, justificativa, tipo);
+                
+                // ✅ SINCRONIZAR: Atualizar vendas após cancelamento bem-sucedido no Focus NFe
+                if (resultadoFocus && (resultadoFocus.status === 'cancelado' || resultadoFocus.sucesso === true)) {
+                    try {
+                        console.log('🔗 [FiscalSystem] Sincronizando venda com cancelamento Focus NFe...');
+                        const { data: venda } = await supabase
+                            .from('vendas')
+                            .select('id, status_fiscal')
+                            .eq('chave_acesso_nfce', chaveAcesso)
+                            .maybeSingle();
+                        
+                        if (venda?.id && venda.status_fiscal !== 'CANCELADA') {
+                            console.log('📝 [FiscalSystem] Atualizando status_fiscal da venda (Focus)...');
+                            await supabase
+                                .from('vendas')
+                                .update({
+                                    status_fiscal: 'CANCELADA'
+                                })
+                                .eq('id', venda.id);
+                            console.log('✅ [FiscalSystem] Venda sincronizada com sucesso (Focus)');
+                        }
+                    } catch (erroSync) {
+                        console.warn('⚠️ [FiscalSystem] Aviso ao sincronizar venda (Focus):', erroSync.message);
+                    }
+                }
+                
+                return resultadoFocus;
             }
         } catch (erro) {
             console.error('Erro ao cancelar documento:', erro);
@@ -880,13 +931,34 @@ class FiscalSystem {
                         // Atualizar status do documento
                         const tabelaAtualizar = docFiscal.tipo === 'venda' ? 'vendas' : 'documentos_fiscais';
                         const campoAtualizacao = docFiscal.tipo === 'venda' 
-                            ? { status_fiscal: 'CANCELADA_NFCE', data_cancelamento: new Date().toISOString() }
+                            ? { status_fiscal: 'CANCELADA' }
                             : { status_sefaz: '135' };
                         
                         await supabase
                             .from(tabelaAtualizar)
                             .update(campoAtualizacao)
                             .eq('id', docFiscal.id);
+                        
+                        // ✅ SINCRONIZAR BIDIRECIONAL: Se atualizou documentos_fiscais, sincronizar vendas também
+                        if (docFiscal.tipo !== 'venda') {
+                            // Procurar correspondência na tabela vendas também
+                            const { data: vendaCorrespondente } = await supabase
+                                .from('vendas')
+                                .select('id, status_fiscal, numero_nfce, chave_acesso_nfce')
+                                .or(`numero_nfce.eq.${docFiscal.numero_documento},chave_acesso_nfce.eq.${chaveAcesso}`)
+                                .maybeSingle();
+                            
+                            if (vendaCorrespondente?.id && vendaCorrespondente.status_fiscal !== 'CANCELADA') {
+                                console.log('🔗 [FiscalSystem] Sincronizando venda correspondente...');
+                                await supabase
+                                    .from('vendas')
+                                    .update({
+                                        status_fiscal: 'CANCELADA'
+                                    })
+                                    .eq('id', vendaCorrespondente.id);
+                                console.log('✅ [FiscalSystem] Venda correspondente sincronizada');
+                            }
+                        }
                         
                         return {
                             sucesso: true,
@@ -1295,6 +1367,149 @@ class FiscalSystem {
         } catch (erro) {
             console.warn('⚠️ Não foi possível atualizar número NFC-e configurado:', erro.message);
             // Continuar de qualquer forma, pois o número foi emitido
+        }
+    }
+
+    /**
+     * 🔗 SINCRONIZAÇÃO MANUAL: Sincronizar vendas com documentos_fiscais cancelados
+     * Use quando detectar inconsistências entre as tabelas
+     * @returns {Promise<Object>} Resultado da sincronização
+     */
+    static async sincronizarVendasCanceladas() {
+        try {
+            console.log('🔗 [FiscalSystem] Iniciando sincronização de vendas canceladas...');
+            
+            // Encontrar vendas que estão EMITIDA_NFCE mas documentos_fiscais está CANCELADO
+            const { data: inconsistentes, error: erroQuery } = await supabase
+                .from('vendas')
+                .select(`
+                    id,
+                    numero_nfce,
+                    chave_acesso_nfce,
+                    status_fiscal
+                `)
+                .eq('status_fiscal', 'EMITIDA_NFCE')
+                .not('chave_acesso_nfce', 'is', null);
+            
+            if (erroQuery) throw erroQuery;
+            
+            let sincronizados = 0;
+            let erros = [];
+            
+            for (const venda of inconsistentes || []) {
+                try {
+                    // Verificar em documentos_fiscais se está cancelado
+                    const { data: docFiscal } = await supabase
+                        .from('documentos_fiscais')
+                        .select('id, status_sefaz, numero_documento')
+                        .or(`chave_acesso.eq.${venda.chave_acesso_nfce},numero_documento.eq.${venda.numero_nfce}`)
+                        .maybeSingle();
+                    
+                    // Se encontrou em documentos_fiscais E está cancelado, sincronizar venda
+                    if (docFiscal?.id && docFiscal.status_sefaz === '135') {
+                        console.log(`📝 Sincronizando venda ${venda.numero_nfce}...`);
+                        
+                        const { error: erroUpdate } = await supabase
+                            .from('vendas')
+                            .update({
+                                status_fiscal: 'CANCELADA',
+                                updated_at: new Date().toISOString()
+                            })
+                            .eq('id', venda.id);
+                        
+                        if (erroUpdate) {
+                            erros.push({
+                                numero_nfce: venda.numero_nfce,
+                                erro: erroUpdate.message
+                            });
+                        } else {
+                            sincronizados++;
+                            console.log(`✅ Venda ${venda.numero_nfce} sincronizada`);
+                        }
+                    }
+                } catch (erro) {
+                    console.error(`❌ Erro ao processar venda ${venda.numero_nfce}:`, erro);
+                    erros.push({
+                        numero_nfce: venda.numero_nfce,
+                        erro: erro.message
+                    });
+                }
+            }
+            
+            const resultado = {
+                total_verificados: inconsistentes?.length || 0,
+                sincronizados,
+                erros,
+                sucesso: erros.length === 0
+            };
+            
+            console.log('✅ Sincronização concluída:', resultado);
+            return resultado;
+            
+        } catch (erro) {
+            console.error('❌ Erro na sincronização de vendas:', erro);
+            throw erro;
+        }
+    }
+
+    /**
+     * 🔗 CANCELAR VENDA ASSOCIADA: Cancela a venda quando uma nota fiscal é cancelada
+     * Respeitando as mesmas regras de negócio
+     * @param {string} vendaId - ID da venda a cancelar
+     * @returns {Promise<Object>} Resultado do cancelamento
+     */
+    static async cancelarVendaAssociada(vendaId) {
+        try {
+            if (!vendaId) {
+                console.warn('⚠️ [FiscalSystem] Nenhum ID de venda fornecido');
+                return { sucesso: false, mensagem: 'Venda não encontrada' };
+            }
+
+            console.log('🔗 [FiscalSystem] Cancelando venda associada:', vendaId);
+
+            // Buscar dados atuais da venda
+            const { data: venda, error: erroVenda } = await supabase
+                .from('vendas')
+                .select('id, status, status_venda, status_fiscal, numero, numero_nfce')
+                .eq('id', vendaId)
+                .single();
+
+            if (erroVenda) throw erroVenda;
+
+            if (!venda) {
+                return { sucesso: false, mensagem: 'Venda não encontrada' };
+            }
+
+            // Verificar se já está cancelada
+            const statusAtual = (venda.status || venda.status_venda || '').toUpperCase();
+            if (statusAtual === 'CANCELADA') {
+                console.log('ℹ️ [FiscalSystem] Venda já está CANCELADA');
+                return { sucesso: true, mensagem: 'Venda já estava cancelada' };
+            }
+
+            // Cancelar a venda
+            const { error: erroCancelar } = await supabase
+                .from('vendas')
+                .update({
+                    status: 'CANCELADA',
+                    status_venda: 'CANCELADA',
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', vendaId);
+
+            if (erroCancelar) throw erroCancelar;
+
+            console.log('✅ [FiscalSystem] Venda cancelada com sucesso:', vendaId);
+
+            return {
+                sucesso: true,
+                mensagem: `Venda #${venda.numero} cancelada com sucesso`,
+                venda_id: vendaId
+            };
+
+        } catch (erro) {
+            console.error('❌ Erro ao cancelar venda:', erro);
+            throw new Error(`Erro ao cancelar venda: ${erro.message}`);
         }
     }
 }

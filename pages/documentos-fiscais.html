@@ -631,18 +631,13 @@
 
                         // Atualizar também na tabela vendas se houver venda_id
                         if (doc.venda_id) {
-                            const { error: erroVenda } = await supabase
-                                .from('vendas')
-                                .update({
-                                    status_fiscal: doc.tipo_documento === 'NFCE' ? 'CANCELADA_NFCE' : 'CANCELADA_NFE',
-                                    data_cancelamento: new Date().toISOString()
-                                })
-                                .eq('id', doc.venda_id);
-
-                            if (erroVenda) {
-                                console.warn('⚠️ Erro ao atualizar vendas:', erroVenda);
-                            } else {
-                                console.log('✅ vendas atualizado');
+                            try {
+                                console.log('🔗 Cancelando venda associada:', doc.venda_id);
+                                const resultadoCancelamentoVenda = await FiscalService.cancelarVendaAssociada(doc.venda_id);
+                                console.log('✅ Venda cancelada:', resultadoCancelamentoVenda);
+                            } catch (erroCancelamentoVenda) {
+                                console.warn('⚠️ Erro ao cancelar venda associada:', erroCancelamentoVenda.message);
+                                showToastSafe('⚠️ Nota cancelada mas erro ao cancelar venda: ' + erroCancelamentoVenda.message, 'warning');
                             }
                         }
                     } catch (erroUpdate) {

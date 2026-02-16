@@ -1305,10 +1305,13 @@
             
             // Botão de emitir nota fiscal para vendas finalizadas sem nota
             if (isFinalizada && ['ADMIN', 'VENDEDOR'].includes(currentUser.role)) {
-                if (!venda.nfce_referencia && !venda.status_fiscal) {
-                    botoes.push('<button onclick="emitirNotaFiscal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">📄 Emitir NFC-e</button>');
-                } else if (venda.nfce_referencia || venda.status_fiscal === 'EMITIDA_NFCE') {
-                    botoes.push('<button onclick="imprimirNotaFiscal()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">🖨️ Imprimir NFC-e</button>');
+                if (!venda.numero_nfce && !venda.status_fiscal) {
+                    botoes.push(`<button onclick="gerarNotaFiscal('${vendaId}')" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700">📄 Emitir NFC-e</button>`);
+                } else if (venda.numero_nfce || venda.chave_acesso_nfce || venda.status_fiscal === 'EMITIDA_NFCE') {
+                    botoes.push(`<button onclick="imprimirNotaFiscal('${vendaId}', '${venda.chave_acesso_nfce || ''}')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">🖨️ Imprimir NFC-e</button>`);
+                    if (venda.status_fiscal !== 'CANCELADA') {
+                        botoes.push(`<button onclick="cancelarNotaFiscal('${vendaId}', '${venda.chave_acesso_nfce || ''}')" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">❌ Cancelar NFC-e</button>`);
+                    }
                 }
             }
             
@@ -1596,166 +1599,272 @@
         });
 
         // Emitir NFC-e para venda finalizada
-        async function emitirNotaFiscal() {
+        // Gerar Nota Fiscal (NFC-e)
+        async function gerarNotaFiscal(vendaId) {
             try {
                 showLoading(true);
                 
-                // Validar se venda está finalizada
-                const statusVenda = (venda.status || venda.status_venda || '').toUpperCase();
-                if (statusVenda !== 'FINALIZADO' && statusVenda !== 'FINALIZADA') {
-                    throw new Error('Apenas vendas finalizadas podem ter nota fiscal emitida');
+                // Buscar dados da venda
+                const { data: vendaBuscada, error: erroVenda } = await supabase
+                    .from('vendas')
+                    .select('*')
+                    .eq('id', vendaId)
+                    .single();
+
+                if (erroVenda || !vendaBuscada) {
+                    console.error('Erro ao buscar venda:', erroVenda);
+                    alert('Erro ao carregar dados da venda');
+                    return;
                 }
                 
-                // Validar se já tem nota
-                if (venda.nfce_referencia || venda.status_fiscal === 'EMITIDA_NFCE') {
-                    throw new Error('Esta venda já possui nota fiscal emitida');
+                // Verificar se já tem nota emitida
+                if (vendaBuscada.numero_nfce || vendaBuscada.chave_acesso_nfce || vendaBuscada.status_fiscal === 'EMITIDA_NFCE') {
+                    alert('Esta venda já possui nota fiscal emitida!\n\nUse o botão de imprimir para visualizar o DANFE.');
+                    return;
                 }
-                
-                // Validar itens
-                if (!itens || itens.length === 0) {
-                    throw new Error('Não é possível emitir nota sem itens');
-                }
-                
-                console.log('📤 [VENDA] Preparando emissão de NFC-e...');
-                
-                // Preparar dados da venda
-                const vendaNFe = {
-                    numero_venda: venda.numero,
-                    subtotal: venda.subtotal || 0,
-                    desconto_valor: venda.desconto_valor || 0,
-                    total: venda.total || 0,
-                    data_emissao: new Date().toISOString()
-                };
-                
-                // Preparar itens para NFCe
-                const itensNFe = itens.map(item => ({
-                    produto_id: item.produto_id,
-                    codigo_barras: item.produtos?.codigo_barras || item.produtos?.sku || item.produto_id.substring(0, 13),
-                    descricao: item.produtos?.nome || item.nome || 'PRODUTO',
-                    ncm: item.produtos?.ncm || '22021000',
-                    cfop: item.produtos?.cfop || '5102',
-                    cst_icms: item.produtos?.cst_icms || '102',
-                    unidade: item.unidade_medida || 'UN',
-                    quantidade: item.quantidade,
-                    preco_unitario: item.preco_unitario,
-                    subtotal: item.subtotal,
-                    desconto_valor: item.desconto || 0,
-                    aliquota_icms: item.produtos?.aliquota_icms || 0
-                }));
-                
-                // Buscar formas de pagamento
-                const { data: pagamentos } = await supabase
-                    .from('pagamentos')
+
+                // Buscar itens da venda
+                const { data: itensVenda, error: erroItens } = await supabase
+                    .from('venda_itens')
                     .select('*')
                     .eq('venda_id', vendaId);
+
+                if (erroItens) {
+                    console.error('Erro ao buscar itens:', erroItens);
+                    alert('Erro ao carregar itens da venda: ' + erroItens.message);
+                    return;
+                }
                 
-                // Se não houver pagamento registrado, usar DINHEIRO como padrão
-                const pagamentosNFe = (pagamentos && pagamentos.length > 0) 
-                    ? pagamentos.map(p => ({
-                        tipo: p.forma_pagamento,
-                        valor: p.valor
-                    }))
-                    : [{
-                        tipo: 'DINHEIRO',
-                        valor: venda.total
-                    }];
+                if (!itensVenda || itensVenda.length === 0) {
+                    alert('Esta venda não possui itens para emitir nota fiscal');
+                    return;
+                }
                 
-                // Buscar cliente se houver
+                // Buscar produtos para cada item separadamente
+                for (let item of itensVenda) {
+                    if (item.produto_id) {
+                        const { data: produto } = await supabase
+                            .from('produtos')
+                            .select('id, nome, codigo_barras, sku, ncm, cfop, cst_icms, aliquota_icms')
+                            .eq('id', item.produto_id)
+                            .single();
+                        
+                        item.produtos = produto;
+                    }
+                }
+
+
+                // Usar forma_pagamento que já vem na venda (tabela pagamentos não precisa existir)
+                const pagamentosParaNFe = [{
+                    tipo: vendaBuscada.forma_pagamento || 'DINHEIRO',
+                    valor: vendaBuscada.total
+                }];
+
+                // Buscar cliente (opcional)
                 let cliente = null;
-                if (venda.cliente_id) {
+                if (vendaBuscada.cliente_id) {
                     const { data: clienteData } = await supabase
                         .from('clientes')
                         .select('*')
-                        .eq('id', venda.cliente_id)
+                        .eq('id', vendaBuscada.cliente_id)
                         .single();
                     cliente = clienteData;
                 }
-                
-                console.log('📤 [VENDA] Emitindo NFC-e via API Fiscal configurada...');
-                
-                // Emitir NFC-e
-                const resultado = await FiscalService.emitirNFCeDireto(vendaNFe, itensNFe, pagamentosNFe, cliente);
-                
-                console.log('📦 [VENDA] Resultado da emissão:', resultado);
-                
+
+                console.log('📦 Venda:', vendaBuscada);
+                console.log('📋 Itens:', itensVenda);
+                console.log('💰 Pagamentos:', pagamentosParaNFe);
+                console.log('📄 Dados fiscais atuais:', {
+                    status_fiscal: vendaBuscada.status_fiscal,
+                    numero_nfce: vendaBuscada.numero_nfce,
+                    chave_acesso_nfce: vendaBuscada.chave_acesso_nfce,
+                    protocolo_nfce: vendaBuscada.protocolo_nfce
+                });
+
+                // Emitir NFC-e via API Fiscal configurada (Focus NFe ou Nuvem Fiscal)
+                const resultado = await FiscalService.emitirNFCeDireto(vendaBuscada, itensVenda, pagamentosParaNFe, cliente);
+
+                console.log('📤 Resultado da emissão:', resultado);
+
                 // Verificar sucesso
-                if (resultado.success && (resultado.status === 'autorizado' || resultado.status_sefaz === 'autorizado')) {
-                    console.log('✅ [VENDA] NFC-e autorizada!');
-                    
-                    // Atualizar venda com dados fiscais
-                    const { error: erroUpdate } = await supabase
+                if (resultado.success || resultado.status === 'autorizado') {
+                    // Atualizar status da venda
+                    await supabase
                         .from('vendas')
                         .update({
                             status_fiscal: 'EMITIDA_NFCE',
-                            nfce_referencia: resultado.ref,
-                            nfce_chave: resultado.chave_nfe,
-                            nfce_numero: resultado.numero
+                            numero_nfce: resultado.numero,
+                            chave_acesso_nfce: resultado.chave_nfe,
+                            protocolo_nfce: resultado.protocolo
                         })
                         .eq('id', vendaId);
-                    
-                    if (erroUpdate) {
-                        console.warn('⚠️ Erro ao atualizar dados fiscais:', erroUpdate);
-                    }
-                    
-                    // Salvar documento fiscal
-                    if (resultado.documentoFiscalData) {
-                        try {
-                            resultado.documentoFiscalData.venda_id = vendaId;
-                            await FocusNFe.salvarDocumentoFiscal(resultado.documentoFiscalData);
-                            console.log('✅ [VENDA] Documento fiscal salvo com sucesso');
-                        } catch (erroDoc) {
-                            console.warn('⚠️ Erro ao salvar documento fiscal:', erroDoc);
+
+                    alert(`✅ NFC-e emitida com sucesso!
+
+Número: ${resultado.numero}
+Série: ${resultado.serie}
+Chave: ${resultado.chave_nfe}
+Protocolo: ${resultado.protocolo}
+
+Deseja baixar o DANFE (PDF)?`);
+
+                    // Baixar DANFE automaticamente
+                    if (confirm('Baixar DANFE agora?')) {
+                        if (resultado.caminho_danfe === 'USE_OBTER_PDF_METHOD' && typeof resultado.obterPDF === 'function') {
+                            try {
+                                const pdfUrl = await resultado.obterPDF();
+                                window.open(pdfUrl, '_blank');
+                            } catch (erroPDF) {
+                                console.error('Erro ao obter PDF:', erroPDF);
+                                alert('Erro ao baixar PDF: ' + erroPDF.message);
+                            }
+                        } else if (resultado.caminho_danfe && resultado.caminho_danfe !== 'USE_OBTER_PDF_METHOD') {
+                            window.open(resultado.caminho_danfe, '_blank');
                         }
                     }
-                    
-                    showToast('✅ NFC-e emitida com sucesso!', 'success');
-                    
+
                     // Recarregar venda
                     await loadVenda();
-                    
-                    // Perguntar se deseja visualizar DANFE
-                    if (resultado.caminho_danfe) {
-                        setTimeout(async () => {
-                            if (confirm('NFC-e autorizada!\n\nDeseja visualizar o DANFE agora?')) {
-                                window.open(resultado.caminho_danfe, '_blank');
-                            }
-                        }, 1000);
-                    }
                 } else {
-                    const mensagemErro = resultado.mensagem_sefaz || resultado.erro || 'Erro desconhecido';
-                    throw new Error(`NFC-e não autorizada: ${mensagemErro}`);
+                    // Erro na emissão
+                    const mensagem = resultado.mensagem_sefaz || resultado.mensagem || 'Erro desconhecido';
+                    throw new Error('Rejeição: ' + mensagem);
                 }
+
             } catch (error) {
-                console.error('❌ Erro ao emitir NFC-e:', error);
-                showToast('Erro ao emitir NFC-e: ' + error.message, 'error');
+                console.error('❌ Erro na emissão:', error);
+                alert('❌ Erro na emissão: ' + error.message);
             } finally {
                 showLoading(false);
             }
         }
         
         // Imprimir/Consultar nota fiscal existente
-        async function imprimirNotaFiscal() {
+        async function imprimirNotaFiscal(vendaId, chaveAcesso) {
             try {
                 showLoading(true);
                 
-                if (!venda.chave_acesso_nfce) {
-                    throw new Error('Esta venda não possui nota fiscal emitida');
+                if (!chaveAcesso || chaveAcesso === 'undefined' || chaveAcesso === '') {
+                    // Buscar chave de acesso do banco
+                    const { data: vendaBuscada } = await supabase
+                        .from('vendas')
+                        .select('chave_acesso_nfce, numero_nfce')
+                        .eq('id', vendaId)
+                        .single();
+                    
+                    chaveAcesso = vendaBuscada?.chave_acesso_nfce;
                 }
                 
-                console.log('🔍 [VENDA] Consultando NFC-e com chave:', venda.chave_acesso_nfce);
+                if (!chaveAcesso) {
+                    alert('Esta venda não possui chave de acesso da NFC-e');
+                    return;
+                }
+                
+                console.log('🔍 Consultando NFC-e com chave:', chaveAcesso);
                 
                 // Consultar nota usando a chave de acesso
-                const resultado = await FiscalService.consultarDocumento(venda.chave_acesso_nfce, 'nfce');
+                const resultado = await FiscalService.consultarDocumento(chaveAcesso, 'nfce');
                 
-                if (resultado.caminho_danfe) {
+                console.log('📋 Resultado consultarDocumento:', {
+                    caminho_danfe: resultado?.caminho_danfe,
+                    tem_obterPDF: typeof resultado?.obterPDF === 'function',
+                    resultado
+                });
+                
+                // Nuvem Fiscal usa método obterPDF() com autenticação
+                if (resultado?.caminho_danfe === 'USE_OBTER_PDF_METHOD' && typeof resultado?.obterPDF === 'function') {
+                    console.log('✅ Usando método obterPDF() da Nuvem Fiscal...');
+                    const pdfUrl = await resultado.obterPDF();
+                    window.open(pdfUrl, '_blank');
+                    showToast('DANFE aberto em nova aba', 'success');
+                } else if (resultado?.caminho_danfe && resultado.caminho_danfe !== 'USE_OBTER_PDF_METHOD') {
+                    console.log('✅ Usando caminho DANFE direto (Focus NFe ou URL):', resultado.caminho_danfe);
                     window.open(resultado.caminho_danfe, '_blank');
                     showToast('DANFE aberto em nova aba', 'success');
                 } else {
-                    throw new Error('Não foi possível obter o DANFE');
+                    console.error('❌ Não foi possível obter o DANFE. Resultado:', resultado);
+                    alert('Não foi possível obter o DANFE desta nota fiscal');
                 }
             } catch (error) {
-                console.error('❌ Erro ao buscar DANFE:', error);
-                showToast('Erro ao consultar nota: ' + error.message, 'error');
+                console.error('❌ Erro ao consultar NFC-e:', error);
+                alert('Erro ao consultar nota: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Cancelar NFC-e
+        async function cancelarNotaFiscal(vendaId, chaveAcesso) {
+            try {
+                // Buscar dados da venda
+                const { data: vendaBuscada, error: vendaError } = await supabase
+                    .from('vendas')
+                    .select('chave_acesso_nfce, numero_nfce, data_venda, status_fiscal')
+                    .eq('id', vendaId)
+                    .single();
+
+                if (vendaError) throw vendaError;
+                if (!vendaBuscada.chave_acesso_nfce) {
+                    alert('Esta venda não possui nota fiscal emitida');
+                    return;
+                }
+
+                // Verificar prazo de cancelamento (30 minutos para NFC-e)
+                const dataEmissao = new Date(vendaBuscada.data_venda);
+                const agora = new Date();
+                const diferencaMinutos = (agora - dataEmissao) / 1000 / 60;
+
+                if (diferencaMinutos > 30) {
+                    alert(`⚠️ Prazo para cancelamento expirado!\n\nNFC-e pode ser cancelada em até 30 minutos após a emissão.\nTempo decorrido: ${Math.round(diferencaMinutos)} minutos`);
+                    return;
+                }
+
+                // Solicitar justificativa
+                const justificativa = prompt('📝 Informe a justificativa do cancelamento:\n\n(mínimo 15 caracteres)');
+                
+                if (!justificativa) return;
+                
+                if (justificativa.length < 15) {
+                    alert('A justificativa deve ter no mínimo 15 caracteres');
+                    return;
+                }
+
+                if (!confirm(`⚠️ Confirma o cancelamento da NFC-e?\n\nNúmero: ${vendaBuscada.numero_nfce}\nJustificativa: ${justificativa}`)) {
+                    return;
+                }
+
+                showLoading(true);
+
+                // Cancelar via API Fiscal configurada
+                const resultado = await FiscalService.cancelarDocumento(chaveAcesso, justificativa, 'nfce');
+
+                if (resultado.status === 'cancelado') {
+                    // Atualizar status no banco
+                    await supabase
+                        .from('vendas')
+                        .update({
+                            status_fiscal: 'CANCELADA'
+                        })
+                        .eq('id', vendaId);
+
+                    // Cancelar a venda também
+                    try {
+                        console.log('🔗 Cancelando venda associada:', vendaId);
+                        const resultadoCancelamentoVenda = await FiscalService.cancelarVendaAssociada(vendaId);
+                        console.log('✅ Venda cancelada:', resultadoCancelamentoVenda);
+                    } catch (erroCancelamento) {
+                        console.warn('⚠️ Erro ao cancelar venda:', erroCancelamento.message);
+                        alert('⚠️ NFC-e cancelada mas erro ao cancelar venda: ' + erroCancelamento.message);
+                    }
+
+                    alert('✅ NFC-e cancelada com sucesso!');
+                    loadVenda(); // Recarregar venda
+                } else {
+                    throw new Error('Erro ao cancelar nota: ' + (resultado.mensagem_sefaz || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                console.error('❌ Erro ao cancelar NFC-e:', error);
+                alert('Erro ao cancelar nota: ' + error.message);
             } finally {
                 showLoading(false);
             }
