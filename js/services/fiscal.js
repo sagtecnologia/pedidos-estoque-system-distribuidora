@@ -764,18 +764,33 @@ class FiscalSystem {
 
             if (provider === 'nuvem_fiscal') {
                 // Nuvem Fiscal usa ID da nota, não chave de acesso
-                // Buscar ID da nota no banco pela chave de acesso
-                const { data: venda } = await supabase
-                    .from('vendas')
-                    .select('nfce_id')
-                    .eq('chave_acesso_nfce', chaveAcesso)
+                // Tentar múltiplas formas de encontrar o ID:
+                // 1. Buscar em documentos_fiscais primeiro (notas de distribuição)
+                const { data: docFiscal } = await supabase
+                    .from('documentos_fiscais')
+                    .select('id, nfce_id, chave_acesso')
+                    .eq('chave_acesso', chaveAcesso)
+                    .eq('tipo_documento', 'NFCE')
                     .maybeSingle();
 
-                if (!venda?.nfce_id) {
+                let nfceId = docFiscal?.nfce_id;
+
+                // 2. Se não encontrou em documentos_fiscais, tentar em vendas
+                if (!nfceId) {
+                    const { data: venda } = await supabase
+                        .from('vendas')
+                        .select('nfce_id')
+                        .eq('chave_acesso_nfce', chaveAcesso)
+                        .maybeSingle();
+                    
+                    nfceId = venda?.nfce_id;
+                }
+
+                if (!nfceId) {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
                 }
 
-                return await NuvemFiscal.consultarNFCe(venda.nfce_id);
+                return await NuvemFiscal.consultarNFCe(nfceId);
             } else {
                 return await FocusNFe.consultarDocumento(chaveAcesso, tipo);
             }
@@ -1031,18 +1046,33 @@ class FiscalSystem {
 
             if (provider === 'nuvem_fiscal') {
                 // Nuvem Fiscal usa ID da nota, não chave de acesso
-                // Buscar ID da nota no banco pela chave de acesso
-                const { data: venda } = await supabase
-                    .from('vendas')
-                    .select('nfce_id')
-                    .eq('chave_acesso_nfce', referencia)
+                // Tentar múltiplas formas de encontrar o ID:
+                // 1. Buscar em documentos_fiscais primeiro (notas de distribuição)
+                const { data: docFiscal } = await supabase
+                    .from('documentos_fiscais')
+                    .select('id, nfce_id, chave_acesso')
+                    .eq('chave_acesso', referencia)
+                    .eq('tipo_documento', 'NFCE')
                     .maybeSingle();
 
-                if (!venda?.nfce_id) {
+                let nfceId = docFiscal?.nfce_id;
+
+                // 2. Se não encontrou em documentos_fiscais, tentar em vendas
+                if (!nfceId) {
+                    const { data: venda } = await supabase
+                        .from('vendas')
+                        .select('nfce_id')
+                        .eq('chave_acesso_nfce', referencia)
+                        .maybeSingle();
+                    
+                    nfceId = venda?.nfce_id;
+                }
+
+                if (!nfceId) {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
                 }
 
-                pdfBlobOrUrl = await NuvemFiscal.baixarPDF(venda.nfce_id);
+                pdfBlobOrUrl = await NuvemFiscal.baixarPDF(nfceId);
                 
                 // Se for um Blob, converter para URL
                 if (pdfBlobOrUrl instanceof Blob) {
