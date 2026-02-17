@@ -7,6 +7,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
+    <style>
+        /* Estado indeterminate do checkbox */
+        input[type="checkbox"]:indeterminate {
+            background-color: #3b82f6;
+            border-color: #3b82f6;
+        }
+        
+        /* Animação suave para painel fiscal */
+        #painel_fiscal {
+            transition: all 0.3s ease-in-out;
+        }
+    </style>
 </head>
 <body class="bg-gray-100">
     <div id="navbar"></div>
@@ -58,6 +70,115 @@
 
             <!-- ENTRADAS -->
             <div id="area_entradas" class="hidden mb-6">
+                <!-- Controles Gerais -->
+                <div class="bg-white rounded-lg shadow p-4 mb-4 flex justify-between items-center">
+                    <div class="flex items-center gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="selecionar_todos" onchange="selecionarTodos(this.checked)" class="w-5 h-5 text-blue-600 rounded cursor-pointer">
+                            <span class="font-medium text-gray-700">Selecionar Todos os Itens</span>
+                        </label>
+                    </div>
+                    <button onclick="toggleConfiguracoesFiscais()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm">
+                        <i class="fas fa-cog mr-2"></i>Configurações Fiscais
+                    </button>
+                </div>
+
+                <!-- Configurações Fiscais (Colapsável) -->
+                <div id="painel_fiscal" class="hidden bg-white rounded-lg shadow p-6 mb-4">
+                    <h3 class="text-lg font-bold mb-4 text-gray-900">
+                        <i class="fas fa-file-invoice mr-2 text-blue-600"></i>Configurações Fiscais - Aplicar a Todos Selecionados
+                    </h3>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                        <p class="text-sm text-blue-800">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            <strong>Dica:</strong> Selecione os CST que deseja aplicar aos itens marcados. Campos vazios manterão o valor original do produto.
+                        </p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST ICMS</label>
+                            <select id="cst_icms_global" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Manter original</option>
+                                <option value="00">00 - Tributada Integralmente</option>
+                                <option value="10">10 - Tributada com cobrança do ICMS por ST</option>
+                                <option value="20">20 - Com redução de base de cálculo</option>
+                                <option value="30">30 - Isenta ou não tributada com cobrança do ICMS por ST</option>
+                                <option value="40">40 - Isenta</option>
+                                <option value="41">41 - Não tributada</option>
+                                <option value="50">50 - Suspensão</option>
+                                <option value="51">51 - Diferimento</option>
+                                <option value="60">60 - ICMS cobrado anteriormente por ST</option>
+                                <option value="70">70 - Com redução de BC e cobrança do ICMS por ST</option>
+                                <option value="90">90 - Outros</option>
+                                <option value="101" selected>101 - Simples Nacional - Tributada com permissão de crédito</option>
+                                <option value="102">102 - Simples Nacional - Tributada sem permissão de crédito</option>
+                                <option value="103">103 - Simples Nacional - Isenção do ICMS para faixa de receita bruta</option>
+                                <option value="201">201 - Simples Nacional - Tributada com permissão de crédito e com cobrança do ICMS por ST</option>
+                                <option value="202">202 - Simples Nacional - Tributada sem permissão de crédito e com cobrança do ICMS por ST</option>
+                                <option value="203">203 - Simples Nacional - Isenção do ICMS para faixa de receita bruta e com cobrança do ICMS por ST</option>
+                                <option value="300">300 - Simples Nacional - Imune</option>
+                                <option value="400">400 - Simples Nacional - Não tributada</option>
+                                <option value="500">500 - Simples Nacional - ICMS cobrado anteriormente por ST ou por antecipação</option>
+                                <option value="900">900 - Simples Nacional - Outros</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST PIS</label>
+                            <select id="cst_pis_global" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Manter original</option>
+                                <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+                                <option value="02">02 - Operação Tributável com Alíquota Diferenciada</option>
+                                <option value="03">03 - Operação Tributável com Alíquota por Unidade de Medida</option>
+                                <option value="04">04 - Operação Tributável Monofásica</option>
+                                <option value="05">05 - Operação Tributável por Substituição Tributária</option>
+                                <option value="06">06 - Operação Tributável a Alíquota Zero</option>
+                                <option value="07">07 - Operação Isenta da Contribuição</option>
+                                <option value="08">08 - Operação sem Incidência da Contribuição</option>
+                                <option value="09">09 - Operação com Suspensão da Contribuição</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="99" selected>99 - Outras Operações</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CST COFINS</label>
+                            <select id="cst_cofins_global" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Manter original</option>
+                                <option value="01">01 - Operação Tributável com Alíquota Básica</option>
+                                <option value="02">02 - Operação Tributável com Alíquota Diferenciada</option>
+                                <option value="03">03 - Operação Tributável com Alíquota por Unidade de Medida</option>
+                                <option value="04">04 - Operação Tributável Monofásica</option>
+                                <option value="05">05 - Operação Tributável por Substituição Tributária</option>
+                                <option value="06">06 - Operação Tributável a Alíquota Zero</option>
+                                <option value="07">07 - Operação Isenta da Contribuição</option>
+                                <option value="08">08 - Operação sem Incidência da Contribuição</option>
+                                <option value="09">09 - Operação com Suspensão da Contribuição</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="99" selected>99 - Outras Operações</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <label class="flex items-center cursor-pointer">
+                            <input type="checkbox" id="salvar_cst_cadastro" class="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-700">
+                                <i class="fas fa-save mr-1 text-yellow-600"></i>
+                                <strong>Salvar CST no cadastro dos produtos</strong> (alterações permanentes)
+                            </span>
+                        </label>
+                        <p class="text-xs text-gray-500 mt-1 ml-6">
+                            Quando marcado, os CST configurados serão salvos no cadastro dos produtos, não sendo necessário reconfigurá-los em futuras emissões.
+                        </p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="aplicarCstTodos()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium">
+                            <i class="fas fa-check mr-2"></i>Aplicar aos Itens Selecionados
+                        </button>
+                        <button onclick="toggleConfiguracoesFiscais()" class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-medium">
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+
                 <div id="entradas_grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Pedidos de compra serão renderizados aqui -->
                 </div>
@@ -111,7 +232,7 @@
             </div>
             <div class="space-y-3 text-sm mb-6 bg-gray-50 p-4 rounded-lg">
                 <div class="flex justify-between">
-                    <span class="text-gray-600">Número:</span>
+                    <span class="text-gray-600">Número/Série:</span>
                     <span class="font-mono font-bold" id="sucesso_numero">-</span>
                 </div>
                 <div class="flex justify-between">
@@ -132,11 +253,11 @@
                 </div>
             </div>
             <div class="flex gap-3">
+                <button onclick="imprimirDANFE()" class="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium">
+                    <i class="fas fa-print mr-2"></i>Imprimir DANFE
+                </button>
                 <button onclick="fecharModal('modal_sucesso'); location.reload();" class="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium">
                     Nova Emissão
-                </button>
-                <button onclick="fecharModal('modal_sucesso')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
-                    Fechar
                 </button>
             </div>
         </div>
@@ -206,7 +327,8 @@
         // Estado global
         let estadoGlobal = {
             entradas: [],
-            itensSelecionados: new Map()
+            itensSelecionados: new Map(), // Map<itemId, { quantidade, preco, cst_icms, cst_pis, cst_cofins }>
+            ultimaEmissao: null // Armazena dados da última emissão para impressão
         };
 
         // BUSCAR ENTRADAS
@@ -303,8 +425,8 @@
                                data-preco-inicial="${precoVenda}"
                                onchange="atualizarSelecao('${item.id}', this.checked, ${item.quantidade}, ${precoVenda})">
                         <div class="flex-1 min-w-0">
-                            <p class="font-medium text-gray-900">${item.produtos?.nome || 'Produto'}</p>
-                            <p class="text-gray-500">${item.quantidade} ${item.produtos?.unidade_medida_padrao || 'UN'}</p>
+                            <p class="font-medium text-gray-900">${item.produto?.nome || 'Produto sem nome'}</p>
+                            <p class="text-gray-500">${item.quantidade} ${item.produto?.unidade_medida_padrao || 'UN'}</p>
                         </div>
                         <div class="text-right flex-shrink-0">
                             <input type="number" 
@@ -339,7 +461,16 @@
             const inputPreco = document.querySelector(`input[data-input-preco="${itemId}"]`);
 
             if (selecionado) {
-                estadoGlobal.itensSelecionados.set(itemId, { quantidade, preco: precoNum });
+                // Buscar CST padrão do produto se disponível
+                const itemData = encontrarItemPorId(itemId);
+                estadoGlobal.itensSelecionados.set(itemId, { 
+                    quantidade, 
+                    preco: precoNum,
+                    produto_id: itemData?.produto_id, // ✅ Adicionar para salvar CST no cadastro
+                    cst_icms: itemData?.produto?.cst_icms || '101',
+                    cst_pis: itemData?.produto?.cst_pis || '99',
+                    cst_cofins: itemData?.produto?.cst_cofins || '99'
+                });
                 if (inputPreco) inputPreco.disabled = false;
             } else {
                 estadoGlobal.itensSelecionados.delete(itemId);
@@ -347,6 +478,131 @@
             }
 
             atualizarResumo();
+            atualizarCheckboxSelecionarTodos();
+        }
+
+        // SELECIONAR TODOS
+        function selecionarTodos(selecionar) {
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            checkboxes.forEach(checkbox => {
+                if (checkbox.checked !== selecionar) {
+                    checkbox.checked = selecionar;
+                    const itemId = checkbox.dataset.itemId;
+                    const quantidade = parseFloat(checkbox.dataset.quantidade);
+                    const preco = parseFloat(checkbox.dataset.precoInicial);
+                    atualizarSelecao(itemId, selecionar, quantidade, preco);
+                }
+            });
+        }
+
+        // ATUALIZAR CHECKBOX SELECIONAR TODOS
+        function atualizarCheckboxSelecionarTodos() {
+            const checkboxTodos = document.getElementById('selecionar_todos');
+            if (!checkboxTodos) return;
+            
+            const checkboxes = document.querySelectorAll('.item-checkbox');
+            const totalCheckboxes = checkboxes.length;
+            const checkedCheckboxes = Array.from(checkboxes).filter(cb => cb.checked).length;
+            
+            if (totalCheckboxes === 0) {
+                checkboxTodos.checked = false;
+                checkboxTodos.indeterminate = false;
+            } else if (checkedCheckboxes === totalCheckboxes) {
+                checkboxTodos.checked = true;
+                checkboxTodos.indeterminate = false;
+            } else if (checkedCheckboxes > 0) {
+                checkboxTodos.checked = false;
+                checkboxTodos.indeterminate = true;
+            } else {
+                checkboxTodos.checked = false;
+                checkboxTodos.indeterminate = false;
+            }
+        }
+
+        // ENCONTRAR ITEM POR ID
+        function encontrarItemPorId(itemId) {
+            for (const entrada of estadoGlobal.entradas) {
+                const item = entrada.pedido_compra_itens?.find(i => i.id === itemId);
+                if (item) return item;
+            }
+            return null;
+        }
+
+        // TOGGLE CONFIGURAÇÕES FISCAIS
+        function toggleConfiguracoesFiscais() {
+            const painel = document.getElementById('painel_fiscal');
+            painel.classList.toggle('hidden');
+        }
+
+        // APLICAR CST A TODOS OS SELECIONADOS
+        async function aplicarCstTodos() {
+            const cstIcms = document.getElementById('cst_icms_global').value;
+            const cstPis = document.getElementById('cst_pis_global').value;
+            const cstCofins = document.getElementById('cst_cofins_global').value;
+            const salvarCadastro = document.getElementById('salvar_cst_cadastro').checked;
+
+            if (!cstIcms && !cstPis && !cstCofins) {
+                alert('Selecione pelo menos um CST para aplicar');
+                return;
+            }
+
+            let contador = 0;
+            let detalhes = [];
+            const produtosParaAtualizar = new Map(); // produto_id -> { cst_icms, cst_pis, cst_cofins }
+            
+            // Aplicar aos itens selecionados (temporário)
+            estadoGlobal.itensSelecionados.forEach((itemData, itemId) => {
+                if (cstIcms) itemData.cst_icms = cstIcms;
+                if (cstPis) itemData.cst_pis = cstPis;
+                if (cstCofins) itemData.cst_cofins = cstCofins;
+                contador++;
+                
+                // Coletar produtos para atualizar no cadastro
+                if (salvarCadastro && itemData.produto_id) {
+                    if (!produtosParaAtualizar.has(itemData.produto_id)) {
+                        produtosParaAtualizar.set(itemData.produto_id, {});
+                    }
+                    const prodUpdate = produtosParaAtualizar.get(itemData.produto_id);
+                    if (cstIcms) prodUpdate.cst_icms = cstIcms;
+                    if (cstPis) prodUpdate.cst_pis = cstPis;
+                    if (cstCofins) prodUpdate.cst_cofins = cstCofins;
+                }
+            });
+
+            if (cstIcms) detalhes.push(`ICMS: ${cstIcms}`);
+            if (cstPis) detalhes.push(`PIS: ${cstPis}`);
+            if (cstCofins) detalhes.push(`COFINS: ${cstCofins}`);
+
+            // Salvar no cadastro se solicitado
+            if (salvarCadastro && produtosParaAtualizar.size > 0) {
+                try {
+                    mostrarMensagem('💾 Salvando alterações no cadastro...', 'info');
+                    
+                    const promises = Array.from(produtosParaAtualizar.entries()).map(([produtoId, updates]) => {
+                        return supabase
+                            .from('produtos')
+                            .update(updates)
+                            .eq('id', produtoId);
+                    });
+                    
+                    const results = await Promise.all(promises);
+                    const erros = results.filter(r => r.error);
+                    
+                    if (erros.length > 0) {
+                        console.error('❌ Erros ao salvar CST:', erros);
+                        mostrarMensagem(`⚠️ CST aplicado a ${contador} item(ns), mas ${erros.length} produto(s) não foram atualizados no cadastro`, 'warning');
+                    } else {
+                        mostrarMensagem(`✅ CST aplicado a ${contador} item(ns) e salvo no cadastro de ${produtosParaAtualizar.size} produto(s): ${detalhes.join(', ')}`, 'success');
+                    }
+                } catch (erro) {
+                    console.error('Erro ao salvar CST no cadastro:', erro);
+                    mostrarMensagem(`✅ CST aplicado temporariamente, mas erro ao salvar no cadastro: ${erro.message}`, 'warning');
+                }
+            } else {
+                mostrarMensagem(`✅ CST aplicado a ${contador} item(ns): ${detalhes.join(', ')}`, 'success');
+            }
+            
+            toggleConfiguracoesFiscais();
         }
 
         // ATUALIZAR RESUMO
@@ -363,6 +619,14 @@
             document.getElementById('resumo_quantidade').textContent = totalQuantidade.toFixed(3);
             document.getElementById('resumo_valor').textContent = 'R$ ' + totalValor.toFixed(2);
             document.getElementById('btn_emitir').disabled = totalItens === 0;
+            
+            // Atualizar contador no botão de configurações fiscais
+            const btnConfig = document.querySelector('button[onclick="toggleConfiguracoesFiscais()"]');
+            if (btnConfig && totalItens > 0) {
+                btnConfig.innerHTML = `<i class="fas fa-cog mr-2"></i>Configurações Fiscais <span class="ml-1 px-2 py-0.5 bg-white text-blue-600 rounded-full text-xs font-bold">${totalItens}</span>`;
+            } else if (btnConfig) {
+                btnConfig.innerHTML = `<i class="fas fa-cog mr-2"></i>Configurações Fiscais`;
+            }
         }
 
         // EMITIR NFC-e
@@ -376,7 +640,10 @@
                 const itensCliente = Array.from(estadoGlobal.itensSelecionados).map(([itemId, dados]) => ({
                     pedido_item_id: itemId,
                     quantidade: dados.quantidade,
-                    preco_venda: dados.preco
+                    preco_venda: dados.preco,
+                    cst_icms: dados.cst_icms,
+                    cst_pis: dados.cst_pis,
+                    cst_cofins: dados.cst_cofins
                 }));
 
                 document.getElementById('btn_emitir').disabled = true;
@@ -388,11 +655,20 @@
                     observacoes: document.getElementById('observacoes_nota').value
                 });
 
-                document.getElementById('sucesso_numero').textContent = resultado.numero_nfce;
+                console.log('✅ [EmitirNFCe] Resultado completo da emissão:', resultado);
+                console.log('📋 [EmitirNFCe] nfce_id:', resultado.nfce_id);
+                console.log('📋 [EmitirNFCe] documento_fiscal_id:', resultado.documento_fiscal_id);
+                
+                // Armazenar dados da última emissão para impressão
+                estadoGlobal.ultimaEmissao = resultado;
+
+                // Exibir informações no modal de sucesso
+                const numeroSerie = `${resultado.numero_nfce}/${resultado.serie || '1'}`;
+                document.getElementById('sucesso_numero').textContent = numeroSerie;
                 document.getElementById('sucesso_chave').textContent = resultado.chave_nfe || 'N/A';
                 document.getElementById('sucesso_protocolo').textContent = resultado.protocolo || 'Processando...';
                 document.getElementById('sucesso_itens').textContent = resultado.total_itens;
-                document.getElementById('sucesso_valor').textContent = resultado.valor_total.toFixed(2);
+                document.getElementById('sucesso_valor').textContent = 'R$ ' + resultado.valor_total.toFixed(2);
                 abrirModal('modal_sucesso');
 
             } catch (erro) {
@@ -407,7 +683,26 @@
         function limparSelecoes() {
             estadoGlobal.itensSelecionados.clear();
             document.querySelectorAll('.item-checkbox').forEach(cb => cb.checked = false);
+            const checkboxTodos = document.getElementById('selecionar_todos');
+            if (checkboxTodos) {
+                checkboxTodos.checked = false;
+                checkboxTodos.indeterminate = false;
+            }
+            // Fechar e resetar painel fiscal
+            const painelFiscal = document.getElementById('painel_fiscal');
+            if (painelFiscal && !painelFiscal.classList.contains('hidden')) {
+                painelFiscal.classList.add('hidden');
+            }
+            resetarCamposFiscais();
             atualizarResumo();
+        }
+
+        // RESETAR CAMPOS FISCAIS
+        function resetarCamposFiscais() {
+            document.getElementById('cst_icms_global').value = '';
+            document.getElementById('cst_pis_global').value = '';
+            document.getElementById('cst_cofins_global').value = '';
+            document.getElementById('salvar_cst_cadastro').checked = false; // Reset checkbox
         }
 
         // UTILIDADES
@@ -432,6 +727,81 @@
 
         function fecharModal(modalId) {
             document.getElementById(modalId).classList.add('hidden');
+        }
+
+        // IMPRIMIR DANFE
+        async function imprimirDANFE() {
+            try {
+                console.log('🖨️ [ImprimirDANFE] Estado global da última emissão:', estadoGlobal.ultimaEmissao);
+                
+                if (!estadoGlobal.ultimaEmissao) {
+                    alert('Nenhuma emissão encontrada para impressão. Por favor, emita uma NFC-e primeiro.');
+                    return;
+                }
+
+                const { nfce_id, chave_nfe, numero_nfce, documento_fiscal_id } = estadoGlobal.ultimaEmissao;
+                
+                console.log('📋 [ImprimirDANFE] Dados extraídos:', { nfce_id, chave_nfe, numero_nfce, documento_fiscal_id });
+                
+                // Se não tiver nfce_id no estado global, tentar buscar do banco
+                let refParaImprimir = nfce_id;
+                
+                if (!refParaImprimir && documento_fiscal_id) {
+                    console.log('🔍 [ImprimirDANFE] nfce_id não encontrado no estado, buscando do banco...');
+                    try {
+                        const { data: docFiscal, error } = await supabase
+                            .from('documentos_fiscais')
+                            .select('nfce_id, chave_acesso')
+                            .eq('id', documento_fiscal_id)
+                            .single();
+                        
+                        if (!error && docFiscal) {
+                            refParaImprimir = docFiscal.nfce_id || docFiscal.chave_acesso;
+                            console.log('✅ [ImprimirDANFE] Referência encontrada no banco:', refParaImprimir);
+                        }
+                    } catch (err) {
+                        console.warn('⚠️ [ImprimirDANFE] Erro ao buscar do banco:', err);
+                    }
+                }
+                
+                // Se ainda não tiver, usar chave de acesso como fallback
+                if (!refParaImprimir && chave_nfe) {
+                    refParaImprimir = chave_nfe;
+                    console.log('📝 [ImprimirDANFE] Usando chave de acesso como fallback:', refParaImprimir);
+                }
+                
+                if (!refParaImprimir) {
+                    alert('❌ Dados insuficientes para impressão.\n\nNão foi possível encontrar:\n- ID da nota na API (nfce_id)\n- Chave de acesso\n- ID do documento fiscal\n\nTente buscar o documento na tela de Documentos Fiscais.');
+                    return;
+                }
+
+                mostrarMensagem('🖨️ Gerando DANFE...', 'info');
+                
+                const tipo = 'nfce';
+                
+                try {
+                    console.log('📤 [ImprimirDANFE] Solicitando DANFE - Ref:', refParaImprimir, 'Tipo:', tipo);
+                    
+                    // Usar FiscalSystem (o serviço está importado como fiscal.js)
+                    const pdfUrl = await FiscalSystem.baixarDANFE(refParaImprimir, tipo);
+                    
+                    // Se for um Blob, converter para URL
+                    let urlParaAbrir = pdfUrl;
+                    if (pdfUrl instanceof Blob) {
+                        urlParaAbrir = URL.createObjectURL(pdfUrl);
+                    }
+                    
+                    console.log('✅ [ImprimirDANFE] DANFE gerado com sucesso!');
+                    window.open(urlParaAbrir, '_blank');
+                    mostrarMensagem('✅ DANFE gerado com sucesso!', 'success');
+                } catch (err) {
+                    console.error('❌ [ImprimirDANFE] Erro ao gerar DANFE:', err);
+                    mostrarErro('Erro ao gerar DANFE: ' + (err.message || err));
+                }
+            } catch (erro) {
+                console.error('❌ [ImprimirDANFE] Erro geral:', erro);
+                mostrarErro('Erro ao imprimir DANFE: ' + erro.message);
+            }
         }
     </script>
 </body>

@@ -1012,16 +1012,21 @@ class NuvemFiscalService {
                 
                 // Se não conseguiu calcular, usar dados já presentes no item (do banco)
                 if (!dadosFiscais) {
+                    const cstIcms = item.cst_icms || '102';
+                    // ✅ CORREÇÃO: CSOSNs sem BC ICMS: 102, 103, 300, 400, 500
+                    const csosnSemBC = ['102', '103', '300', '400', '500'];
+                    const temBCIcms = !csosnSemBC.includes(cstIcms);
+                    
                     dadosFiscais = {
                         cfop: item.cfop || '5102', // 5102 = venda de produto
                         ncm: item.ncm || '22021000', // bebida não alcoólica
-                        cst_icms: item.cst_icms || '102',
+                        cst_icms: cstIcms,
                         cst_pis: item.cst_pis || '99',
                         cst_cofins: item.cst_cofins || '99',
                         origem: item.icms_origem || 0,
                         aliquota_icms: item.icms_aliquota || 0,
                         valor_icms: item.icms_valor || 0,
-                        base_icms: item.icms_base_calculo || item.valor_total || 0,
+                        base_icms: temBCIcms ? (item.icms_base_calculo || item.valor_total || 0) : 0,
                         aliquota_pis: item.pis_aliquota || 0,
                         valor_pis: item.pis_valor || 0,
                         base_pis: item.pis_base_calculo || item.valor_total || 0,
@@ -1029,10 +1034,10 @@ class NuvemFiscalService {
                         valor_cofins: item.cofins_valor || 0,
                         base_cofins: item.cofins_base_calculo || item.valor_total || 0,
                         icms: {
-                            base_calculo: item.icms_base_calculo || item.valor_total || 0,
+                            base_calculo: temBCIcms ? (item.icms_base_calculo || item.valor_total || 0) : 0,
                             aliquota: item.icms_aliquota || 0,
                             valor: item.icms_valor || 0,
-                            situacao_tributaria: item.cst_icms || '102',
+                            situacao_tributaria: cstIcms,
                             origem: item.icms_origem || 0
                         },
                         pis: {
@@ -1077,7 +1082,29 @@ class NuvemFiscalService {
                 const totalICMS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.icms.valor || 0), 0);
                 const totalPIS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.pis.valor || 0), 0);
                 const totalCOFINS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.cofins.valor || 0), 0);
-                const baseICMS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.icms.base_calculo || 0), 0);
+                
+                // ✅ CORREÇÃO: Para Simples Nacional, verificar se o CSOSN permite BC ICMS
+                // CSOSNs SEM base de cálculo: 102, 103, 300, 400, 500
+                const csosnSemBC = ['102', '103', '300', '400', '500'];
+                const crt = parseInt(empresa.regime_tributario_codigo || empresa.crt || '1');
+                
+                let baseICMS = 0;
+                if (crt === 1 || crt === 2) {
+                    // Simples Nacional - apenas somar BC dos itens que permitem
+                    baseICMS = itensComDadosFiscais.reduce((sum, item) => {
+                        const csosn = item.dadosFiscais.icms.situacao_tributaria || '102';
+                        // Se o CSOSN não permite BC, não somar
+                        if (csosnSemBC.includes(csosn)) {
+                            return sum + 0;
+                        }
+                        return sum + (item.dadosFiscais.icms.base_calculo || 0);
+                    }, 0);
+                } else {
+                    // Regime Normal - somar todas as BCs
+                    baseICMS = itensComDadosFiscais.reduce((sum, item) => sum + (item.dadosFiscais.icms.base_calculo || 0), 0);
+                }
+                
+                console.log('💰 [NuvemFiscal] Base ICMS calculada:', baseICMS, '(Regime:', crt === 1 || crt === 2 ? 'Simples Nacional' : 'Normal', ')');
                 
                 totaisFiscais = {
                     base_icms: baseICMS,

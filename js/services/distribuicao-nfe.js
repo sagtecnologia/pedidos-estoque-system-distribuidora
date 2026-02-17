@@ -126,7 +126,7 @@ class DistribuicaoNFCeService {
     static async emitirNFCeDistribuicao(params) {
         try {
             const {
-                itensCliente, // [{ pedido_item_id, quantidade, preco_venda }, ...]
+                itensCliente, // [{ pedido_item_id, quantidade, preco_venda, cst_icms, cst_pis, cst_cofins }, ...]
                 cliente = null, // CPF/CNPJ cliente (opcional)
                 descricaoNota = 'Distribuição de Produtos', // Descrição opcional
                 observacoes = null
@@ -179,7 +179,11 @@ class DistribuicaoNFCeService {
                     return {
                         ...pedidoItem,
                         preco_venda: item.preco_venda || pedidoItem.preco_venda_nfe || pedidoItem.produto.preco_venda,
-                        quantidade_emissao: item.quantidade
+                        quantidade_emissao: item.quantidade,
+                        // CST personalizados vindo do frontend (se fornecidos)
+                        cst_icms_customizado: item.cst_icms,
+                        cst_pis_customizado: item.cst_pis,
+                        cst_cofins_customizado: item.cst_cofins
                     };
                 })
             );
@@ -228,17 +232,25 @@ class DistribuicaoNFCeService {
             const itensVenda = itensComDados.map((item, idx) => ({
                 numero_item: idx + 1,
                 codigo: item.produto.codigo_barras || String(item.produto_id),
+                codigo_produto: item.produto.codigo_barras || String(item.produto_id), // ✅ Campo adicional para compatibilidade
+                codigo_barras: item.produto.codigo_barras || null,
+                produto_id: item.produto_id,
                 nome_produto: item.produto.nome,
                 descricao: item.produto.descricao_nfe || item.produto.nome,
                 quantidade: item.quantidade_emissao,
+                preco_unitario: item.preco_venda,
                 valor_unitario: item.preco_venda,
+                subtotal: item.preco_venda * item.quantidade_emissao,
                 valor_total: item.preco_venda * item.quantidade_emissao,
+                unidade: item.produto.unidade_medida_padrao || 'UN',
                 ncm: item.produto.ncm || '22021000',
                 cfop: item.produto.cfop_venda || '5102',
                 origem: item.produto.origem_produto || 0,
-                cst_icms: item.produto.cst_icms || '102',
-                cst_pis: item.produto.cst_pis || '99',
-                cst_cofins: item.produto.cst_cofins || '99',
+                icms_origem: item.produto.origem_produto || 0,
+                // ✅ Aplicar CST customizados se fornecidos, senão usar do produto
+                cst_icms: item.cst_icms_customizado || item.produto.cst_icms || '102',
+                cst_pis: item.cst_pis_customizado || item.produto.cst_pis || '99',
+                cst_cofins: item.cst_cofins_customizado || item.produto.cst_cofins || '99',
                 unidade_medida: item.produto.unidade_medida_padrao || 'UN',
                 icms_aliquota: item.produto.aliquota_icms || 0,
                 icms_valor: (item.preco_venda * item.quantidade_emissao) * (item.produto.aliquota_icms || 0) / 100,
@@ -267,6 +279,13 @@ class DistribuicaoNFCeService {
             }
 
             console.log('✅ [DistribuicaoNFCe] NFC-e emitida com sucesso! Número:', resultadoFiscal.numero);
+            console.log('📋 [DistribuicaoNFCe] DADOS COMPLETOS DA EMISSÃO (GUARDAR PARA CANCELAMENTO):');
+            console.log('   - Número:', resultadoFiscal.numero);
+            console.log('   - Chave:', resultadoFiscal.chave_nfe || resultadoFiscal.chave_acesso);
+            console.log('   - Protocolo:', resultadoFiscal.protocolo);
+            console.log('   - NFC-e ID (API):', resultadoFiscal.nfce_id);
+            console.log('   - Provider:', resultadoFiscal.provider);
+            console.log('   - Objeto completo:', JSON.stringify(resultadoFiscal, null, 2));
 
             // 6️⃣ Marcar itens como emitidos (SEM CRIAR MOVIMENTAÇÃO DE ESTOQUE)
             const atualizacoes = itensVenda.map(item =>
@@ -289,37 +308,53 @@ class DistribuicaoNFCeService {
 
             console.log('✅ [DistribuicaoNFCe] Itens marcados como emitidos');
 
-            // 7️⃣ Salvar documento fiscal no banco (para poder cancelar/baixar depois)
-            const documentoFiscal = {
+            // 7️⃣ Salvar documento fiscal no banco - SEGUINDO PADRÃO DO PDV
+            // ⚠️ CRITICAL: Salvar todos os dados necessários para cancelamento!
+            // ⚠️ USAR DATA/HORA DA SEFAZ, NÃO DO NAVEGADOR (horário correto de Brasília)
+            const dataEmissaoSefaz = resultadoFiscal.data_emissao || resultadoFiscal.documentoFiscalData?.data_emissao || new Date().toISOString();
+            const dataAutorizacaoSefaz = resultadoFiscal.data_autorizacao || resultadoFiscal.documentoFiscalData?.data_autorizacao || new Date().toISOString();
+            
+            console.log('📅 [DistribuicaoNFCe] Datas SEFAZ para salvar:', { dataEmissaoSefaz, dataAutorizacaoSefaz });
+            
+            const documentoFiscalData = resultadoFiscal.documentoFiscalData || {
+                venda_id: null, // ✅ NULL pois não há venda na distribuição
                 tipo_documento: 'NFCE',
                 numero_documento: String(resultadoFiscal.numero),
                 serie: parseInt(resultadoFiscal.serie || '1'),
-                chave_acesso: resultadoFiscal.chave_nfe,
+                chave_acesso: resultadoFiscal.chave_nfe || resultadoFiscal.chave_acesso,
                 protocolo_autorizacao: resultadoFiscal.protocolo,
                 status_sefaz: '100', // Autorizado
-                mensagem_sefaz: 'Autorizado o uso da NFC-e',
+                mensagem_sefaz: resultadoFiscal.mensagem || 'Autorizado o uso da NFC-e',
                 valor_total: vendaData.total,
-                natureza_operacao: 'VENDA',
-                data_emissao: vendaData.data_emissao,
-                data_autorizacao: new Date().toISOString(),
-                xml_nota: null,
+                natureza_operacao: 'DISTRIBUICAO',
+                data_emissao: dataEmissaoSefaz,
+                data_autorizacao: dataAutorizacaoSefaz,
+                xml_nota: resultadoFiscal.caminho_xml || null,
                 xml_retorno: JSON.stringify(resultadoFiscal),
                 tentativas_emissao: 1,
                 ultima_tentativa: new Date().toISOString(),
-                api_provider: 'nuvem_fiscal',
-                nfce_id: resultadoFiscal.nfce_id // ✅ IMPORTANTE: ID da nota na Nuvem Fiscal
+                api_provider: resultadoFiscal.provider || 'nuvem_fiscal',
+                nfce_id: resultadoFiscal.nfce_id, // ✅ CRITICAL: ID da nota na Nuvem Fiscal/Focus NFe
+                origem_emissao: 'DISTRIBUICAO', // ✅ Identificar origem
+                observacoes: `DISTRIBUIÇÃO DE PRODUTOS\n${descricaoNota}\n${observacoes || ''}`
             };
 
+            let documentoFiscalId = null;
             const { error: erroDocumento, data: docInserido } = await supabase
                 .from('documentos_fiscais')
-                .insert([documentoFiscal])
-                .select('id');
+                .insert([documentoFiscalData])
+                .select('id')
+                .single();
 
             if (erroDocumento) {
-                console.warn('⚠️ [DistribuicaoNFCe] Não foi possível salvar documento fiscal:', erroDocumento.message);
-                // Continuar mesmo com erro, pois a nota foi emitida
-            } else if (docInserido && docInserido.length > 0) {
-                console.log('✅ [DistribuicaoNFCe] Documento fiscal salvo no banco com ID:', docInserido[0].id);
+                console.error('❌ [DistribuicaoNFCe] ERRO CRÍTICO ao salvar documento fiscal:', erroDocumento.message);
+                console.error('⚠️ [DistribuicaoNFCe] A nota foi emitida mas não foi salva no banco!');
+                console.error('⚠️ [DistribuicaoNFCe] Dados da nota:', documentoFiscalData);
+                // ⚠️ NÃO continuar silenciosamente - lançar aviso mas retornar resultado
+                throw new Error(`Nota emitida mas ERRO ao salvar no banco: ${erroDocumento.message}. ANOTE: Chave ${resultadoFiscal.chave_nfe}, Número ${resultadoFiscal.numero}`);
+            } else if (docInserido && docInserido.id) {
+                documentoFiscalId = docInserido.id;
+                console.log('✅ [DistribuicaoNFCe] Documento fiscal salvo no banco com ID:', documentoFiscalId);
             }
 
             // 📋 Retornar resultado completo
@@ -327,11 +362,14 @@ class DistribuicaoNFCeService {
                 success: true,
                 status: 'emitida',
                 numero_nfce: resultadoFiscal.numero,
-                chave_nfe: resultadoFiscal.chave_nfe,
+                serie: resultadoFiscal.serie || resultadoFiscal.documentoFiscalData?.serie || 1,
+                chave_nfe: resultadoFiscal.chave_nfe || resultadoFiscal.chave_acesso,
                 protocolo: resultadoFiscal.protocolo,
                 caminho_danfe: resultadoFiscal.caminho_danfe,
                 caminho_xml: resultadoFiscal.caminho_xml_nota_fiscal,
-                nfce_id: resultadoFiscal.nfce_id,
+                nfce_id: resultadoFiscal.nfce_id, // ✅ ID para download de XML/PDF
+                documento_fiscal_id: documentoFiscalId, // ✅ ID do registro no banco
+                provider: resultadoFiscal.provider || 'nuvem_fiscal',
                 total_itens: itensVenda.length,
                 valor_total: vendaData.total,
                 itens_marcados: resultadosAtualizacao.filter(r => !r.error).length,

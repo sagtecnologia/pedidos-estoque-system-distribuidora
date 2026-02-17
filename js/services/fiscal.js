@@ -77,6 +77,12 @@ class FiscalSystem {
                     // Mapear resposta da Nuvem Fiscal para formato padrão
                     if (resultado.status === 'autorizado') {
                         // ✅ Preparar dados do documento fiscal para salvar no banco
+                        // ⚠️ USAR DATA/HORA DA SEFAZ, NÃO DO NAVEGADOR
+                        const dataEmissaoSefaz = resultado.data_emissao || resultado.autorizacao?.data_emissao || vendaData.data_emissao || new Date().toISOString();
+                        const dataAutorizacaoSefaz = resultado.data_autorizacao || resultado.autorizacao?.data_hora || resultado.autorizacao?.data_autorizacao || new Date().toISOString();
+                        
+                        console.log('📅 [FiscalSystem] Datas SEFAZ:', { dataEmissaoSefaz, dataAutorizacaoSefaz });
+                        
                         const documentoFiscalData = {
                             // venda_id será adicionado depois pelo PDV
                             tipo_documento: 'NFCE',
@@ -88,8 +94,8 @@ class FiscalSystem {
                             mensagem_sefaz: resultado.autorizacao?.mensagem || 'Autorizado o uso da NFC-e',
                             valor_total: vendaData.total,
                             natureza_operacao: 'VENDA',
-                            data_emissao: vendaData.data_emissao || new Date().toISOString(),
-                            data_autorizacao: new Date().toISOString(),
+                            data_emissao: dataEmissaoSefaz,
+                            data_autorizacao: dataAutorizacaoSefaz,
                             xml_nota: resultado.caminho_xml || null,
                             xml_retorno: JSON.stringify(resultado),
                             tentativas_emissao: 1,
@@ -104,7 +110,9 @@ class FiscalSystem {
                             status: 'autorizado',
                             status_sefaz: 'autorizado',
                             numero: resultado.numero,
+                            serie: resultado.serie,
                             chave_nfe: resultado.chave_acesso || resultado.chave,
+                            chave_acesso: resultado.chave_acesso || resultado.chave,
                             protocolo: resultado.autorizacao?.numero_protocolo || resultado.protocolo,
                             caminho_xml_nota_fiscal: resultado.caminho_xml,
                             caminho_danfe: resultado.caminho_danfe,
@@ -112,6 +120,8 @@ class FiscalSystem {
                             ref: resultado.referencia || resultado.id, // ✅ Referência para exibição
                             provider: 'nuvem_fiscal',
                             mensagem: 'NFC-e autorizada pela SEFAZ via Nuvem Fiscal',
+                            data_emissao: dataEmissaoSefaz, // ✅ Propagar data SEFAZ
+                            data_autorizacao: dataAutorizacaoSefaz, // ✅ Propagar data SEFAZ
                             documentoFiscalData // ✅ Dados para salvar na tabela documentos_fiscais
                         };
                     } else {
