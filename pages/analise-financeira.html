@@ -766,22 +766,37 @@
             let custoTotalVendas = 0;
             let qtdVendas = vendasFiltradas.length;
             
-            // Calcular receita e custo das vendas
-            vendasFiltradas.forEach(venda => {
-                (venda.venda_itens || []).forEach(item => {
-                    const produto = item.produtos;
-                    if (!produto) return;
+            // QUANDO NÃO HÁ FILTRO: usar venda.total (como Evolução de Vendas faz)
+            // QUANDO HÁ FILTRO: iterar pelos itens e usar item.subtotal
+            if (!filtroAtual.categoria && !filtroAtual.marca) {
+                // ✅ SEM FILTROS: usar venda.total
+                vendasFiltradas.forEach(venda => {
+                    receitaTotal += venda.total || 0;
                     
-                    // Aplicar filtros de categoria e marca
-                    if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
-                    
-                    receitaTotal += (item.preco_unitario || 0) * (item.quantidade || 0);
-                    // Usar custo histórico correto (item > lote > produto)
-                    const custo = getCustoItem(item);
-                    custoTotalVendas += custo * (item.quantidade || 0);
+                    // Custo: somar todos os itens (já que sem filtro)
+                    (venda.venda_itens || []).forEach(item => {
+                        const custo = getCustoItem(item);
+                        custoTotalVendas += custo * (item.quantidade || 0);
+                    });
                 });
-            });
+            } else {
+                // 🔍 COM FILTROS: iterar pelos itens com filtros aplicados
+                vendasFiltradas.forEach(venda => {
+                    (venda.venda_itens || []).forEach(item => {
+                        const produto = item.produtos;
+                        if (!produto) return;
+                        
+                        // Aplicar filtros de categoria e marca
+                        if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                        if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                        
+                        // Usar item.subtotal que já tem descontos do item
+                        receitaTotal += item.subtotal || 0;
+                        const custo = getCustoItem(item);
+                        custoTotalVendas += custo * (item.quantidade || 0);
+                    });
+                });
+            }
             
             // Adicionar despesas das contas a pagar no período filtrado
             let despesasExtras = 0;
