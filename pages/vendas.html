@@ -371,8 +371,8 @@
                     // Filtrar produtos por categoria e marca
                     const produtosValidos = new Set();
                     (produtos || []).forEach(p => {
-                        const passaCategoriaFiltro = !categoriaId || p.categoria_id === parseInt(categoriaId);
-                        const passaMarcaFiltro = !marcaId || p.marca_id === parseInt(marcaId);
+                        const passaCategoriaFiltro = !categoriaId || p.categoria_id === categoriaId;
+                        const passaMarcaFiltro = !marcaId || p.marca_id === marcaId;
                         
                         if (passaCategoriaFiltro && passaMarcaFiltro) {
                             produtosValidos.add(p.id);
