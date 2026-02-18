@@ -86,7 +86,7 @@
                 <div class="bg-white rounded-lg shadow p-5 border-l-4 border-red-500">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-sm text-gray-600">Custo Total</p>
+                            <p class="text-sm text-gray-600">CMV (Custo Mercadorias)</p>
                             <p id="card-custo" class="text-xl font-bold text-red-600">R$ 0,00</p>
                         </div>
                         <div class="bg-red-100 p-2 rounded-full">
@@ -496,33 +496,49 @@
                     .from('vendas')
                     .select('*')
                     .eq('status', 'FINALIZADA')
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .limit(100000);
 
                 if (erroVendas) {
                     console.error('Erro ao carregar vendas:', erroVendas);
                     showToast('Erro ao carregar vendas: ' + erroVendas.message, 'error');
                     vendas = [];
                 } else {
-                    // Carregar itens apenas das vendas carregadas (otimiza performance)
+                    // Carregar itens em LOTES de 300 IDs com limit alto para evitar corte do Supabase (padrão = 1000 linhas)
                     const vendasIds = (vendasData || []).map(v => v.id);
-                    const { data: itensData } = vendasIds.length > 0 ? 
-                        await supabase
-                            .from('venda_itens')
-                            .select(`
-                                id,
-                                venda_id,
-                                produto_id,
-                                quantidade,
-                                preco_unitario,
-                                subtotal,
-                                preco_custo,
-                                lote_id
-                            `)
-                            .in('venda_id', vendasIds)
-                        : { data: [] };
+                    let itensData = [];
+                    
+                    if (vendasIds.length > 0) {
+                        const BATCH_SIZE = 300;
+                        for (let i = 0; i < vendasIds.length; i += BATCH_SIZE) {
+                            const batchIds = vendasIds.slice(i, i + BATCH_SIZE);
+                            const { data: batchItens, error: erroItens } = await supabase
+                                .from('venda_itens')
+                                .select(`
+                                    id,
+                                    venda_id,
+                                    produto_id,
+                                    quantidade,
+                                    preco_unitario,
+                                    subtotal,
+                                    preco_custo,
+                                    lote_id
+                                `)
+                                .in('venda_id', batchIds)
+                                .limit(10000);
+                            
+                            if (erroItens) {
+                                console.error(`Erro ao carregar itens (lote ${i / BATCH_SIZE + 1}):`, erroItens);
+                            } else {
+                                itensData = itensData.concat(batchItens || []);
+                            }
+                        }
+                    }
+                    
+                    console.log(`📦 Total de venda_itens carregados: ${itensData.length} (de ${vendasIds.length} vendas)`);
 
                     const itensPorVenda = {};
-                    (itensData || []).forEach(item => {
+                    itensData.forEach(item => {
                         if (!itensPorVenda[item.venda_id]) {
                             itensPorVenda[item.venda_id] = [];
                         }
@@ -532,7 +548,8 @@
                     // Carregar produtos
                     const { data: produtosData } = await supabase
                         .from('produtos')
-                        .select('id, nome, codigo, preco_venda, preco_custo, categoria_id, marca_id, fornecedor_id');
+                        .select('id, nome, codigo, preco_venda, preco_custo, categoria_id, marca_id, fornecedor_id')
+                        .limit(100000);
 
                     const produtosMap = {};
                     (produtosData || []).forEach(p => {
@@ -695,13 +712,18 @@
          */
         function getCustoItem(item) {
             // 1. Prioridade: custo do item (já vem da movimentação/compra via trigger)
-            if (item.preco_custo && item.preco_custo > 0) {
-                return item.preco_custo;
+            // Usar parseFloat para garantir que o valor é numérico
+            const custoItem = parseFloat(item.preco_custo);
+            if (!isNaN(custoItem) && custoItem > 0) {
+                return custoItem;
             }
             
             // 2. Fallback: custo do cadastro do produto
-            if (item.produtos && item.produtos.preco_custo && item.produtos.preco_custo > 0) {
-                return item.produtos.preco_custo;
+            if (item.produtos) {
+                const custoProduto = parseFloat(item.produtos.preco_custo);
+                if (!isNaN(custoProduto) && custoProduto > 0) {
+                    return custoProduto;
+                }
             }
             
             return 0;
@@ -773,12 +795,13 @@
             if (!filtroAtual.categoria && !filtroAtual.marca) {
                 // ✅ SEM FILTROS: usar venda.total
                 vendasFiltradas.forEach(venda => {
-                    receitaTotal += venda.total || 0;
+                    receitaTotal += parseFloat(venda.total) || 0;
                     
-                    // Custo: somar todos os itens (já que sem filtro)
+                    // CMV: somar custo de todos os itens
                     (venda.venda_itens || []).forEach(item => {
                         const custo = getCustoItem(item);
-                        custoTotalVendas += custo * (item.quantidade || 0);
+                        const qtd = parseFloat(item.quantidade) || 0;
+                        custoTotalVendas += custo * qtd;
                     });
                 });
             } else {
@@ -793,33 +816,17 @@
                         if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
                         
                         // Usar item.subtotal que já tem descontos do item
-                        receitaTotal += item.subtotal || 0;
+                        receitaTotal += parseFloat(item.subtotal) || 0;
                         const custo = getCustoItem(item);
-                        custoTotalVendas += custo * (item.quantidade || 0);
+                        const qtd = parseFloat(item.quantidade) || 0;
+                        custoTotalVendas += custo * qtd;
                     });
                 });
             }
             
-            // Adicionar despesas das contas a pagar no período filtrado
-            let despesasExtras = 0;
-            contasPagar.forEach(cp => {
-                if (cp.status === 'PAGO') {
-                    const dataPagamento = getDateBrasilia(cp.data_pagamento);
-                    const dataInicio = filtroAtual.dataInicio ? filtroAtual.dataInicio.split('T')[0] : null;
-                    const dataFim = filtroAtual.dataFim ? filtroAtual.dataFim.split('T')[0] : null;
-                    
-                    // Converter para números YYYYMMDD para comparação correta
-                    const datPagNum = parseInt(dataPagamento.replace(/-/g, ''));
-                    const dataInicioNum = dataInicio ? parseInt(dataInicio.replace(/-/g, '')) : null;
-                    const dataFimNum = dataFim ? parseInt(dataFim.replace(/-/g, '')) : null;
-                    
-                    if (dataInicioNum !== null && datPagNum < dataInicioNum) return;
-                    if (dataFimNum !== null && datPagNum > dataFimNum) return;
-                    despesasExtras += cp.valor_pago || 0;
-                }
-            });
-            
-            const custoTotal = custoTotalVendas + despesasExtras;
+            // ✅ CMV puro = custo das mercadorias vendidas (SEM misturar com contas a pagar)
+            // Despesas operacionais (contas a pagar) aparecem apenas no DRE
+            const custoTotal = custoTotalVendas;
             const lucroTotal = receitaTotal - custoTotal;
             const margemMedia = receitaTotal > 0 ? (lucroTotal / receitaTotal * 100) : 0;
             
@@ -1930,15 +1937,23 @@
 
             // Pagamentos no período (despesas operacionais, excluindo compras de mercadorias)
             let despesasOperacionais = 0;
+            const dreDataInicio = filtroAtual.dataInicio ? filtroAtual.dataInicio.split('T')[0] : null;
+            const dreDataFim = filtroAtual.dataFim ? filtroAtual.dataFim.split('T')[0] : null;
+            const dreDataInicioNum = dreDataInicio ? parseInt(dreDataInicio.replace(/-/g, '')) : null;
+            const dreDataFimNum = dreDataFim ? parseInt(dreDataFim.replace(/-/g, '')) : null;
+            
             contasPagar.forEach(cp => {
                 if (cp.status === 'PAGO') {
-                    if (!filtroAtual.dataInicio || cp.data_pagamento >= filtroAtual.dataInicio) {
-                        if (!filtroAtual.dataFim || cp.data_pagamento <= filtroAtual.dataFim) {
-                            // Considerar despesas operacionais (não compras de mercadorias)
-                            if (cp.categoria !== 'FORNECEDOR' && cp.categoria !== 'COMPRA') {
-                                despesasOperacionais += cp.valor_pago || 0;
-                            }
-                        }
+                    // Converter data_pagamento para data de Brasília (mesmo padrão das vendas)
+                    const dataPag = getDateBrasilia(cp.data_pagamento || cp.created_at);
+                    const dataPagNum = parseInt(dataPag.replace(/-/g, ''));
+                    
+                    if (dreDataInicioNum !== null && dataPagNum < dreDataInicioNum) return;
+                    if (dreDataFimNum !== null && dataPagNum > dreDataFimNum) return;
+                    
+                    // Considerar despesas operacionais (não compras de mercadorias)
+                    if (cp.categoria !== 'FORNECEDOR' && cp.categoria !== 'COMPRA') {
+                        despesasOperacionais += parseFloat(cp.valor_pago) || 0;
                     }
                 }
             });
