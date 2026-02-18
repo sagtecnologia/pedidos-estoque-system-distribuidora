@@ -794,17 +794,46 @@ class PDVSystem {
                 return false;
             }
 
-            // 🚀 VALIDAR ESTOQUE CONSIDERANDO O QUE JÁ ESTÁ NO CARRINHO
-            const estoqueDisponivel = produto.estoque_atual || 0;
+            // 🚀 VALIDAR ESTOQUE CONSIDERANDO COMANDAS ABERTAS + CARRINHO DO PDV
+            // 1. Buscar comandas abertas
+            const { data: cmdAbertas } = await supabase
+                .from('comandas')
+                .select('id')
+                .eq('status', 'aberta');
+            
+            const idsCmdAbertas = (cmdAbertas || []).map(c => c.id);
+            
+            // 2. Buscar quantidade do produto em comandas abertas
+            let totalEmComandas = 0;
+            if (idsCmdAbertas.length > 0) {
+                const { data: itensComandas } = await supabase
+                    .from('comanda_itens')
+                    .select('quantidade')
+                    .eq('produto_id', produtoId)
+                    .eq('status', 'pendente')
+                    .in('comanda_id', idsCmdAbertas);
+                
+                if (itensComandas && itensComandas.length > 0) {
+                    totalEmComandas = itensComandas.reduce((sum, item) => sum + (item.quantidade || 0), 0);
+                }
+            }
+            
+            // 3. Calcular estoque disponível real
+            const estoqueTotal = produto.estoque_atual || 0;
+            const estoqueDisponivel = estoqueTotal - totalEmComandas;
+            
+            // 4. Validar contra estoque disponível + o que já está no carrinho do PDV
             const itemExistenteIdx = this.itensCarrinho.findIndex(i => i.produto_id === produtoId);
             const quantidadeJaAdicionada = itemExistenteIdx >= 0 ? this.itensCarrinho[itemExistenteIdx].quantidade : 0;
             const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
 
             if (quantidadeTotalNecessaria > estoqueDisponivel && !false) { // permitir_venda_zerado
-                const mensagem = `Já adicionado: ${quantidadeJaAdicionada.toFixed(2)}\n` +
-                                `Novo: ${quantidade.toFixed(2)}\n` +
-                                `Total solicitado: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
-                                `Disponível: ${estoqueDisponivel.toFixed(2)}`;
+                const mensagem = `Quantidade solicitada:\n` +
+                                `  • Já adicionado neste PDV: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                                `  • Novo: ${quantidade.toFixed(2)}\n` +
+                                `  • Total: ${quantidadeTotalNecessaria.toFixed(2)}\n\n` +
+                                `Disponível em estoque: ${estoqueDisponivel.toFixed(2)}\n` +
+                                `(Descontas: ${totalEmComandas.toFixed(2)} em comandas abertas)`;
                 this.exibirMensagemModal(`Estoque insuficiente para ${produto.nome}`, mensagem);
                 return false;
             }
@@ -904,9 +933,9 @@ class PDVSystem {
                     </div>
                     <div class="text-right">
                         <div class="font-bold">R$ ${total.toFixed(2)}</div>
-                        <div class="text-sm space-x-1">
+                        <div class="text-sm space-x-1 flex items-center gap-1 mt-1 justify-end">
                             <button class="btn-diminuir px-2 py-1 bg-gray-300 rounded hover:bg-gray-400" data-item-id="${item.id}">-</button>
-                            <span>${item.quantidade}</span>
+                            <input type="number" class="input-quantidade w-16 px-2 py-1 border rounded text-center" data-item-id="${item.id}" value="${item.quantidade}" min="0.01" step="0.01">
                             <button class="btn-aumentar px-2 py-1 bg-gray-300 rounded hover:bg-gray-400" data-item-id="${item.id}">+</button>
                             <button class="btn-remover px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600" data-item-id="${item.id}">✕</button>
                         </div>
@@ -938,6 +967,19 @@ class PDVSystem {
             btn.addEventListener('click', (e) => {
                 const itemId = e.target.getAttribute('data-item-id');
                 this.removerItem(itemId);
+            });
+        });
+
+        // Setup input de quantidade para edição direta
+        container.querySelectorAll('.input-quantidade').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const itemId = e.target.getAttribute('data-item-id');
+                const novaQuantidade = parseFloat(e.target.value);
+                if (novaQuantidade > 0) {
+                    this.atualizarQuantidade(itemId, novaQuantidade);
+                } else {
+                    e.target.value = this.itensCarrinho.find(i => i.id === itemId)?.quantidade || 1;
+                }
             });
         });
 
@@ -994,13 +1036,37 @@ class PDVSystem {
                     continue;
                 }
                 
-                const estoqueDisponivel = produto.estoque_atual || 0;
+                // 🚀 CALCULAR ESTOQUE DISPONÍVEL DESCONTANDO COMANDAS ABERTAS
+                const { data: cmdAbertas } = await supabase
+                    .from('comandas')
+                    .select('id')
+                    .eq('status', 'aberta');
+                
+                const idsCmdAbertas = (cmdAbertas || []).map(c => c.id);
+                let totalEmComandas = 0;
+                
+                if (idsCmdAbertas.length > 0) {
+                    const { data: itensComandas } = await supabase
+                        .from('comanda_itens')
+                        .select('quantidade')
+                        .eq('produto_id', item.produto_id)
+                        .eq('status', 'pendente')
+                        .in('comanda_id', idsCmdAbertas);
+                    
+                    if (itensComandas && itensComandas.length > 0) {
+                        totalEmComandas = itensComandas.reduce((sum, it) => sum + (it.quantidade || 0), 0);
+                    }
+                }
+                
+                const estoqueDisponivel = (produto.estoque_atual || 0) - totalEmComandas;
                 if (item.quantidade > estoqueDisponivel) {
-                    this.exibirErro(
-                        `Estoque insuficiente para ${produto.nome}\n` +
-                        `Disponível: ${estoqueDisponivel.toFixed(2)} ${item.unidade}\n` +
-                        `Solicitado: ${item.quantidade.toFixed(2)} ${item.unidade}`
-                    );
+                    const mensagem = `Quantidade solicitada:\n` +
+                        `  • Total: ${item.quantidade.toFixed(2)}\n\n` +
+                        `Estoque total: ${(produto.estoque_atual || 0).toFixed(2)}\n` +
+                        `Reservado em comandas: ${totalEmComandas.toFixed(2)}\n` +
+                        `Disponível em estoque: ${Math.max(0, estoqueDisponivel).toFixed(2)}\n` +
+                        `(Desconta quantidade reservada em comandas abertas)`;
+                    this.exibirMensagemModal(`Estoque insuficiente para ${produto.nome}`, mensagem);
                     return false;
                 }
             }

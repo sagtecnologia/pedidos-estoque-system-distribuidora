@@ -664,11 +664,13 @@
 
                     if (quantidadeTotalNecessaria > estoqueDisponivel) {
                         throw new Error(
-                            `Estoque insuficiente para ${produto.nome}\n` +
-                            `Já adicionado nesta comanda: ${quantidadeJaAdicionada.toFixed(2)}\n` +
-                            `Novo: ${quantidade.toFixed(2)}\n` +
-                            `Total: ${quantidadeTotalNecessaria.toFixed(2)}\n` +
-                            `Disponível (outras comandas descontadas): ${estoqueDisponivel.toFixed(2)}`
+                            `Estoque insuficiente para ${produto.nome}\n\n` +
+                            `Quantidade solicitada:\n` +
+                            `  • Já adicionado nesta comanda: ${quantidadeJaAdicionada.toFixed(2)}\n` +
+                            `  • Novo: ${quantidade.toFixed(2)}\n` +
+                            `  • Total: ${quantidadeTotalNecessaria.toFixed(2)}\n\n` +
+                            `Disponível em estoque: ${estoqueDisponivel.toFixed(2)}\n` +
+                            `(Desconta quantidade reservada em outras comandas abertas)`
                         );
                     }
                 } else {
