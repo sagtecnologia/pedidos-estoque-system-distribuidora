@@ -348,13 +348,15 @@
                         <button onclick="verDetalhes('${doc.id}')" class="text-blue-600 hover:text-blue-900 mr-3" title="Ver Detalhes">
                             <i class="fas fa-eye"></i>
                         </button>
-                        ${doc.chave_acesso && doc.status_sefaz === '100' ? `
+                        ${doc.chave_acesso && (doc.status_sefaz === '100' || doc.status_sefaz === '135') ? `
                             <button onclick="baixarXML('${doc.id}')" class="text-green-600 hover:text-green-900 mr-3" title="Baixar XML">
                                 <i class="fas fa-download"></i>
                             </button>
                             <button onclick="imprimirDANFE('${doc.id}')" class="text-purple-600 hover:text-purple-900 mr-3" title="Imprimir DANFE">
                                 <i class="fas fa-print"></i>
                             </button>
+                        ` : ''}
+                        ${doc.chave_acesso && doc.status_sefaz === '100' ? `
                             <button onclick="cancelarNota('${doc.id}')" class="text-red-600 hover:text-red-900" title="Cancelar Nota">
                                 <i class="fas fa-ban"></i>
                             </button>
@@ -451,6 +453,26 @@
         // AÇÕES
         // ========================================
         
+        /**
+         * Resolver o nfce_id da Nuvem Fiscal a partir do documento
+         */
+        async function resolverNfceId(doc) {
+            // 1. Direto de documentos_fiscais
+            if (doc.nfce_id) return doc.nfce_id;
+            
+            // 2. Via venda_id -> vendas.nfce_id
+            if (doc.venda_id) {
+                const { data: venda } = await supabase
+                    .from('vendas')
+                    .select('nfce_id')
+                    .eq('id', doc.venda_id)
+                    .maybeSingle();
+                if (venda?.nfce_id) return venda.nfce_id;
+            }
+            
+            return null;
+        }
+
         async function baixarXML(docId) {
             try {
                 const doc = documentos.find(d => d.id === docId);
@@ -458,31 +480,58 @@
                     showToastSafe('Documento sem chave de acesso', 'error');
                     return;
                 }
-                if (doc.status_sefaz !== '100') {
-                    showToastSafe('Só é possível baixar XML de notas autorizadas!', 'error');
+                if (doc.status_sefaz !== '100' && doc.status_sefaz !== '135') {
+                    showToastSafe('Só é possível baixar XML de notas autorizadas ou canceladas!', 'error');
                     return;
                 }
                 showToastSafe('Baixando XML...', 'info');
                 
-                const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
-                
                 try {
-                    // Usar o nfce_id se disponível (Nuvem Fiscal)
-                    if (doc.nfce_id && doc.api_provider === 'nuvem_fiscal') {
-                        console.log('✅ Usando nfce_id para download:', doc.nfce_id);
-                        await FiscalService.baixarXML(doc.nfce_id, tipo);
-                    } else {
-                        // Fallback para chave de acesso (Focus NFe ou legado)
-                        console.log('📋 Usando chave_acesso para download:', doc.chave_acesso);
-                        await FiscalService.baixarXML(doc.chave_acesso, tipo);
+                    if (doc.api_provider === 'nuvem_fiscal') {
+                        const nfceId = await resolverNfceId(doc);
+                        
+                        if (nfceId) {
+                            if (doc.status_sefaz === '135') {
+                                // Nota cancelada: usar endpoint de cancelamento
+                                console.log('✅ Baixando XML de cancelamento, nfce_id:', nfceId);
+                                await NuvemFiscal.baixarXMLCancelamento(nfceId);
+                            } else {
+                                // Nota autorizada: usar endpoint da nota
+                                console.log('✅ Baixando XML da nota, nfce_id:', nfceId);
+                                await NuvemFiscal.baixarXML(nfceId);
+                            }
+                            showToastSafe('XML baixado com sucesso!', 'success');
+                            return;
+                        }
+                        
+                        // Fallback: XML salvo no banco
+                        if (doc.xml_nota || doc.xml_retorno) {
+                            console.log('✅ Usando XML salvo no banco de dados');
+                            const xmlContent = doc.xml_nota || doc.xml_retorno;
+                            const blob = new Blob([xmlContent], { type: 'application/xml' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `NFCE-${doc.numero_documento || doc.chave_acesso}.xml`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            showToastSafe('XML baixado com sucesso!', 'success');
+                            return;
+                        }
+                        
+                        showToastSafe('nfce_id não encontrado para esta nota.', 'error');
+                        return;
                     }
+                    
+                    // Focus NFe ou outro provider
+                    const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                    await FiscalService.baixarXML(doc.chave_acesso, tipo);
                     showToastSafe('XML baixado com sucesso!', 'success');
                 } catch (err) {
-                    if (err && err.message && err.message.includes('não encontrada')) {
-                        showToastSafe('Nota fiscal não encontrada na SEFAZ/Focus NFe.', 'error');
-                    } else {
-                        showToastSafe('Erro ao baixar XML: ' + (err.message || err), 'error');
-                    }
+                    console.error('❌ Erro ao baixar XML:', err);
+                    showToastSafe('Erro ao baixar XML: ' + (err.message || err), 'error');
                 }
             } catch (error) {
                 console.error('Erro ao baixar XML:', error);
@@ -497,16 +546,35 @@
                     showToastSafe('Documento sem chave de acesso', 'error');
                     return;
                 }
-                if (doc.status_sefaz !== '100') {
-                    showToastSafe('Só é possível imprimir DANFE de notas autorizadas!', 'error');
+                if (doc.status_sefaz !== '100' && doc.status_sefaz !== '135') {
+                    showToastSafe('Só é possível imprimir DANFE de notas autorizadas ou canceladas!', 'error');
                     return;
                 }
                 showToastSafe('Gerando DANFE...', 'info');
-                const ref = doc.chave_acesso;
                 const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
                 try {
-                    // Baixar PDF e abrir em nova aba
-                    const pdfUrl = await FiscalService.baixarDANFE(ref, tipo);
+                    let pdfUrl;
+                    
+                    if (doc.api_provider === 'nuvem_fiscal') {
+                        const nfceId = await resolverNfceId(doc);
+                        
+                        if (nfceId) {
+                            if (doc.status_sefaz === '135') {
+                                // Nota cancelada: usar endpoint de cancelamento
+                                console.log('✅ Baixando PDF de cancelamento, nfce_id:', nfceId);
+                                pdfUrl = await NuvemFiscal.baixarPDFCancelamento(nfceId);
+                            } else {
+                                // Nota autorizada: PDF normal
+                                console.log('✅ Baixando PDF da nota, nfce_id:', nfceId);
+                                pdfUrl = await NuvemFiscal.baixarPDF(nfceId);
+                            }
+                        }
+                    }
+                    
+                    // Fallback: usar FiscalService com chave de acesso
+                    if (!pdfUrl) {
+                        pdfUrl = await FiscalService.baixarDANFE(doc.chave_acesso, tipo);
+                    }
                     
                     // Se for um Blob, converter para URL
                     let urlParaAbrir = pdfUrl;

@@ -1045,34 +1045,59 @@ class FiscalSystem {
             let pdfBlobOrUrl = null;
 
             if (provider === 'nuvem_fiscal') {
-                // Nuvem Fiscal usa ID da nota, não chave de acesso
-                // Tentar múltiplas formas de encontrar o ID:
-                // 1. Buscar em documentos_fiscais primeiro (notas de distribuição)
+                // Nuvem Fiscal usa nfce_id (salvo em documentos_fiscais e vendas)
+                let nfceId = null;
+
+                // 1. Buscar nfce_id diretamente em documentos_fiscais
                 const { data: docFiscal } = await supabase
                     .from('documentos_fiscais')
-                    .select('id, nfce_id, chave_acesso')
+                    .select('nfce_id, venda_id, status_sefaz')
                     .eq('chave_acesso', referencia)
                     .eq('tipo_documento', 'NFCE')
                     .maybeSingle();
 
-                let nfceId = docFiscal?.nfce_id;
+                if (docFiscal?.nfce_id) {
+                    nfceId = docFiscal.nfce_id;
+                    console.log('✅ nfce_id encontrado em documentos_fiscais:', nfceId);
+                }
 
-                // 2. Se não encontrou em documentos_fiscais, tentar em vendas
+                // 2. Buscar via venda_id -> vendas.nfce_id
+                if (!nfceId && docFiscal?.venda_id) {
+                    const { data: vendaPorDoc } = await supabase
+                        .from('vendas')
+                        .select('nfce_id')
+                        .eq('id', docFiscal.venda_id)
+                        .maybeSingle();
+                    if (vendaPorDoc?.nfce_id) {
+                        nfceId = vendaPorDoc.nfce_id;
+                        console.log('✅ nfce_id encontrado via vendas:', nfceId);
+                    }
+                }
+
+                // 3. Buscar diretamente em vendas por chave_acesso_nfce
                 if (!nfceId) {
                     const { data: venda } = await supabase
                         .from('vendas')
                         .select('nfce_id')
                         .eq('chave_acesso_nfce', referencia)
                         .maybeSingle();
-                    
-                    nfceId = venda?.nfce_id;
+                    if (venda?.nfce_id) {
+                        nfceId = venda.nfce_id;
+                        console.log('✅ nfce_id encontrado em vendas por chave_acesso:', nfceId);
+                    }
                 }
 
                 if (!nfceId) {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
                 }
 
-                pdfBlobOrUrl = await NuvemFiscal.baixarPDF(nfceId);
+                // Verificar se é nota cancelada para usar endpoint correto
+                const isCancelada = docFiscal?.status_sefaz === '135';
+                if (isCancelada) {
+                    pdfBlobOrUrl = await NuvemFiscal.baixarPDFCancelamento(nfceId);
+                } else {
+                    pdfBlobOrUrl = await NuvemFiscal.baixarPDF(nfceId);
+                }
                 
                 // Se for um Blob, converter para URL
                 if (pdfBlobOrUrl instanceof Blob) {
@@ -1114,40 +1139,89 @@ class FiscalSystem {
             const provider = config?.api_fiscal_provider || 'focus_nfe';
 
             if (provider === 'nuvem_fiscal') {
-                // Nuvem Fiscal usa ID da nota, não chave de acesso
-                // Tentar múltiplas formas de encontrar o ID:
-                // 1. Buscar por chave_acesso em documentos_fiscais (campo chave_acesso)
+                // Nuvem Fiscal usa o nfce_id (ID retornado pela API na emissão)
+                // Esse ID é salvo tanto em documentos_fiscais.nfce_id quanto em vendas.nfce_id
+                
+                let nfceId = null;
+
+                // 1. Buscar nfce_id diretamente em documentos_fiscais (gravado na emissão)
                 const { data: docFiscal } = await supabase
                     .from('documentos_fiscais')
-                    .select('id, chave_acesso')
+                    .select('nfce_id, venda_id, xml_nota, xml_retorno')
                     .eq('chave_acesso', referencia)
                     .eq('tipo_documento', 'NFCE')
                     .maybeSingle();
                 
-                if (docFiscal) {
-                    console.log('✅ Documento fiscal encontrado em documentos_fiscais, usando ID Nuvem Fiscal...');
+                if (docFiscal?.nfce_id) {
+                    nfceId = docFiscal.nfce_id;
+                    console.log('✅ nfce_id encontrado em documentos_fiscais:', nfceId);
                 }
 
-                // 2. Se não encontrou em documentos_fiscais, tentar em vendas
-                if (!docFiscal) {
+                // 2. Buscar em vendas via venda_id
+                if (!nfceId && docFiscal?.venda_id) {
+                    const { data: venda } = await supabase
+                        .from('vendas')
+                        .select('nfce_id')
+                        .eq('id', docFiscal.venda_id)
+                        .maybeSingle();
+                    if (venda?.nfce_id) {
+                        nfceId = venda.nfce_id;
+                        console.log('✅ nfce_id encontrado via vendas:', nfceId);
+                    }
+                }
+
+                // 3. Buscar diretamente em vendas por chave_acesso_nfce
+                if (!nfceId) {
                     const { data: venda } = await supabase
                         .from('vendas')
                         .select('nfce_id')
                         .eq('chave_acesso_nfce', referencia)
                         .maybeSingle();
-
                     if (venda?.nfce_id) {
-                        console.log('✅ Nota encontrada em vendas, ID Nuvem Fiscal:', venda.nfce_id);
-                        return await NuvemFiscal.baixarXML(venda.nfce_id);
+                        nfceId = venda.nfce_id;
+                        console.log('✅ nfce_id encontrado em vendas por chave_acesso:', nfceId);
                     }
                 }
-                
-                if (docFiscal?.id) {
-                    console.log('✅ Documento encontrado, ID:', docFiscal.id);
-                    return await NuvemFiscal.baixarXML(docFiscal.id);
+
+                // 4. Se a referência já é um nfce_id, usá-lo diretamente
+                if (!nfceId) {
+                    const { data: vendaDireta } = await supabase
+                        .from('vendas')
+                        .select('nfce_id')
+                        .eq('nfce_id', referencia)
+                        .maybeSingle();
+                    if (vendaDireta?.nfce_id) {
+                        nfceId = vendaDireta.nfce_id;
+                        console.log('✅ Referência já é um nfce_id:', nfceId);
+                    }
                 }
 
-                throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal e salva corretamente.');
+                // 5. Fallback: usar XML salvo no banco de dados
+                if (!nfceId && docFiscal && (docFiscal.xml_nota || docFiscal.xml_retorno)) {
+                    console.log('✅ Usando XML salvo no banco de dados (fallback)');
+                    const xmlContent = docFiscal.xml_nota || docFiscal.xml_retorno;
+                    const blob = new Blob([xmlContent], { type: 'application/xml' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `NFCE-${referencia}.xml`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    return blob;
+                }
+
+                if (!nfceId) {
+                    throw new Error('ID da nota na Nuvem Fiscal não encontrado. Verifique se a nota foi emitida pela Nuvem Fiscal e salva corretamente.');
+                }
+
+                // Verificar se é nota cancelada para usar endpoint correto
+                const isCancelada = docFiscal?.status_sefaz === '135';
+                if (isCancelada) {
+                    return await NuvemFiscal.baixarXMLCancelamento(nfceId);
+                }
+                return await NuvemFiscal.baixarXML(nfceId);
             } else {
                 return await FocusNFe.baixarXML(referencia, tipo);
             }

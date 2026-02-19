@@ -594,55 +594,98 @@ class NuvemFiscalService {
     }
 
     /**
-     * Baixar XML da NFC-e
-     * GET /nfce/{id}/xml
-     * @param {string} id - ID da NFC-e
+     * Baixar XML da NFC-e (nota completa)
+     * GET /nfce/{id}/xml/nota - XML completo da NFC-e
+     * @param {string} id - ID da NFC-e na Nuvem Fiscal
      * @returns {Blob} Arquivo XML
      */
     async baixarXML(id) {
         try {
             console.log('📥 [NuvemFiscal] Baixando XML da NFC-e:', id);
             
-            // Fazer requisição e receber como blob
-            const response = await fetch(`${this.apiUrl}/nfce/${id}/xml`, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Accept': 'application/xml'
-                }
+            const blob = await this.request(`/nfce/${id}/xml/nota`, 'GET', null, {
+                'Accept': 'application/xml'
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('❌ Erro ao baixar XML:', response.status, errorText);
-                throw new Error(`Erro ao baixar XML: ${response.status} - ${errorText}`);
-            }
-
-            // Receber como blob (arquivo)
-            const blob = await response.blob();
             
-            if (blob.size === 0) {
+            if (!blob || blob.size === 0) {
                 throw new Error('XML recebido vazio da Nuvem Fiscal');
             }
 
             console.log('✅ [NuvemFiscal] XML baixado com sucesso, tamanho:', blob.size);
-            
-            // Criar link de download automático
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `NFCE-${id}.xml`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            console.log('✅ [NuvemFiscal] Download do XML iniciado');
+            this._triggerDownload(blob, `NFCE-${id}.xml`);
             return blob;
         } catch (erro) {
             console.error('❌ Erro ao baixar XML:', erro);
             throw erro;
         }
+    }
+
+    /**
+     * Baixar XML de cancelamento da NFC-e
+     * GET /nfce/{id}/cancelamento/xml
+     * @param {string} id - ID da NFC-e na Nuvem Fiscal
+     * @returns {Blob} Arquivo XML do cancelamento
+     */
+    async baixarXMLCancelamento(id) {
+        try {
+            console.log('📥 [NuvemFiscal] Baixando XML de cancelamento da NFC-e:', id);
+            
+            const blob = await this.request(`/nfce/${id}/cancelamento/xml`, 'GET', null, {
+                'Accept': 'application/xml'
+            });
+            
+            if (!blob || blob.size === 0) {
+                throw new Error('XML de cancelamento recebido vazio da Nuvem Fiscal');
+            }
+
+            console.log('✅ [NuvemFiscal] XML de cancelamento baixado, tamanho:', blob.size);
+            this._triggerDownload(blob, `NFCE-CANCELAMENTO-${id}.xml`);
+            return blob;
+        } catch (erro) {
+            console.error('❌ Erro ao baixar XML de cancelamento:', erro);
+            throw erro;
+        }
+    }
+
+    /**
+     * Baixar PDF de cancelamento da NFC-e
+     * GET /nfce/{id}/cancelamento/pdf
+     * @param {string} id - ID da NFC-e na Nuvem Fiscal
+     * @returns {Blob} Arquivo PDF do cancelamento
+     */
+    async baixarPDFCancelamento(id) {
+        try {
+            console.log('📥 [NuvemFiscal] Baixando PDF de cancelamento da NFC-e:', id);
+            
+            const blob = await this.request(`/nfce/${id}/cancelamento/pdf`, 'GET', null, {
+                'Accept': 'application/pdf'
+            });
+            
+            if (!blob || blob.size === 0) {
+                throw new Error('PDF de cancelamento recebido vazio da Nuvem Fiscal');
+            }
+
+            console.log('✅ [NuvemFiscal] PDF de cancelamento baixado, tamanho:', blob.size);
+            return blob;
+        } catch (erro) {
+            console.error('❌ Erro ao baixar PDF de cancelamento:', erro);
+            throw erro;
+        }
+    }
+
+    /**
+     * Helper: disparar download de arquivo no navegador
+     */
+    _triggerDownload(blob, filename) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        console.log('✅ [NuvemFiscal] Download iniciado:', filename);
     }
 
     /**
