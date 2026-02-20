@@ -87,6 +87,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qtd</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pagamento</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NFC-e</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Chave Acesso</th>
@@ -96,14 +97,14 @@
                             </tr>
                         </thead>
                         <tbody id="vendas-tbody" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="11" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            <tr><td colspan="12" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
                         </tbody>
                         <tfoot id="vendas-tfoot" class="bg-gray-50 border-t-2 border-gray-300">
                             <tr>
                                 <td colspan="3" class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">TOTAL:</td>
                                 <td class="px-6 py-4 text-sm font-bold text-gray-900" id="total-quantidade">0</td>
                                 <td class="px-6 py-4 text-sm font-bold text-gray-900" id="total-valor">R$ 0,00</td>
-                                <td colspan="6"></td>
+                                <td colspan="7"></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -480,7 +481,7 @@
             const tbody = document.getElementById('vendas-tbody');
             
             if (vendas.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
                 document.getElementById('total-quantidade').textContent = '0';
                 document.getElementById('total-valor').textContent = 'R$ 0,00';
                 return;
@@ -548,6 +549,12 @@
                     </td>
                     <td class="px-6 py-4 text-sm font-medium text-gray-900">
                         ${formatCurrency(venda.total || 0)}${badgePagamento}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">
+                        <span class="inline-flex items-center gap-1">
+                            ${formatarFormaPagamento(venda.forma_pagamento)}
+                            ${vendaFinalizada ? `<button onclick="abrirModalEditarPagamento('${venda.id}', '${venda.forma_pagamento || ''}', ${venda.subtotal || 0}, ${venda.desconto_valor || 0}, ${venda.total || 0})" class="text-blue-500 hover:text-blue-700 ml-1" title="Alterar forma de pagamento"><i class="fas fa-edit text-xs"></i></button>` : ''}
+                        </span>
                     </td>
                     <td class="px-6 py-4">
                         ${getStatusBadge(venda.status)}
@@ -851,6 +858,150 @@ Deseja baixar o DANFE (PDF)?`);
             } finally {
                 showLoading(false);
             }
+        }
+
+        // Formatar forma de pagamento para exibição
+        function formatarFormaPagamento(forma) {
+            const mapa = {
+                'DINHEIRO': '<span class="text-green-700">Dinheiro</span>',
+                'PIX': '<span class="text-purple-700">PIX</span>',
+                'CARTAO_DEBITO': '<span class="text-blue-700">Débito</span>',
+                'CARTAO_CREDITO': '<span class="text-orange-700">Crédito</span>',
+                'PRAZO': '<span class="text-gray-700">A Prazo</span>'
+            };
+            return mapa[forma] || forma || '-';
+        }
+
+        // Abrir modal para editar forma de pagamento
+        function abrirModalEditarPagamento(vendaId, formaAtual, subtotal, descontoAtual, totalAtual) {
+            console.log('🔵 Abrindo modal editar pagamento:', { vendaId, formaAtual, subtotal, descontoAtual, totalAtual });
+
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            overlay.id = 'modal-editar-pagamento-overlay';
+
+            const container = document.createElement('div');
+            container.className = 'bg-white p-6 rounded-lg max-w-md w-full mx-4';
+            container.innerHTML = `
+                <h3 class="text-xl font-bold mb-4"><i class="fas fa-exchange-alt mr-2 text-blue-600"></i>Alterar Forma de Pagamento</h3>
+                <p class="text-gray-600 mb-2">Subtotal: <strong>R$ ${subtotal.toFixed(2)}</strong></p>
+                <p class="text-gray-600 mb-4">Total atual: <strong>R$ ${totalAtual.toFixed(2)}</strong></p>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Nova Forma de Pagamento</label>
+                    <select id="nova-forma-pagamento" class="w-full border rounded px-3 py-2">
+                        <option value="DINHEIRO" ${formaAtual === 'DINHEIRO' ? 'selected' : ''}>Dinheiro</option>
+                        <option value="PIX" ${formaAtual === 'PIX' ? 'selected' : ''}>PIX</option>
+                        <option value="CARTAO_DEBITO" ${formaAtual === 'CARTAO_DEBITO' ? 'selected' : ''}>Cartão Débito</option>
+                        <option value="CARTAO_CREDITO" ${formaAtual === 'CARTAO_CREDITO' ? 'selected' : ''}>Cartão Crédito</option>
+                        <option value="PRAZO" ${formaAtual === 'PRAZO' ? 'selected' : ''}>A Prazo</option>
+                    </select>
+                </div>
+
+                <div id="info-taxa-edicao" class="mb-4 hidden p-3 bg-yellow-50 rounded border border-yellow-200">
+                    <p class="text-sm text-yellow-800"><i class="fas fa-info-circle mr-1"></i>Taxa do cartão: <strong id="taxa-info-edicao">0%</strong></p>
+                    <p class="text-sm text-yellow-800">Desconto da taxa: <strong id="taxa-valor-edicao">R$ 0,00</strong></p>
+                </div>
+
+                <div class="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                    <p class="text-sm">Novo total: <strong id="novo-total-edicao" class="text-blue-700 text-lg">R$ ${totalAtual.toFixed(2)}</strong></p>
+                </div>
+
+                <div class="flex gap-2">
+                    <button id="btn-cancelar-edicao" class="flex-1 px-4 py-2 border rounded hover:bg-gray-100">Cancelar</button>
+                    <button id="btn-confirmar-edicao" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Salvar</button>
+                </div>
+            `;
+
+            overlay.appendChild(container);
+            document.body.appendChild(overlay);
+
+            const selectForma = container.querySelector('#nova-forma-pagamento');
+            const infoTaxa = container.querySelector('#info-taxa-edicao');
+            const taxaInfo = container.querySelector('#taxa-info-edicao');
+            const taxaValorEl = container.querySelector('#taxa-valor-edicao');
+            const novoTotalEl = container.querySelector('#novo-total-edicao');
+            const btnCancelar = container.querySelector('#btn-cancelar-edicao');
+            const btnConfirmar = container.querySelector('#btn-confirmar-edicao');
+
+            // Taxas padrão (TODO: buscar da empresa_config se disponível)
+            const TAXA_DEBITO = 1.09;
+            const TAXA_CREDITO = 3.16;
+
+            let novoTotal = totalAtual;
+            let novaTaxa = 0;
+
+            const recalcularValores = () => {
+                const forma = selectForma.value;
+                let taxa = 0;
+
+                if (forma === 'CARTAO_DEBITO') {
+                    taxa = TAXA_DEBITO;
+                } else if (forma === 'CARTAO_CREDITO') {
+                    taxa = TAXA_CREDITO;
+                }
+
+                if (taxa > 0) {
+                    novaTaxa = (subtotal * taxa) / 100;
+                    novoTotal = subtotal - novaTaxa;
+                    infoTaxa.classList.remove('hidden');
+                    taxaInfo.textContent = `${taxa.toFixed(2)}%`;
+                    taxaValorEl.textContent = `R$ ${novaTaxa.toFixed(2)}`;
+                } else {
+                    novaTaxa = 0;
+                    novoTotal = subtotal;
+                    infoTaxa.classList.add('hidden');
+                }
+
+                novoTotalEl.textContent = `R$ ${novoTotal.toFixed(2)}`;
+            };
+
+            selectForma.addEventListener('change', recalcularValores);
+            recalcularValores(); // Calcular com valor atual
+
+            btnCancelar.addEventListener('click', () => overlay.remove(), { once: true });
+
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) overlay.remove();
+            });
+
+            container.addEventListener('click', (e) => e.stopPropagation());
+
+            btnConfirmar.addEventListener('click', async () => {
+                const novaForma = selectForma.value;
+
+                if (novaForma === formaAtual && Math.abs(novoTotal - totalAtual) < 0.01) {
+                    overlay.remove();
+                    return;
+                }
+
+                btnConfirmar.disabled = true;
+                btnConfirmar.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Salvando...';
+
+                try {
+                    const { error } = await supabase
+                        .from('vendas')
+                        .update({
+                            forma_pagamento: novaForma,
+                            desconto_valor: novaTaxa,
+                            total: novoTotal,
+                            valor_pago: novoTotal
+                        })
+                        .eq('id', vendaId);
+
+                    if (error) throw error;
+
+                    console.log(`✅ Pagamento atualizado: ${formaAtual} -> ${novaForma}, Total: R$ ${novoTotal.toFixed(2)}`);
+                    overlay.remove();
+                    showToast('Forma de pagamento atualizada!', 'success');
+                    await loadVendas();
+                } catch (error) {
+                    console.error('❌ Erro ao atualizar pagamento:', error);
+                    alert('Erro ao atualizar: ' + error.message);
+                    btnConfirmar.disabled = false;
+                    btnConfirmar.innerHTML = 'Salvar';
+                }
+            }, { once: true });
         }
 
         // Cancelar NFC-e

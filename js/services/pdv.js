@@ -1004,7 +1004,7 @@ class PDVSystem {
     /**
      * Finalizar venda com bloqueio para evitar race condition
      */
-    static async finalizarVenda(formaPagamento, valorPago, acrescimoTarifa = 0) {
+    static async finalizarVenda(formaPagamento, valorPago, acrescimoTarifa = 0, descontoFinal = 0) {
         try {
             if (this.itensCarrinho.length === 0) {
                 this.exibirErro('Carrinho vazio');
@@ -1077,8 +1077,8 @@ class PDVSystem {
             
             // ✅ Taxa é desconto do estabelecimento (não afeta cliente)
             // Cliente paga valor normal, taxa é deducted do final saved value
-            const totalComDesconto = this.totaisAtual.total - acrescimoTarifa;
-            const troco = valorPago - this.totaisAtual.total;  // Troco baseado no total normal, não no desconto
+            const totalComDesconto = this.totaisAtual.total - descontoFinal - acrescimoTarifa;
+            const troco = valorPago - (this.totaisAtual.total - descontoFinal);  // Troco baseado no total com desconto
 
             console.log('🔵 Estado da movimentação:', {
                 movimentacaoAtual: this.movimentacaoAtual,
@@ -1114,7 +1114,7 @@ class PDVSystem {
                     vendedor_id: usuario.id,
                     sessao_id: this.movimentacaoAtual.id,
                     subtotal: this.totaisAtual.subtotal,
-                    desconto_valor: this.totaisAtual.desconto + acrescimoTarifa,
+                    desconto_valor: this.totaisAtual.desconto + descontoFinal + acrescimoTarifa,
                     acrescimo: this.totaisAtual.acrescimo,
                     total: totalComDesconto,
                     valor_pago: valorPago,
@@ -1521,8 +1521,33 @@ class PDVSystem {
         // Construir HTML manualmente
         container.innerHTML = `
             <h3 class="text-xl font-bold mb-4">Finalizar Venda</h3>
-            <p class="text-gray-600 mb-4">Total: <strong>R$ ${total.toFixed(2)}</strong></p>
+            <p class="text-gray-600 mb-4">Subtotal: <strong>R$ ${total.toFixed(2)}</strong></p>
             
+            <div class="mb-4">
+                <label class="block text-sm font-medium mb-2">Desconto na Venda</label>
+                <div class="flex gap-2">
+                    <div class="flex-1">
+                        <div class="flex">
+                            <input type="number" id="desconto-percentual-final" class="w-24 border rounded-l px-3 py-2" placeholder="0" step="0.01" min="0" max="100" value="0">
+                            <span class="flex items-center px-2 bg-gray-100 border border-l-0 rounded-r text-gray-600 font-medium text-sm">%</span>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex">
+                            <span class="flex items-center px-2 bg-gray-100 border border-r-0 rounded-l text-gray-600 font-medium text-sm">R$</span>
+                            <input type="number" id="desconto-valor-final" class="flex-1 border rounded-r px-3 py-2" placeholder="0.00" step="0.01" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-4 p-3 bg-green-50 rounded border border-green-200">
+                <div class="flex justify-between text-sm">
+                    <span>Total com desconto:</span>
+                    <strong id="total-com-desconto" class="text-green-700 text-lg">R$ ${total.toFixed(2)}</strong>
+                </div>
+            </div>
+
             <div class="mb-4">
                 <label class="block text-sm font-medium mb-2">Forma de Pagamento</label>
                 <select id="forma-pagamento" class="w-full border rounded px-3 py-2">
@@ -1569,32 +1594,59 @@ class PDVSystem {
         const trocoValor = container.querySelector('#troco-valor');
         const btnCancelar = container.querySelector('#btn-cancelar-venda');
         const btnConfirmar = container.querySelector('#btn-confirmar-venda');
+        const descontoPercentualInput = container.querySelector('#desconto-percentual-final');
+        const descontoValorInput = container.querySelector('#desconto-valor-final');
+        const totalComDescontoEl = container.querySelector('#total-com-desconto');
 
-        console.log('✅ Elementos encontrados:', {
-            formaPagamentoSelect: !!formaPagamentoSelect,
-            secaoAcrescimo: !!secaoAcrescimo,
-            acrescimoTarifaInput: !!acrescimoTarifaInput,
-            valorPagoInput: !!valorPagoInput,
-            trocoValor: !!trocoValor,
-            btnCancelar: !!btnCancelar,
-            btnConfirmar: !!btnConfirmar
-        });
+        // Estado do desconto na finalização
+        let descontoFinal = 0;
+        let totalFinal = total;
 
         if (!valorPagoInput || !trocoValor) {
             console.error('❌ Elementos não encontrados!');
             return;
         }
 
+        // Função para recalcular total com desconto
+        const recalcularTotal = () => {
+            totalFinal = total - descontoFinal;
+            if (totalFinal < 0) totalFinal = 0;
+            totalComDescontoEl.textContent = `R$ ${totalFinal.toFixed(2)}`;
+            valorPagoInput.value = totalFinal.toFixed(2);
+            // Recalcular taxa de cartão se ativo
+            const formaAtual = formaPagamentoSelect.value;
+            if (formaAtual === 'CARTAO_CREDITO' || formaAtual === 'CARTAO_DEBITO') {
+                const taxa = formaAtual === 'CARTAO_DEBITO' ? taxaDebitoEmpresa : taxaCreditoEmpresa;
+                acrescimoTarifaInput.value = ((totalFinal * taxa) / 100).toFixed(2);
+            }
+            atualizarTroco();
+        };
+
+        // Listeners de desconto: percentual → valor
+        descontoPercentualInput.addEventListener('input', () => {
+            const perc = parseFloat(descontoPercentualInput.value) || 0;
+            descontoFinal = (total * perc) / 100;
+            descontoValorInput.value = descontoFinal.toFixed(2);
+            recalcularTotal();
+        });
+
+        // Listeners de desconto: valor → percentual
+        descontoValorInput.addEventListener('input', () => {
+            descontoFinal = parseFloat(descontoValorInput.value) || 0;
+            if (total > 0) {
+                descontoPercentualInput.value = ((descontoFinal / total) * 100).toFixed(2);
+            }
+            recalcularTotal();
+        });
+
         // Função para calcular e atualizar troco
-        const atualizarTroco = (e) => {
-            const acrescimo = parseFloat(acrescimoTarifaInput.value) || 0;
-            // ✅ IMPORTANTE: Taxa NÃO afeta o troco!
-            // Cliente paga o valor total normal, taxa é desconto do estabelecimento
+        const atualizarTroco = () => {
             const valorPago = parseFloat(valorPagoInput.value) || 0;
-            const troco = valorPago - total;
+            const taxaAtual = parseFloat(acrescimoTarifaInput.value) || 0;
+            const troco = valorPago - totalFinal;
             trocoValor.textContent = `R$ ${troco.toFixed(2)}`;
             
-            console.log(`💰 Cálculo: R$ ${valorPago.toFixed(2)} - R$ ${total.toFixed(2)} = R$ ${troco.toFixed(2)} (taxa ${acrescimo.toFixed(2)} é desconto do lojista, não afeta cliente)`);
+            console.log(`💰 Cálculo: R$ ${valorPago.toFixed(2)} - R$ ${totalFinal.toFixed(2)} = R$ ${troco.toFixed(2)} (desconto ${descontoFinal.toFixed(2)}, taxa ${taxaAtual.toFixed(2)})`);
             
             // Mudar cor conforme o troco
             if (troco < -0.01) {
@@ -1627,7 +1679,7 @@ class PDVSystem {
                 }
                 
                 // Calcular desconto (tarifa) baseado na taxa
-                const acrescimo = (total * taxa) / 100;
+                const acrescimo = (totalFinal * taxa) / 100;
                 
                 // Preencher campo de desconto de tarifa
                 acrescimoTarifaInput.value = acrescimo.toFixed(2);
@@ -1636,15 +1688,15 @@ class PDVSystem {
                 container.querySelector('#taxa-percentual').textContent = `${taxa.toFixed(2)}%`;
                 container.querySelector('#taxa-descricao').textContent = descricao;
                 
-                // ✅ IMPORTANTE: Cliente SEMPRE paga o total normal
+                // ✅ IMPORTANTE: Cliente SEMPRE paga o total com desconto aplicado
                 // Taxa é apenas informativa (desconto do estabelecimento), não afeta valor recebido
-                valorPagoInput.value = total.toFixed(2);
+                valorPagoInput.value = totalFinal.toFixed(2);
                 
                 console.log(`💳 ${forma}: Taxa ${taxa}% = R$ ${acrescimo.toFixed(2)}`);
             } else {
                 secaoAcrescimo.classList.add('hidden');
                 acrescimoTarifaInput.value = '0';
-                valorPagoInput.value = total.toFixed(2);
+                valorPagoInput.value = totalFinal.toFixed(2);
                 container.querySelector('#taxa-percentual').textContent = '';
                 container.querySelector('#taxa-descricao').textContent = 'Tarifa do cartão (desconto do estabelecimento)';
             }
@@ -1679,7 +1731,7 @@ class PDVSystem {
             const valorPago = parseFloat(container.querySelector('#valor-pago')?.value);
             const acrescimo = parseFloat(container.querySelector('#acrescimo-tarifa')?.value) || 0;
 
-            console.log('💳 Confirmando pagamento:', { forma, valorPago, acrescimo });
+            console.log('💳 Confirmando pagamento:', { forma, valorPago, acrescimo, descontoFinal });
 
             if (!forma) {
                 alert('Selecione uma forma de pagamento!');
@@ -1698,7 +1750,7 @@ class PDVSystem {
             
             // Chamar finalizarVenda (async)
             (async () => {
-                const resultado = await PDVSystem.finalizarVenda(forma, valorPago, acrescimo);
+                const resultado = await PDVSystem.finalizarVenda(forma, valorPago, acrescimo, descontoFinal);
                 
                 // Se deu sucesso, fechar overlay e exibir cupom imediatamente
                 if (resultado && resultado.cupom) {

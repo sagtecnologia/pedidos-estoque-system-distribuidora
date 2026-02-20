@@ -989,6 +989,21 @@
             container.innerHTML = `
                 <h3 class="text-xl font-bold mb-4">Finalizar Comanda</h3>
                 <p class="text-gray-600 mb-4">Total: <strong>R$ ${total.toFixed(2)}</strong></p>
+
+                <div class="mb-4 p-3 bg-yellow-50 rounded border border-yellow-200">
+                    <label class="block text-sm font-medium mb-2">Desconto na Venda</label>
+                    <div class="flex gap-2">
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500">Percentual (%)</label>
+                            <input type="number" id="desconto-percentual-comanda" class="w-full border rounded px-3 py-2" placeholder="0" step="0.01" min="0" max="100" value="0">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-xs text-gray-500">Valor (R$)</label>
+                            <input type="number" id="desconto-valor-comanda" class="w-full border rounded px-3 py-2" placeholder="0.00" step="0.01" min="0" value="0">
+                        </div>
+                    </div>
+                    <p class="text-sm mt-2">Total com desconto: <strong id="total-com-desconto-comanda" class="text-green-700">R$ ${total.toFixed(2)}</strong></p>
+                </div>
                 
                 <div class="mb-4">
                     <label class="block text-sm font-medium mb-2">Forma de Pagamento</label>
@@ -1036,22 +1051,61 @@
             const trocoValor = container.querySelector('#troco-valor-comanda');
             const btnCancelar = container.querySelector('#btn-cancelar-comanda');
             const btnConfirmar = container.querySelector('#btn-confirmar-comanda');
+            const descontoPercentualInput = container.querySelector('#desconto-percentual-comanda');
+            const descontoValorInput = container.querySelector('#desconto-valor-comanda');
+            const totalComDescontoEl = container.querySelector('#total-com-desconto-comanda');
 
             if (!valorPagoInput || !trocoValor) {
                 console.error('❌ Elementos nao encontrados!');
                 return;
             }
 
+            // Estado do desconto
+            let descontoFinal = 0;
+            let totalFinal = total;
+
+            // Recalcular total com desconto
+            const recalcularTotal = () => {
+                totalFinal = total - descontoFinal;
+                if (totalFinal < 0) totalFinal = 0;
+                totalComDescontoEl.textContent = `R$ ${totalFinal.toFixed(2)}`;
+                valorPagoInput.value = totalFinal.toFixed(2);
+
+                // Recalcular taxa de cartão se necessário
+                const forma = formaPagamentoSelect.value;
+                if (forma === 'CARTAO_CREDITO' || forma === 'CARTAO_DEBITO') {
+                    let taxa = forma === 'CARTAO_DEBITO' ? 1.09 : 3.16;
+                    const taxaValor = (totalFinal * taxa) / 100;
+                    acrescimoTarifaInput.value = taxaValor.toFixed(2);
+                }
+
+                atualizarTroco();
+            };
+
+            // Listener: percentual -> valor
+            descontoPercentualInput.addEventListener('input', () => {
+                const perc = parseFloat(descontoPercentualInput.value) || 0;
+                descontoFinal = (total * perc) / 100;
+                descontoValorInput.value = descontoFinal.toFixed(2);
+                recalcularTotal();
+            });
+
+            // Listener: valor -> percentual
+            descontoValorInput.addEventListener('input', () => {
+                descontoFinal = parseFloat(descontoValorInput.value) || 0;
+                const perc = total > 0 ? (descontoFinal / total) * 100 : 0;
+                descontoPercentualInput.value = perc.toFixed(2);
+                recalcularTotal();
+            });
+
             // Funcao para calcular e atualizar troco
             const atualizarTroco = (e) => {
                 const acrescimo = parseFloat(acrescimoTarifaInput.value) || 0;
-                // ✅ IMPORTANTE: Taxa NÃO afeta o troco!
-                // Cliente paga o valor total normal, taxa é desconto do estabelecimento
                 const valorPago = parseFloat(valorPagoInput.value) || 0;
-                const troco = valorPago - total;
+                const troco = valorPago - totalFinal;
                 trocoValor.textContent = `R$ ${troco.toFixed(2)}`;
                 
-                console.log(`💰 Calculo: R$ ${valorPago.toFixed(2)} - R$ ${total.toFixed(2)} = R$ ${troco.toFixed(2)} (taxa ${acrescimo.toFixed(2)} é desconto do lojista, não afeta cliente)`);
+                console.log(`💰 Calculo: R$ ${valorPago.toFixed(2)} - R$ ${totalFinal.toFixed(2)} = R$ ${troco.toFixed(2)} (desconto ${descontoFinal.toFixed(2)}, taxa ${acrescimo.toFixed(2)})`);
                 
                 // Mudar cor conforme o troco
                 if (troco < -0.01) {
@@ -1085,7 +1139,7 @@
                     
                     // 💡 IMPORTANTE: Taxa é apenas INFORMATIVA na tela!
                     // Não afeta nenhum cálculo de troco ou valor a pagar
-                    const taxaValor = (total * taxa) / 100;
+                    const taxaValor = (totalFinal * taxa) / 100;
                     
                     // Mostrar apenas a taxa (NÃO editar campo de acrescimo)
                     acrescimoTarifaInput.value = taxaValor.toFixed(2);
@@ -1095,15 +1149,15 @@
                     container.querySelector('#taxa-percentual-comanda').textContent = `${taxa.toFixed(2)}%`;
                     container.querySelector('#taxa-descricao-comanda').textContent = descricao;
                     
-                    // ✅ MANTER valor a cobrar igual ao total (SEM adicionar taxa na tela)
-                    valorPagoInput.value = total.toFixed(2);
+                    // ✅ MANTER valor a cobrar igual ao total com desconto
+                    valorPagoInput.value = totalFinal.toFixed(2);
                     
                     console.log(`💳 ${forma}: Taxa ${taxa}% = R$ ${taxaValor.toFixed(2)} (apenas informativa)`);
                 } else {
                     secaoAcrescimo.classList.add('hidden');
                     acrescimoTarifaInput.value = '0';
                     acrescimoTarifaInput.disabled = false;
-                    valorPagoInput.value = total.toFixed(2);
+                    valorPagoInput.value = totalFinal.toFixed(2);
                     container.querySelector('#taxa-percentual-comanda').textContent = '';
                     container.querySelector('#taxa-descricao-comanda').textContent = 'Valor da tarifa';
                 }
@@ -1138,7 +1192,7 @@
                 const valorPago = parseFloat(container.querySelector('#valor-pago-comanda')?.value);
                 const acrescimo = parseFloat(container.querySelector('#acrescimo-tarifa-comanda')?.value) || 0;
 
-                console.log('💳 Confirmando pagamento:', { forma, valorPago, acrescimo });
+                console.log('💳 Confirmando pagamento:', { forma, valorPago, acrescimo, descontoFinal });
 
                 if (!forma) {
                     mostrarMensagem('Atenção', 'Selecione uma forma de pagamento!', 'aviso');
@@ -1159,16 +1213,14 @@
                 (async () => {
                     try {
                         // 💡 Taxa é apenas INFORMATIVA - não afeta cálculos na tela
-                        // Cliente sempre paga o valor total sem taxa adicionada
-                        const totalAcobrar = total; // Valor REAL que cliente paga (sem taxa)
+                        // Cliente sempre paga o valor total com desconto, sem taxa adicionada
+                        const totalAcobrar = totalFinal; // Valor REAL que cliente paga (com desconto)
                         const troco = valorPago - totalAcobrar; // Troco baseado no valor real
                         
-                        // Chamar serviço passando:
-                        // - acrescimo: 0 (taxa NÃO é acrescimo, é apenas informativa)
-                        // - forumla: sempre será o valor real sem taxa
-                        console.log(`📊 Processando: Total=${totalAcobrar.toFixed(2)}, Pago=${valorPago.toFixed(2)}, Troco=${troco.toFixed(2)}`);
+                        // Chamar serviço passando desconto
+                        console.log(`📊 Processando: Total=${totalAcobrar.toFixed(2)}, Desconto=${descontoFinal.toFixed(2)}, Pago=${valorPago.toFixed(2)}, Troco=${troco.toFixed(2)}`);
                         
-                        await ServicoComandasService.fecharComanda(comandaAtual.id, forma, valorPago, 0);
+                        await ServicoComandasService.fecharComanda(comandaAtual.id, forma, valorPago, 0, descontoFinal);
                         console.log(`✅ Comanda finalizada com sucesso: ${comandaAtual.numero_comanda}`);
                         
                         // Fechar overlay e exibir cupom

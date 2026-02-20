@@ -100,7 +100,15 @@ async function uploadLogo(file) {
                 upsert: false
             });
 
-        if (error) throw error;
+        if (error) {
+            if (error.message?.toLowerCase().includes('bucket') || error.message?.toLowerCase().includes('not found')) {
+                throw new Error(
+                    'O bucket "company-logos" não existe no Supabase Storage. ' +
+                    'Acesse o painel do Supabase → Storage → New bucket → nome: company-logos → ative "Public bucket" → salve.'
+                );
+            }
+            throw error;
+        }
 
         // Obter URL pública
         const { data: { publicUrl } } = supabase.storage

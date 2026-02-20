@@ -67,7 +67,7 @@ async function initNavbar() {
             const logoEl = document.getElementById('empresa-logo');
             if (logoEl) {
                 if (empresaConfig.logo_url) {
-                    logoEl.innerHTML = `<img src="${empresaConfig.logo_url}" alt="Logo" class="w-full h-full object-contain rounded-lg">`;
+                    logoEl.innerHTML = `<img src="${empresaConfig.logo_url}" alt="Logo" class="w-full h-full object-cover rounded-lg">`;
                 } else {
                     // Manter ícone padrão se não houver logo
                     logoEl.innerHTML = `<span class="text-white font-bold text-xl">SC</span>`;

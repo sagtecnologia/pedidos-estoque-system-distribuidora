@@ -847,11 +847,15 @@
 
             try {
                 showLoading(true);
-                const result = await updateEmpresaConfig(configData);
-                
+
                 if (logoFile) {
-                    await uploadLogo(logoFile);
+                    const novaLogoUrl = await uploadLogo(logoFile);
+                    if (novaLogoUrl) {
+                        configData.logo_url = novaLogoUrl;
+                    }
                 }
+
+                const result = await updateEmpresaConfig(configData);
                 
                 showToast('Configurações salvas com sucesso!', 'success');
                 setTimeout(() => window.location.reload(), 1500);
@@ -1042,7 +1046,7 @@
                     }
                     
                     if (config.logo_url) {
-                        document.getElementById('logo-preview').innerHTML = `<img src="${config.logo_url}" class="w-full h-full object-contain">`;
+                        document.getElementById('logo-preview').innerHTML = `<img src="${config.logo_url}" class="w-full h-full object-cover">`;
                         document.getElementById('btn-remove-logo').classList.remove('hidden');
                     }
                 }
@@ -1107,7 +1111,7 @@
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     document.getElementById('logo-preview').innerHTML = `
-                        <img src="${e.target.result}" alt="Logo" class="w-full h-full object-contain">
+                        <img src="${e.target.result}" alt="Logo" class="w-full h-full object-cover">
                     `;
                     document.getElementById('btn-remove-logo').classList.remove('hidden');
                 };

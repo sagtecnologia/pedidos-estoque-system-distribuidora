@@ -562,8 +562,9 @@ class ServicoComandas {
      * @param {string} formaPagamento - Forma de pagamento
      * @param {number} valorPago - Valor pago pelo cliente
      * @param {number} acrescimoTarifa - Acrescimo de tarifa de cartao (opcional)
+     * @param {number} descontoFinal - Desconto aplicado na finalização (opcional)
      */
-    async fecharComanda(comandaId, formaPagamento, valorPago, acrescimoTarifa = 0) {
+    async fecharComanda(comandaId, formaPagamento, valorPago, acrescimoTarifa = 0, descontoFinal = 0) {
         try {
             // Buscar comanda completa
             const comanda = await this.buscarComandaPorId(comandaId);
@@ -651,25 +652,26 @@ class ServicoComandas {
 
             // Criar venda
             const valorTotal = comanda.valor_total;
-            const troco = valorPago > valorTotal ? valorPago - valorTotal : 0;
+            const valorComDesconto = valorTotal - descontoFinal;
+            const troco = valorPago > valorComDesconto ? valorPago - valorComDesconto : 0;
 
             // ✅ CALCULAR TAXA NO BACKEND (apenas informativo na tela, debitada ao gravar)
             let acrescimoTarifa_Calculado = 0;
             if (formaPagamento === 'CARTAO_CREDITO') {
-                acrescimoTarifa_Calculado = (valorTotal * 3.16) / 100; // 3,16% para crédito
+                acrescimoTarifa_Calculado = (valorComDesconto * 3.16) / 100; // 3,16% para crédito
             } else if (formaPagamento === 'CARTAO_DEBITO') {
-                acrescimoTarifa_Calculado = (valorTotal * 1.09) / 100; // 1,09% para débito
+                acrescimoTarifa_Calculado = (valorComDesconto * 1.09) / 100; // 1,09% para débito
             }
             
-            console.log(`💳 Taxa de ${formaPagamento}: R$ ${acrescimoTarifa_Calculado.toFixed(2)}`);
+            console.log(`💳 Taxa de ${formaPagamento}: R$ ${acrescimoTarifa_Calculado.toFixed(2)} (desconto: R$ ${descontoFinal.toFixed(2)})`);
 
             // ✅ CALCULAR VALOR FINAL DA VENDA
             // Se é cartão: SUBTRAIR a taxa do valor gravado
-            // Se não é cartão: manter o valor normal
-            let valorFinalVenda = valorTotal;
+            // Se não é cartão: manter o valor com desconto
+            let valorFinalVenda = valorComDesconto;
             if (formaPagamento === 'CARTAO_CREDITO' || formaPagamento === 'CARTAO_DEBITO') {
                 // Taxa é debitada ao gravar (reduz o valor da venda)
-                valorFinalVenda = valorTotal - acrescimoTarifa_Calculado;
+                valorFinalVenda = valorComDesconto - acrescimoTarifa_Calculado;
                 console.log(`💳 Valor da venda após debitar taxa: R$ ${valorFinalVenda.toFixed(2)}`);
             }
 
@@ -690,8 +692,8 @@ class ServicoComandas {
                 operador_id: user.id,
                 vendedor_id: user.id,
                 subtotal: comanda.subtotal,
-                desconto: comanda.desconto || 0,
-                desconto_valor: comanda.desconto || 0,
+                desconto: (comanda.desconto || 0) + descontoFinal,
+                desconto_valor: (comanda.desconto || 0) + descontoFinal,
                 acrescimo: acrescimoTarifa_Calculado,
                 total: valorFinalVenda,
                 forma_pagamento: formaPagamento,

@@ -38,7 +38,7 @@
             </div>
 
             <!-- Stats Cards - Financeiro -->
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                 <!-- Vendas do Dia -->
                 <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-green-500">
                     <div class="flex items-center justify-between">
@@ -53,34 +53,6 @@
                     </div>
                 </div>
 
-                <!-- Contas a Receber -->
-                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-blue-500">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-600 font-medium">A Receber</p>
-                            <p id="stat-a-receber" class="text-2xl font-bold text-blue-600 mt-2">R$ 0,00</p>
-                            <p class="text-xs text-red-500 mt-1">Vencido: <span id="stat-receber-vencido" class="font-semibold">R$ 0,00</span></p>
-                        </div>
-                        <div class="bg-blue-100 p-3 rounded-full">
-                            <i class="fas fa-hand-holding-usd text-blue-600 text-xl"></i>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Contas a Pagar -->
-                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-red-500">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <p class="text-sm text-gray-600 font-medium">A Pagar</p>
-                            <p id="stat-a-pagar" class="text-2xl font-bold text-red-600 mt-2">R$ 0,00</p>
-                            <p class="text-xs text-red-500 mt-1">Vencido: <span id="stat-pagar-vencido" class="font-semibold">R$ 0,00</span></p>
-                        </div>
-                        <div class="bg-red-100 p-3 rounded-full">
-                            <i class="fas fa-file-invoice-dollar text-red-600 text-xl"></i>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Saldo -->
                 <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-purple-500">
                     <div class="flex items-center justify-between">
@@ -91,6 +63,51 @@
                         </div>
                         <div class="bg-purple-100 p-3 rounded-full">
                             <i class="fas fa-balance-scale text-purple-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stats Cards - Comandas -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- Comandas Abertas -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-yellow-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">Comandas Abertas</p>
+                            <p id="stat-qtd-comandas-abertas" class="text-2xl font-bold text-yellow-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Total: <span id="stat-val-comandas-abertas" class="font-semibold">R$ 0,00</span></p>
+                        </div>
+                        <div class="bg-yellow-100 p-3 rounded-full">
+                            <i class="fas fa-clipboard-list text-yellow-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comandas Finalizadas Hoje -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-teal-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">Comandas Finalizadas Hoje</p>
+                            <p id="stat-qtd-comandas-finalizadas" class="text-2xl font-bold text-teal-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Total: <span id="stat-val-comandas-finalizadas" class="font-semibold">R$ 0,00</span></p>
+                        </div>
+                        <div class="bg-teal-100 p-3 rounded-full">
+                            <i class="fas fa-clipboard-check text-teal-600 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Vendas sem Comanda Hoje -->
+                <div class="bg-white rounded-lg shadow p-6 card-hover border-l-4 border-indigo-500">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600 font-medium">Vendas sem Comanda (Hoje)</p>
+                            <p id="stat-qtd-vendas-sem-comanda" class="text-2xl font-bold text-indigo-600 mt-2">0</p>
+                            <p class="text-xs text-gray-500 mt-1">Total: <span id="stat-val-vendas-sem-comanda" class="font-semibold">R$ 0,00</span></p>
+                        </div>
+                        <div class="bg-indigo-100 p-3 rounded-full">
+                            <i class="fas fa-store text-indigo-600 text-xl"></i>
                         </div>
                     </div>
                 </div>
@@ -308,6 +325,7 @@
                 await Promise.all([
                     carregarResumoFinanceiro(),
                     carregarVendasHoje(),
+                    carregarEstatisticasComandas(),
                     carregarEstoqueBaixo(),
                     carregarProdutosVencendo(),
                     carregarContasPagarVencendo(),
@@ -324,50 +342,7 @@
 
         async function carregarResumoFinanceiro() {
             try {
-                // Contas a receber pendentes
-                const { data: contasReceber, error: errReceber } = await supabase
-                    .from('contas_receber')
-                    .select('valor_original, valor_recebido, status, data_vencimento')
-                    .in('status', ['PENDENTE', 'VENCIDO', 'RECEBIDO_PARCIAL']);
-
-                if (errReceber) throw errReceber;
-
-                let totalReceber = 0;
-                let receberVencido = 0;
                 const hoje = getHojeBrasilia();
-
-                (contasReceber || []).forEach(c => {
-                    const saldo = (c.valor_original || 0) - (c.valor_recebido || 0);
-                    totalReceber += saldo;
-                    if (c.data_vencimento < hoje) {
-                        receberVencido += saldo;
-                    }
-                });
-
-                document.getElementById('stat-a-receber').textContent = formatCurrency(totalReceber);
-                document.getElementById('stat-receber-vencido').textContent = formatCurrency(receberVencido);
-
-                // Contas a pagar pendentes
-                const { data: contasPagar, error: errPagar } = await supabase
-                    .from('contas_pagar')
-                    .select('valor_original, valor_pago, status, data_vencimento')
-                    .in('status', ['PENDENTE', 'VENCIDO', 'PAGO_PARCIAL']);
-
-                if (errPagar) throw errPagar;
-
-                let totalPagar = 0;
-                let pagarVencido = 0;
-
-                (contasPagar || []).forEach(c => {
-                    const saldo = (c.valor_original || 0) - (c.valor_pago || 0);
-                    totalPagar += saldo;
-                    if (c.data_vencimento < hoje) {
-                        pagarVencido += saldo;
-                    }
-                });
-
-                document.getElementById('stat-a-pagar').textContent = formatCurrency(totalPagar);
-                document.getElementById('stat-pagar-vencido').textContent = formatCurrency(pagarVencido);
 
                 // Calcular balanço do mês (recebido - pago)
                 const inicioMes = new Date();
@@ -427,6 +402,77 @@
             const month = parts.find(p => p.type === 'month').value;
             const day = parts.find(p => p.type === 'day').value;
             return `${year}-${month}-${day}`;
+        }
+
+        async function carregarEstatisticasComandas() {
+            try {
+                const hoje = getHojeBrasilia();
+                const ontem = new Date();
+                ontem.setDate(ontem.getDate() - 1);
+
+                // 1. Comandas abertas (todas as abertas, sem filtro de data)
+                const { data: comandasAbertas } = await supabase
+                    .from('comandas')
+                    .select('id, valor_total')
+                    .eq('status', 'aberta');
+
+                const qtdAbertas = (comandasAbertas || []).length;
+                const totalAbertas = (comandasAbertas || []).reduce((sum, c) => sum + (c.valor_total || 0), 0);
+
+                document.getElementById('stat-qtd-comandas-abertas').textContent = qtdAbertas;
+                document.getElementById('stat-val-comandas-abertas').textContent = formatCurrency(totalAbertas);
+
+                // 2. Comandas finalizadas hoje (status = 'fechada')
+                const { data: comandasFechadas } = await supabase
+                    .from('comandas')
+                    .select('id, valor_total, data_fechamento')
+                    .eq('status', 'fechada')
+                    .gte('data_fechamento', ontem.toISOString())
+                    .order('data_fechamento', { ascending: false });
+
+                const finalizadasHoje = (comandasFechadas || []).filter(c => {
+                    const dataBrasilia = getDateBrasilia(c.data_fechamento);
+                    return dataBrasilia === hoje;
+                });
+
+                const qtdFinalizadas = finalizadasHoje.length;
+                const totalFinalizadas = finalizadasHoje.reduce((sum, c) => sum + (c.valor_total || 0), 0);
+
+                document.getElementById('stat-qtd-comandas-finalizadas').textContent = qtdFinalizadas;
+                document.getElementById('stat-val-comandas-finalizadas').textContent = formatCurrency(totalFinalizadas);
+
+                // 3. Vendas sem comanda hoje
+                // Buscar todos os venda_ids que possuem comanda
+                const { data: vendasComComanda } = await supabase
+                    .from('comandas')
+                    .select('venda_id')
+                    .not('venda_id', 'is', null);
+
+                const idsComComanda = (vendasComComanda || []).map(c => c.venda_id).filter(Boolean);
+
+                // Buscar vendas de hoje
+                const { data: vendasPeriodo } = await supabase
+                    .from('vendas')
+                    .select('id, total, created_at')
+                    .eq('status', 'FINALIZADA')
+                    .gte('created_at', ontem.toISOString())
+                    .order('created_at', { ascending: false });
+
+                // Filtrar: apenas hoje e sem comanda
+                const vendasSemComandaHoje = (vendasPeriodo || []).filter(v => {
+                    const dataBrasilia = getDateBrasilia(v.created_at);
+                    return dataBrasilia === hoje && !idsComComanda.includes(v.id);
+                });
+
+                const qtdSemComanda = vendasSemComandaHoje.length;
+                const totalSemComanda = vendasSemComandaHoje.reduce((sum, v) => sum + (v.total || 0), 0);
+
+                document.getElementById('stat-qtd-vendas-sem-comanda').textContent = qtdSemComanda;
+                document.getElementById('stat-val-vendas-sem-comanda').textContent = formatCurrency(totalSemComanda);
+
+            } catch (error) {
+                console.error('Erro ao carregar estatísticas de comandas:', error);
+            }
         }
 
         async function carregarVendasHoje() {
