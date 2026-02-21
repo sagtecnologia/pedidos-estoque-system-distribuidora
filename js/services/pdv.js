@@ -896,6 +896,18 @@ class PDVSystem {
     }
 
     /**
+     * Atualizar preço unitário do item
+     */
+    static atualizarPreco(itemId, novoPreco) {
+        const item = this.itensCarrinho.find(i => i.id === itemId);
+        if (item) {
+            item.preco_unitario = novoPreco;
+            item.subtotal = novoPreco * item.quantidade;
+            this.atualizarCarrinho();
+        }
+    }
+
+    /**
      * Aplicar desconto ao item
      */
     static aplicarDesconto(itemId, percentual) {
@@ -937,6 +949,7 @@ class PDVSystem {
                             <button class="btn-diminuir px-2 py-1 bg-gray-300 rounded hover:bg-gray-400" data-item-id="${item.id}">-</button>
                             <input type="number" class="input-quantidade w-16 px-2 py-1 border rounded text-center" data-item-id="${item.id}" value="${item.quantidade}" min="0.01" step="0.01">
                             <button class="btn-aumentar px-2 py-1 bg-gray-300 rounded hover:bg-gray-400" data-item-id="${item.id}">+</button>
+                            <input type="number" class="input-preco w-20 px-2 py-1 border border-green-400 rounded text-center text-green-700 font-semibold" data-item-id="${item.id}" value="${item.preco_unitario.toFixed(2)}" min="0" step="0.01" title="Alterar preço unitário">
                             <button class="btn-remover px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600" data-item-id="${item.id}">✕</button>
                         </div>
                     </div>
@@ -979,6 +992,19 @@ class PDVSystem {
                     this.atualizarQuantidade(itemId, novaQuantidade);
                 } else {
                     e.target.value = this.itensCarrinho.find(i => i.id === itemId)?.quantidade || 1;
+                }
+            });
+        });
+
+        // Setup input de preço para edição direta
+        container.querySelectorAll('.input-preco').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const itemId = e.target.getAttribute('data-item-id');
+                const novoPreco = parseFloat(e.target.value);
+                if (novoPreco >= 0) {
+                    this.atualizarPreco(itemId, novoPreco);
+                } else {
+                    e.target.value = this.itensCarrinho.find(i => i.id === itemId)?.preco_unitario.toFixed(2) || '0.00';
                 }
             });
         });
