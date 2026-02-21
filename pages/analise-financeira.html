@@ -31,7 +31,7 @@
                 <h3 class="text-lg font-semibold mb-4">
                     <i class="fas fa-filter text-gray-500 mr-2"></i>Filtros
                 </h3>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
                         <select id="filter-categoria" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
@@ -42,6 +42,12 @@
                         <label class="block text-sm font-medium text-gray-700 mb-2">Marca</label>
                         <select id="filter-marca" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
                             <option value="">Todas as marcas</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Produto</label>
+                        <select id="filter-produto" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                            <option value="">Todos os produtos</option>
                         </select>
                     </div>
                     <div>
@@ -401,6 +407,7 @@
         let filtroAtual = {
             categoria: '',
             marca: '',
+            produto: '',
             dataInicio: '',
             dataFim: ''
         };
@@ -556,6 +563,13 @@
                         produtosMap[p.id] = p;
                     });
 
+                    // Popular filtro de produtos
+                    const selectProduto = document.getElementById('filter-produto');
+                    selectProduto.innerHTML = '<option value="">Todos os produtos</option>';
+                    (produtosData || []).sort((a, b) => (a.nome || '').localeCompare(b.nome || '')).forEach(p => {
+                        selectProduto.innerHTML += `<option value="${p.id}">${p.codigo ? p.codigo + ' - ' : ''}${p.nome}</option>`;
+                    });
+
                     // Montar objeto vendas com itens e produtos
                     vendas = (vendasData || []).map(venda => ({
                         ...venda,
@@ -567,6 +581,26 @@
                             } : null
                         }))
                     }));
+
+                    // 🔥 PRÉ-CALCULAR receita líquida por item
+                    // Distribui descontos globais e taxas de cartão proporcionalmente entre os itens
+                    // venda.total já tem descontos e taxas aplicados, mas venda_itens.subtotal NÃO
+                    vendas.forEach(venda => {
+                        const totalItens = (venda.venda_itens || []).reduce((sum, item) => {
+                            return sum + (parseFloat(item.subtotal) || (parseFloat(item.preco_unitario) || 0) * (parseFloat(item.quantidade) || 0));
+                        }, 0);
+                        const vendaTotal = parseFloat(venda.total) || 0;
+                        
+                        (venda.venda_itens || []).forEach(item => {
+                            const subtotalItem = parseFloat(item.subtotal) || (parseFloat(item.preco_unitario) || 0) * (parseFloat(item.quantidade) || 0);
+                            if (totalItens > 0 && vendaTotal > 0) {
+                                // Proporção do item no total → aplica sobre o total real da venda
+                                item._receita_liquida = (subtotalItem / totalItens) * vendaTotal;
+                            } else {
+                                item._receita_liquida = subtotalItem;
+                            }
+                        });
+                    });
                     
                     console.log('✅ Vendas carregadas com itens e produtos:', vendas.length);
                 }
@@ -651,12 +685,14 @@
         function aplicarFiltros() {
             filtroAtual.categoria = document.getElementById('filter-categoria').value;
             filtroAtual.marca = document.getElementById('filter-marca').value;
+            filtroAtual.produto = document.getElementById('filter-produto').value;
             filtroAtual.dataInicio = document.getElementById('filter-data-inicio').value;
             filtroAtual.dataFim = document.getElementById('filter-data-fim').value;
             
             console.log('🎯 [APLICAR FILTROS] Filtros atualizados:', {
                 categoria: filtroAtual.categoria,
                 marca: filtroAtual.marca,
+                produto: filtroAtual.produto,
                 dataInicio: filtroAtual.dataInicio,
                 dataFim: filtroAtual.dataFim
             });
@@ -668,6 +704,7 @@
         function limparFiltros() {
             document.getElementById('filter-categoria').value = '';
             document.getElementById('filter-marca').value = '';
+            document.getElementById('filter-produto').value = '';
             
             // Limpar para mostrar APENAS HOJE (como padrão, igual tela de vendas)
             const hoje = new Date();
@@ -791,8 +828,8 @@
             let qtdVendas = vendasFiltradas.length;
             
             // QUANDO NÃO HÁ FILTRO: usar venda.total (como Evolução de Vendas faz)
-            // QUANDO HÁ FILTRO: iterar pelos itens e usar item.subtotal
-            if (!filtroAtual.categoria && !filtroAtual.marca) {
+            // QUANDO HÁ FILTRO: iterar pelos itens e usar _receita_liquida
+            if (!filtroAtual.categoria && !filtroAtual.marca && !filtroAtual.produto) {
                 // ✅ SEM FILTROS: usar venda.total
                 vendasFiltradas.forEach(venda => {
                     receitaTotal += parseFloat(venda.total) || 0;
@@ -811,12 +848,13 @@
                         const produto = item.produtos;
                         if (!produto) return;
                         
-                        // Aplicar filtros de categoria e marca
+                        // Aplicar filtros de categoria, marca e produto
                         if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
                         if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                        if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                         
-                        // Usar item.subtotal que já tem descontos do item
-                        receitaTotal += parseFloat(item.subtotal) || 0;
+                        // Usar _receita_liquida que já tem descontos e taxas distribuídos
+                        receitaTotal += item._receita_liquida || 0;
                         const custo = getCustoItem(item);
                         const qtd = parseFloat(item.quantidade) || 0;
                         custoTotalVendas += custo * qtd;
@@ -934,13 +972,14 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     const cat = categorias.find(c => c.id === produto.categoria_id);
                     const catNome = cat?.nome || 'Sem Categoria';
                     
                     if (!vendasPorCategoria[catNome]) vendasPorCategoria[catNome] = 0;
-                    vendasPorCategoria[catNome] += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    vendasPorCategoria[catNome] += item._receita_liquida || 0;
                 });
             });
 
@@ -983,7 +1022,8 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     if (!qtdPorProduto[produto.nome]) qtdPorProduto[produto.nome] = 0;
                     qtdPorProduto[produto.nome] += item.quantidade || 0;
@@ -1022,12 +1062,13 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     const marca = produto.marca_nome || 'SEM MARCA';
                     if (!dadosPorMarca[marca]) dadosPorMarca[marca] = { receita: 0, custo: 0 };
                     
-                    dadosPorMarca[marca].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    dadosPorMarca[marca].receita += item._receita_liquida || 0;
                     dadosPorMarca[marca].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -1084,9 +1125,10 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
-                    dadosPorDia[data].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    dadosPorDia[data].receita += item._receita_liquida || 0;
                     dadosPorDia[data].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -1254,6 +1296,7 @@
                 (pedido.pedido_compra_itens || []).forEach(item => {
                     if (filtroAtual.categoria && item.produtos?.categoria_id !== filtroAtual.categoria) return;
                     if (filtroAtual.marca && item.produtos?.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && item.produto_id !== filtroAtual.produto) return;
                     
                     // Usar preço de custo do produto cadastrado (não temos preço histórico do pedido)
                     const precoCusto = item.produtos?.preco_custo || 0;
@@ -1371,9 +1414,10 @@
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
                     if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     vendasPorHora[hora].quantidade += 1;
-                    vendasPorHora[hora].valor += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    vendasPorHora[hora].valor += item._receita_liquida || 0;
                     vendasPorHora[hora].itens += (item.quantidade || 0);
                 });
             });
@@ -1457,7 +1501,8 @@
                     const produto = item.produtos;
                     if (!produto) return;
                     
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     const cat = categorias.find(c => c.id === produto.categoria_id);
                     const catNome = cat?.nome || 'Sem Categoria';
@@ -1467,7 +1512,7 @@
                     }
                     
                     lucrosPorCategoria[catNome].quantidade += item.quantidade || 0;
-                    lucrosPorCategoria[catNome].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucrosPorCategoria[catNome].receita += item._receita_liquida || 0;
                     lucrosPorCategoria[catNome].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -1535,6 +1580,7 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     const marca = produto.marca_nome || 'SEM MARCA';
                     
@@ -1543,7 +1589,7 @@
                     }
                     
                     lucrosPorMarca[marca].quantidade += item.quantidade || 0;
-                    lucrosPorMarca[marca].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucrosPorMarca[marca].receita += item._receita_liquida || 0;
                     lucrosPorMarca[marca].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -1611,7 +1657,8 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
                     const key = produto.id;
                     if (!lucrosPorProduto[key]) {
@@ -1627,7 +1674,7 @@
                     }
                     
                     lucrosPorProduto[key].quantidade += item.quantidade || 0;
-                    lucrosPorProduto[key].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucrosPorProduto[key].receita += item._receita_liquida || 0;
                     lucrosPorProduto[key].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -1926,9 +1973,10 @@
                     if (!produto) return;
                     
                     if (filtroAtual.categoria && produto.categoria_id !== filtroAtual.categoria) return;
-                    if (filtroAtual.marca && produto.marca !== filtroAtual.marca) return;
+                    if (filtroAtual.marca && produto.marca_id !== filtroAtual.marca) return;
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
                     
-                    receitaBruta += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    receitaBruta += item._receita_liquida || 0;
                     // Usar custo histórico correto (item > lote > produto)
                     const custo = getCustoItem(item);
                     custoMercadoria += custo * (item.quantidade || 0);
@@ -2087,13 +2135,15 @@
                     const produto = item.produtos;
                     if (!produto) return;
                     
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    
                     const cat = categorias.find(c => c.id === produto.categoria_id);
                     const catNome = cat?.nome || 'Sem Categoria';
                     
                     if (!lucros[catNome]) lucros[catNome] = { quantidade: 0, receita: 0, custo: 0 };
                     
                     lucros[catNome].quantidade += item.quantidade || 0;
-                    lucros[catNome].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucros[catNome].receita += item._receita_liquida || 0;
                     lucros[catNome].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -2117,12 +2167,14 @@
                     const produto = item.produtos;
                     if (!produto) return;
                     
+                    if (filtroAtual.produto && produto.id !== filtroAtual.produto) return;
+                    
                     const marca = produto.marca_nome || 'SEM MARCA';
                     
                     if (!lucros[marca]) lucros[marca] = { quantidade: 0, receita: 0, custo: 0 };
                     
                     lucros[marca].quantidade += item.quantidade || 0;
-                    lucros[marca].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucros[marca].receita += item._receita_liquida || 0;
                     lucros[marca].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
@@ -2158,7 +2210,7 @@
                     }
                     
                     lucros[key].quantidade += item.quantidade || 0;
-                    lucros[key].receita += (item.preco_unitario || 0) * (item.quantidade || 0);
+                    lucros[key].receita += item._receita_liquida || 0;
                     lucros[key].custo += getCustoItem(item) * (item.quantidade || 0);
                 });
             });
