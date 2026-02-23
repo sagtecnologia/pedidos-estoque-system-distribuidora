@@ -59,9 +59,14 @@
                         </h1>
                         <p class="text-gray-600 mt-2">Gerenciamento completo de inventário</p>
                     </div>
-                    <button onclick="openModalProduto()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
-                        <i class="fas fa-plus"></i> Novo Produto
-                    </button>
+                    <div class="flex gap-2">
+                        <button onclick="openModalDadosFiscaisEmMassa()" class="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-5 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
+                            <i class="fas fa-file-invoice"></i> Dados Fiscais em Massa
+                        </button>
+                        <button onclick="openModalProduto()" class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
+                            <i class="fas fa-plus"></i> Novo Produto
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -487,6 +492,140 @@
 
     <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded-lg"><div class="spinner mx-auto"></div><p class="mt-4 text-gray-700">Carregando...</p></div>
+    </div>
+
+    <!-- Modal Dados Fiscais em Massa -->
+    <div id="modal-fiscal-massa" class="modal-backdrop hidden">
+        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center px-6 py-4 border-b bg-gradient-to-r from-orange-500 to-orange-600 sticky top-0">
+                <h3 class="text-xl font-bold text-white"><i class="fas fa-file-invoice mr-2"></i>Alterar Dados Fiscais em Massa</h3>
+                <button onclick="closeModal('modal-fiscal-massa')" class="text-orange-100 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="px-6 py-4">
+                <!-- Aviso -->
+                <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-lg mb-6">
+                    <p class="text-sm font-semibold text-orange-800"><i class="fas fa-exclamation-triangle mr-2"></i>Atenção</p>
+                    <p class="text-sm text-orange-700 mt-1">Esta operação irá atualizar os dados fiscais de <strong id="fiscal-massa-total">...</strong> produtos ativos. Marque apenas os campos que deseja alterar.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- NCM -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-ncm" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('ncm')">
+                        <div class="flex-1">
+                            <label for="fm-check-ncm" class="block text-sm font-semibold text-gray-700 cursor-pointer">NCM <span class="text-xs font-normal text-gray-500">(Nomenclatura Comum do Mercosul)</span></label>
+                            <input type="text" id="fm-ncm" maxlength="10" placeholder="Ex: 1234567890" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                        </div>
+                    </div>
+                    <!-- CEST -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-cest" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('cest')">
+                        <div class="flex-1">
+                            <label for="fm-check-cest" class="block text-sm font-semibold text-gray-700 cursor-pointer">CEST <span class="text-xs font-normal text-gray-500">(Substituição Tributária)</span></label>
+                            <input type="text" id="fm-cest" maxlength="10" placeholder="Ex: 1234567" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                        </div>
+                    </div>
+                    <!-- CFOP Venda -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-cfop-venda" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('cfop-venda')">
+                        <div class="flex-1">
+                            <label for="fm-check-cfop-venda" class="block text-sm font-semibold text-gray-700 cursor-pointer">CFOP Venda</label>
+                            <input type="text" id="fm-cfop-venda" maxlength="10" placeholder="Ex: 5102" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                        </div>
+                    </div>
+                    <!-- CFOP Compra -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-cfop-compra" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('cfop-compra')">
+                        <div class="flex-1">
+                            <label for="fm-check-cfop-compra" class="block text-sm font-semibold text-gray-700 cursor-pointer">CFOP Compra</label>
+                            <input type="text" id="fm-cfop-compra" maxlength="10" placeholder="Ex: 1102" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                        </div>
+                    </div>
+                    <!-- CST ICMS -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-cst-icms" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('cst-icms')">
+                        <div class="flex-1">
+                            <label for="fm-check-cst-icms" class="block text-sm font-semibold text-gray-700 cursor-pointer">CST ICMS</label>
+                            <select id="fm-cst-icms" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                                <option value="">Selecione CST ICMS</option>
+                                <option value="000">000 - Tributada integralmente</option>
+                                <option value="010">010 - Tributada com cobrança de ICMS por ST</option>
+                                <option value="020">020 - Com redução de BC</option>
+                                <option value="030">030 - Isenta ou não trib. com cobrança de ICMS por ST</option>
+                                <option value="040">040 - Isenta</option>
+                                <option value="041">041 - Não tributada</option>
+                                <option value="050">050 - Suspensão</option>
+                                <option value="051">051 - Diferimento</option>
+                                <option value="060">060 - ICMS cobrado anteriormente por ST</option>
+                                <option value="070">070 - Com redução de BC e cobrança de ICMS por ST</option>
+                                <option value="090">090 - Outras</option>
+                                <optgroup label="Simples Nacional">
+                                    <option value="101">101 - SN Tributada com permissão de crédito</option>
+                                    <option value="102">102 - SN Tributada sem permissão de crédito</option>
+                                    <option value="103">103 - SN Isenção para faixa de receita bruta</option>
+                                    <option value="201">201 - SN com crédito e ICMS por ST</option>
+                                    <option value="202">202 - SN sem crédito e ICMS por ST</option>
+                                    <option value="203">203 - SN isenta com ICMS por ST</option>
+                                    <option value="300">300 - SN Imune</option>
+                                    <option value="400">400 - SN Não tributada</option>
+                                    <option value="500">500 - SN ICMS cobrado por ST</option>
+                                    <option value="900">900 - SN Outros</option>
+                                </optgroup>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- CST PIS -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-cst-pis" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('cst-pis')">
+                        <div class="flex-1">
+                            <label for="fm-check-cst-pis" class="block text-sm font-semibold text-gray-700 cursor-pointer">CST PIS</label>
+                            <select id="fm-cst-pis" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                                <option value="">Selecione CST PIS</option>
+                                <option value="01">01 - Tributável com Alíquota Básica</option>
+                                <option value="02">02 - Tributável com Alíquota Diferenciada</option>
+                                <option value="03">03 - Tributável por Unidade de Medida</option>
+                                <option value="04">04 - Monofásica - Revenda a Alíquota Zero</option>
+                                <option value="06">06 - Tributável a Alíquota Zero</option>
+                                <option value="07">07 - Isenta da Contribuição</option>
+                                <option value="08">08 - Sem Incidência da Contribuição</option>
+                                <option value="09">09 - Com Suspensão da Contribuição</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="99">99 - Outras Operações</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- CST COFINS -->
+                    <div class="flex items-start gap-3 p-3 border border-gray-200 rounded-lg">
+                        <input type="checkbox" id="fm-check-cst-cofins" class="mt-1 w-4 h-4 text-orange-500 rounded" onchange="toggleFiscalMassaField('cst-cofins')">
+                        <div class="flex-1">
+                            <label for="fm-check-cst-cofins" class="block text-sm font-semibold text-gray-700 cursor-pointer">CST COFINS</label>
+                            <select id="fm-cst-cofins" disabled class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-sm disabled:cursor-not-allowed">
+                                <option value="">Selecione CST COFINS</option>
+                                <option value="01">01 - Tributável com Alíquota Básica</option>
+                                <option value="02">02 - Tributável com Alíquota Diferenciada</option>
+                                <option value="03">03 - Tributável por Unidade de Medida</option>
+                                <option value="04">04 - Monofásica - Revenda a Alíquota Zero</option>
+                                <option value="06">06 - Tributável a Alíquota Zero</option>
+                                <option value="07">07 - Isenta da Contribuição</option>
+                                <option value="08">08 - Sem Incidência da Contribuição</option>
+                                <option value="09">09 - Com Suspensão da Contribuição</option>
+                                <option value="49">49 - Outras Operações de Saída</option>
+                                <option value="99">99 - Outras Operações</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t">
+                    <button type="button" onclick="closeModal('modal-fiscal-massa')" class="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition">Cancelar</button>
+                    <button type="button" onclick="aplicarDadosFiscaisEmMassa()" class="px-6 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:shadow-lg font-medium transition flex items-center gap-2">
+                        <i class="fas fa-save"></i> Aplicar a Todos os Ativos
+                    </button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1520,6 +1659,109 @@
                 setTimeout(() => {
                     document.getElementById('produto-nome')?.focus();
                 }, 300);
+            }
+        }
+
+        // ======== DADOS FISCAIS EM MASSA ========
+        function toggleFiscalMassaField(field) {
+            const fieldMap = {
+                'ncm': 'fm-ncm',
+                'cest': 'fm-cest',
+                'cfop-venda': 'fm-cfop-venda',
+                'cfop-compra': 'fm-cfop-compra',
+                'cst-icms': 'fm-cst-icms',
+                'cst-pis': 'fm-cst-pis',
+                'cst-cofins': 'fm-cst-cofins'
+            };
+            const checkbox = document.getElementById(`fm-check-${field}`);
+            const input = document.getElementById(fieldMap[field]);
+            if (!input || !checkbox) return;
+
+            input.disabled = !checkbox.checked;
+            if (checkbox.checked) {
+                input.classList.remove('bg-gray-100', 'disabled:cursor-not-allowed');
+                input.classList.add('bg-white', 'focus:ring-2', 'focus:ring-orange-400', 'focus:border-transparent');
+                input.focus();
+            } else {
+                input.classList.add('bg-gray-100', 'disabled:cursor-not-allowed');
+                input.classList.remove('bg-white', 'focus:ring-2', 'focus:ring-orange-400', 'focus:border-transparent');
+                // Limpa o valor ao desmarcar
+                if (input.tagName === 'SELECT') input.value = '';
+                else input.value = '';
+            }
+        }
+
+        async function openModalDadosFiscaisEmMassa() {
+            // Resetar campos
+            const fields = ['ncm', 'cest', 'cfop-venda', 'cfop-compra', 'cst-icms', 'cst-pis', 'cst-cofins'];
+            fields.forEach(f => {
+                const checkbox = document.getElementById(`fm-check-${f}`);
+                if (checkbox) checkbox.checked = false;
+                toggleFiscalMassaField(f);
+            });
+
+            // Contar produtos ativos
+            try {
+                const { count, error } = await window.supabase
+                    .from('produtos')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('ativo', true);
+                document.getElementById('fiscal-massa-total').textContent =
+                    error ? '?' : `${count ?? 0}`;
+            } catch {
+                document.getElementById('fiscal-massa-total').textContent = '?';
+            }
+
+            openModal('modal-fiscal-massa');
+        }
+
+        async function aplicarDadosFiscaisEmMassa() {
+            const fields = [
+                { fieldKey: 'ncm',         dbKey: 'ncm',         inputId: 'fm-ncm' },
+                { fieldKey: 'cest',        dbKey: 'cest',        inputId: 'fm-cest' },
+                { fieldKey: 'cfop-venda',  dbKey: 'cfop_venda',  inputId: 'fm-cfop-venda' },
+                { fieldKey: 'cfop-compra', dbKey: 'cfop_compra', inputId: 'fm-cfop-compra' },
+                { fieldKey: 'cst-icms',    dbKey: 'cst_icms',    inputId: 'fm-cst-icms' },
+                { fieldKey: 'cst-pis',     dbKey: 'cst_pis',     inputId: 'fm-cst-pis' },
+                { fieldKey: 'cst-cofins',  dbKey: 'cst_cofins',  inputId: 'fm-cst-cofins' }
+            ];
+
+            const updates = {};
+            fields.forEach(({ fieldKey, dbKey, inputId }) => {
+                const checkbox = document.getElementById(`fm-check-${fieldKey}`);
+                if (checkbox?.checked) {
+                    const val = document.getElementById(inputId)?.value?.trim();
+                    updates[dbKey] = val || null;
+                }
+            });
+
+            if (Object.keys(updates).length === 0) {
+                showToast('⚠️ Marque pelo menos um campo para alterar.', 'error');
+                return;
+            }
+
+            const total = document.getElementById('fiscal-massa-total').textContent;
+            const camposLabel = Object.keys(updates).join(', ');
+
+            if (!confirm(`Confirma a alteração dos campos (${camposLabel}) em ${total} produtos ativos?\n\nEsta ação não pode ser desfeita.`)) return;
+
+            try {
+                showLoading(true);
+                const { error } = await window.supabase
+                    .from('produtos')
+                    .update(updates)
+                    .eq('ativo', true);
+
+                if (error) throw error;
+
+                showToast(`✅ Dados fiscais atualizados em ${total} produtos!`, 'success');
+                closeModal('modal-fiscal-massa');
+                await loadProdutos();
+            } catch (error) {
+                console.error('❌ Erro ao atualizar dados fiscais em massa:', error);
+                showToast('❌ Erro ao atualizar: ' + (error.message || 'Erro desconhecido'), 'error');
+            } finally {
+                showLoading(false);
             }
         }
 
