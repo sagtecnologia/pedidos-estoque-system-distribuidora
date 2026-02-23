@@ -67,7 +67,7 @@
 
             <!-- Filtros -->
             <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">
                             <i class="fas fa-search mr-2"></i>Buscar
@@ -80,6 +80,16 @@
                         </label>
                         <select id="categoria-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="filterProdutos()">
                             <option value="">Todas as categorias</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            <i class="fas fa-toggle-on mr-2"></i>Status
+                        </label>
+                        <select id="status-filter" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="loadProdutos()">
+                            <option value="ativos">Ativos</option>
+                            <option value="excluidos">Excluídos</option>
+                            <option value="todos">Todos</option>
                         </select>
                     </div>
                     <div class="flex items-end">
@@ -892,17 +902,24 @@
         }
 
         // ======== CARREGAR DADOS ========
-        async function listProdutos() {
-            const { data, error } = await window.supabase
+        async function listProdutos(statusFiltro = 'ativos') {
+            let query = window.supabase
                 .from('produtos')
                 .select(`
                     *,
                     categoria:categorias(nome),
                     marca:marcas(nome)
                 `)
-                .eq('ativo', true)
                 .order('nome');
-            
+
+            if (statusFiltro === 'ativos') {
+                query = query.eq('ativo', true);
+            } else if (statusFiltro === 'excluidos') {
+                query = query.eq('ativo', false);
+            }
+            // 'todos' => sem filtro de ativo
+
+            const { data, error } = await query;
             if (error) throw error;
             return data || [];
         }
@@ -910,7 +927,8 @@
         async function loadProdutos() {
             try {
                 showLoading(true);
-                produtosData = await listProdutos();
+                const statusFiltro = document.getElementById('status-filter')?.value || 'ativos';
+                produtosData = await listProdutos(statusFiltro);
                 console.log('✓ Produtos carregados:', { total: produtosData?.length || 0, data: produtosData });
                 renderProdutos(produtosData);
             } catch (error) {
@@ -998,35 +1016,44 @@
                 // Buscar nome da categoria
                 const categoria = categoriasData.find(c => c.id === p.categoria_id);
                 const categoriaNome = categoria ? categoria.nome : 'Sem categoria';
-                
+                const excluido = p.ativo === false;
+
+                const estoqueAtual = p.estoque_atual || 0;
+                const estoqueBadge = excluido
+                    ? `<span class="px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">${estoqueAtual.toFixed(2)} ${p.unidade || 'UN'}</span>`
+                    : `<span class="px-3 py-1 rounded-full text-xs font-semibold ${
+                            estoqueAtual <= (p.estoque_minimo || 10)
+                                ? 'bg-red-100 text-red-700'
+                                : estoqueAtual <= 50
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-green-100 text-green-700'
+                        }">${estoqueAtual.toFixed(2)} ${p.unidade || 'UN'}</span>`;
+
+                const acoes = excluido
+                    ? `<button onclick="reativarProduto('${p.id}')" class="btn-action px-3 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200 transition flex items-center gap-1">
+                            <i class="fas fa-undo"></i><span class="hidden sm:inline">Reativar</span>
+                       </button>`
+                    : `<button onclick="editProduto('${p.id}')" class="btn-action px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center gap-1">
+                            <i class="fas fa-edit"></i><span class="hidden sm:inline">Editar</span>
+                       </button>
+                       <button onclick="deleteProdutoConfirm('${p.id}', ${estoqueAtual})" class="btn-action px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition flex items-center gap-1">
+                            <i class="fas fa-trash"></i><span class="hidden sm:inline">Excluir</span>
+                       </button>`;
+
                 return `
-                <tr class="table-row-hover border-b border-gray-200">
+                <tr class="table-row-hover border-b border-gray-200 ${excluido ? 'opacity-60' : ''}">
                     <td class="px-6 py-4 text-sm font-mono text-blue-600">${p.codigo || 'N/A'}</td>
-                    <td class="px-6 py-4 text-sm font-medium text-gray-900">${p.nome}</td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-900">
+                        ${p.nome}
+                        ${excluido ? '<span class="ml-2 px-2 py-0.5 bg-red-100 text-red-600 rounded text-xs font-semibold">Excluído</span>' : ''}
+                    </td>
                     <td class="px-6 py-4 text-sm text-gray-600">
                         <span class="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs">${categoriaNome}</span>
                     </td>
-                    <td class="px-6 py-4 text-sm">
-                        <span class="px-3 py-1 rounded-full text-xs font-semibold ${
-                            (p.estoque_atual || 0) <= (p.estoque_minimo || 10) 
-                                ? 'bg-red-100 text-red-700' 
-                                : (p.estoque_atual || 0) <= 50
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-green-100 text-green-700'
-                        }">
-                            ${(p.estoque_atual || 0).toFixed(2)} ${p.unidade || 'UN'}
-                        </span>
-                    </td>
+                    <td class="px-6 py-4 text-sm">${estoqueBadge}</td>
                     <td class="px-6 py-4 text-sm font-semibold text-gray-900">R$ ${(p.preco_venda || 0).toFixed(2)}</td>
                     <td class="px-6 py-4 text-sm">
-                        <div class="flex items-center space-x-1">
-                            <button onclick="editProduto('${p.id}')" class="btn-action px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center gap-1">
-                                <i class="fas fa-edit"></i><span class="hidden sm:inline">Editar</span>
-                            </button>
-                            <button onclick="deleteProdutoConfirm('${p.id}')" class="btn-action px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 transition flex items-center gap-1">
-                                <i class="fas fa-trash"></i><span class="hidden sm:inline">Excluir</span>
-                            </button>
-                        </div>
+                        <div class="flex items-center space-x-1">${acoes}</div>
                     </td>
                 </tr>
             `}).join('');
@@ -1040,7 +1067,8 @@
             const filtered = produtosData.filter(p => {
                 const matchSearch = !search || 
                     p.nome.toLowerCase().includes(search) || 
-                    (p.codigo && p.codigo.toLowerCase().includes(search));
+                    (p.codigo && p.codigo.toLowerCase().includes(search)) ||
+                    (p.codigo_barras && p.codigo_barras.toLowerCase().includes(search));
                 
                 const matchCategoria = !categoria || p.categoria_id == categoria;
                 
@@ -1238,8 +1266,16 @@
             }
         }
 
-        async function deleteProdutoConfirm(id) {
-            console.log('Deletando produto ID:', id);
+        async function deleteProdutoConfirm(id, estoqueAtual) {
+            console.log('Deletando produto ID:', id, 'Estoque:', estoqueAtual);
+
+            // 🔒 Trava: impede exclusão de produto com estoque
+            const estoque = parseFloat(estoqueAtual) || 0;
+            if (estoque > 0) {
+                showToast(`❌ Não é possível excluir este produto pois ele possui ${estoque.toFixed(2)} unidade(s) em estoque.\n\nZere o estoque antes de excluir.`, 'error');
+                return;
+            }
+
             if (confirm('Tem certeza que deseja excluir este produto?')) {
                 try {
                     showLoading(true);
@@ -1252,6 +1288,25 @@
                 } finally {
                     showLoading(false);
                 }
+            }
+        }
+
+        async function reativarProduto(id) {
+            if (!confirm('Deseja reativar este produto?')) return;
+            try {
+                showLoading(true);
+                const { error } = await window.supabase
+                    .from('produtos')
+                    .update({ ativo: true })
+                    .eq('id', id);
+                if (error) throw error;
+                showToast('✅ Produto reativado com sucesso!', 'success');
+                await loadProdutos();
+            } catch (error) {
+                console.error('Erro ao reativar produto:', error);
+                showToast('Erro ao reativar produto', 'error');
+            } finally {
+                showLoading(false);
             }
         }
 
