@@ -152,14 +152,21 @@
             <div id="secao-historico" class="hidden">
                 <!-- Filtros do Histórico -->
                 <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Início</label>
                             <input 
                                 type="datetime-local" 
-                                id="filtro-data-historico" 
+                                id="filtro-data-inicio" 
                                 class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                                onchange="carregarHistoricoComandas()"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Fim</label>
+                            <input 
+                                type="datetime-local" 
+                                id="filtro-data-fim" 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                             >
                         </div>
                         <div>
@@ -1291,24 +1298,21 @@
 
         async function inicializarHistorico() {
             try {
-                // Setar data padrão como "hoje" em formato datetime-local
+                // Setar período padrão: hoje 00:00 até 23:59
                 const hoje = new Date();
                 const ano = hoje.getFullYear();
                 const mes = String(hoje.getMonth() + 1).padStart(2, '0');
                 const dia = String(hoje.getDate()).padStart(2, '0');
-                const horas = String(hoje.getHours()).padStart(2, '0');
-                const minutos = String(hoje.getMinutes()).padStart(2, '0');
+                const dataHojeInicio = `${ano}-${mes}-${dia}T00:00`;
+                const dataHojeFim = `${ano}-${mes}-${dia}T23:59`;
                 
-                const dataHoje = `${ano}-${mes}-${dia}T${horas}:${minutos}`;
-                
-                const inputData = document.getElementById('filtro-data-historico');
-                if (inputData) {
-                    inputData.value = dataHoje;
-                    console.log(`📅 Data padrão do histórico setada para: ${dataHoje}`);
-                    
-                    // Carregar histórico automaticamente
-                    await carregarHistoricoComandas();
-                }
+                const inputInicio = document.getElementById('filtro-data-inicio');
+                const inputFim = document.getElementById('filtro-data-fim');
+                if (inputInicio) inputInicio.value = dataHojeInicio;
+                if (inputFim) inputFim.value = dataHojeFim;
+
+                console.log(`📅 Período padrão do histórico: ${dataHojeInicio} a ${dataHojeFim}`);
+                await carregarHistoricoComandas();
             } catch (error) {
                 console.error('❌ Erro ao inicializar histórico:', error);
             }
@@ -1323,31 +1327,41 @@
             document.getElementById('secao-abertos').classList.toggle('hidden', aba === 'historico');
             document.getElementById('secao-historico').classList.toggle('hidden', aba === 'abertos');
 
-            // Carregar histórico se for a primeira vez
-            if (aba === 'historico' && historicoComandas.length === 0) {
-                const hoje = new Date().toISOString().split('T')[0];
-                document.getElementById('filtro-data-historico').value = hoje;
+            // Carregar histórico ao abrir a aba (sempre define o dia atual se não houver valor)
+            if (aba === 'historico') {
+                const hoje = new Date();
+                const ano = hoje.getFullYear();
+                const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+                const dia = String(hoje.getDate()).padStart(2, '0');
+                const dataHojeInicio = `${ano}-${mes}-${dia}T00:00`;
+                const dataHojeFim = `${ano}-${mes}-${dia}T23:59`;
+
+                const inputInicio = document.getElementById('filtro-data-inicio');
+                const inputFim = document.getElementById('filtro-data-fim');
+                if (inputInicio && !inputInicio.value) inputInicio.value = dataHojeInicio;
+                if (inputFim && !inputFim.value) inputFim.value = dataHojeFim;
+
                 carregarHistoricoComandas();
             }
         }
 
         async function carregarHistoricoComandas() {
             try {
-                const dataInputStr = document.getElementById('filtro-data-historico').value;
-                if (!dataInputStr) {
-                    mostrarMensagem('Atenção', 'Por favor, selecione uma data', 'aviso');
+                const dataInicioStr = document.getElementById('filtro-data-inicio').value;
+                const dataFimStr = document.getElementById('filtro-data-fim').value;
+
+                if (!dataInicioStr || !dataFimStr) {
+                    mostrarMensagem('Atenção', 'Por favor, selecione o período (data/hora início e fim)', 'aviso');
                     return;
                 }
 
-                // Extrair apenas a data (YYYY-MM-DD) do datetime-local
-                const dataParte = dataInputStr.split('T')[0]; // Pega apenas YYYY-MM-DD
-                const dataInicio = `${dataParte}T00:00:00`;
-                const dataFim = `${dataParte}T23:59:59`;
+                // datetime-local retorna YYYY-MM-DDTHH:mm, adicionar segundos
+                const dataInicio = dataInicioStr.length === 16 ? `${dataInicioStr}:00` : dataInicioStr;
+                const dataFim = dataFimStr.length === 16 ? `${dataFimStr}:59` : dataFimStr;
 
-                console.log(`📅 Carregando histórico para ${dataParte}`);
-                console.log(`📅 Range: ${dataInicio} a ${dataFim}`);
+                console.log(`📅 Carregando histórico de ${dataInicio} a ${dataFim}`);
 
-                // Buscar comandas fechadas ou canceladas do dia
+                // Buscar comandas fechadas ou canceladas no período
                 const { data, error } = await supabase
                     .from('comandas')
                     .select(`
