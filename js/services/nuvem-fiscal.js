@@ -674,6 +674,28 @@ class NuvemFiscalService {
     }
 
     /**
+     * Obter blob do XML da NFC-e sem disparar download (para uso em ZIP bulk)
+     * @param {string} id - ID da NFC-e
+     * @returns {Blob}
+     */
+    async obterXMLBlob(id) {
+        const blob = await this.request(`/nfce/${id}/xml/nota`, 'GET', null, { 'Accept': 'application/xml' });
+        if (!blob || blob.size === 0) throw new Error('XML vazio retornado pela Nuvem Fiscal');
+        return blob;
+    }
+
+    /**
+     * Obter blob do XML de cancelamento da NFC-e sem disparar download (para uso em ZIP bulk)
+     * @param {string} id - ID da NFC-e
+     * @returns {Blob}
+     */
+    async obterXMLCancelamentoBlob(id) {
+        const blob = await this.request(`/nfce/${id}/cancelamento/xml`, 'GET', null, { 'Accept': 'application/xml' });
+        if (!blob || blob.size === 0) throw new Error('XML de cancelamento vazio retornado pela Nuvem Fiscal');
+        return blob;
+    }
+
+    /**
      * Helper: disparar download de arquivo no navegador
      */
     _triggerDownload(blob, filename) {

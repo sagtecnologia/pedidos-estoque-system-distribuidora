@@ -115,16 +115,43 @@
             </div>
 
             <!-- Barra de seleção múltipla -->
-            <div id="barra-selecao-docs" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between">
+            <div id="barra-selecao-docs" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex flex-wrap items-center gap-3 justify-between">
                 <span id="texto-selecao-docs" class="text-sm font-medium text-blue-800">0 nota(s) selecionada(s)</span>
-                <div class="flex items-center gap-2">
-                    <button onclick="imprimirSelecionadasDocs()" class="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-1.5 rounded-lg transition">
-                        <i class="fas fa-print"></i> Imprimir todas
-                    </button>
-                    <button onclick="baixarXMLSelecionadasDocs()" class="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded-lg transition">
-                        <i class="fas fa-download"></i> Baixar XMLs
-                    </button>
-                    <button onclick="desselecionarTodasDocs()" class="flex items-center gap-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-3 py-1.5 rounded-lg transition">
+                <div class="flex flex-wrap items-center gap-2">
+
+                    <!-- DANFE split -->
+                    <div class="flex items-stretch rounded-lg overflow-hidden border border-purple-400 text-sm">
+                        <span class="flex items-center px-2 bg-purple-100 text-purple-700 font-semibold text-xs">
+                            <i class="fas fa-print mr-1"></i>DANFE
+                        </span>
+                        <button onclick="imprimirSelecionadasDocs('separado')" title="Abre uma aba do navegador por nota"
+                            class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white transition">
+                            Abas separadas
+                        </button>
+                        <button onclick="imprimirSelecionadasDocs('zip')" title="Baixa um arquivo ZIP com todos os PDFs"
+                            class="px-3 py-1.5 bg-purple-800 hover:bg-purple-900 text-white transition border-l border-purple-500">
+                            <i class="fas fa-file-archive mr-1"></i>ZIP único
+                        </button>
+                    </div>
+
+                    <!-- XML split -->
+                    <div class="flex items-stretch rounded-lg overflow-hidden border border-green-400 text-sm">
+                        <span class="flex items-center px-2 bg-green-100 text-green-700 font-semibold text-xs">
+                            <i class="fas fa-code mr-1"></i>XML
+                        </span>
+                        <button onclick="baixarXMLSelecionadasDocs('separado')" title="Baixa cada XML em arquivo separado"
+                            class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white transition">
+                            Separados
+                        </button>
+                        <button onclick="baixarXMLSelecionadasDocs('zip')" title="Baixa um arquivo ZIP com todos os XMLs"
+                            class="px-3 py-1.5 bg-green-800 hover:bg-green-900 text-white transition border-l border-green-500">
+                            <i class="fas fa-file-archive mr-1"></i>ZIP único
+                        </button>
+                    </div>
+
+                    <!-- Limpar -->
+                    <button onclick="desselecionarTodasDocs()"
+                        class="flex items-center gap-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-3 py-1.5 rounded-lg transition">
                         <i class="fas fa-times"></i> Limpar
                     </button>
                 </div>
@@ -194,6 +221,7 @@
     <script src="../js/services/focus-nfe.js"></script>
     <script src="../js/services/nuvem-fiscal.js"></script>
     <script src="../js/services/fiscal.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="../components/navbar.js"></script>
     <script src="../components/sidebar.js"></script>
 
@@ -433,93 +461,162 @@
             }));
         }
 
-        async function imprimirSelecionadasDocs() {
+        async function imprimirSelecionadasDocs(modo = 'separado') {
             const selecionadas = getSelecionadasDocs();
             if (!selecionadas.length) return;
-            showToastSafe(`Gerando DANFE de ${selecionadas.length} nota(s)...`, 'info');
-            let erros = 0;
-            for (const item of selecionadas) {
-                try {
-                    const doc = documentos.find(d => d.id === item.docId);
-                    if (!doc) continue;
-                    let pdfUrl;
-                    if (item.provider === 'nuvem_fiscal') {
-                        const nfceId = item.nfceId || await resolverNfceId(doc);
-                        if (nfceId) {
-                            pdfUrl = item.status === '135'
-                                ? await NuvemFiscal.baixarPDFCancelamento(nfceId)
-                                : await NuvemFiscal.baixarPDF(nfceId);
-                        }
-                    }
-                    if (!pdfUrl) {
-                        const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
-                        pdfUrl = await FiscalService.baixarDANFE(item.chave, tipo);
-                    }
-                    const urlParaAbrir = pdfUrl instanceof Blob ? URL.createObjectURL(pdfUrl) : pdfUrl;
-                    window.open(urlParaAbrir, '_blank');
-                    await new Promise(r => setTimeout(r, 400));
-                } catch (err) {
-                    console.error('Erro ao imprimir nota', item.docId, err);
-                    erros++;
+
+            if (modo === 'zip') {
+                // ── ZIP de PDFs ──────────────────────────────────────────
+                if (typeof JSZip === 'undefined') {
+                    showToastSafe('JSZip não carregado. Tente novamente.', 'error'); return;
                 }
-            }
-            if (erros > 0) {
-                showToastSafe(`${selecionadas.length - erros} impresso(s), ${erros} erro(s).`, 'warning');
+                showToastSafe(`Baixando ${selecionadas.length} PDF(s), aguarde...`, 'info');
+                const zip = new JSZip();
+                let erros = 0;
+                for (const item of selecionadas) {
+                    try {
+                        const doc = documentos.find(d => d.id === item.docId);
+                        if (!doc) continue;
+                        let blob;
+                        if (item.provider === 'nuvem_fiscal') {
+                            const nfceId = item.nfceId || await resolverNfceId(doc);
+                            if (nfceId) {
+                                blob = item.status === '135'
+                                    ? await NuvemFiscal.baixarPDFCancelamento(nfceId)
+                                    : await NuvemFiscal.baixarPDF(nfceId);
+                            }
+                        }
+                        if (!blob) {
+                            const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                            const url = await FiscalService.baixarDANFE(item.chave, tipo);
+                            if (url instanceof Blob) blob = url;
+                            else { const r = await fetch(url); blob = await r.blob(); }
+                        }
+                        const nome = `DANFE-${doc.numero_documento || item.docId}.pdf`;
+                        zip.file(nome, blob);
+                    } catch (err) {
+                        console.error('Erro ao obter PDF', item.docId, err);
+                        erros++;
+                    }
+                }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                NuvemFiscal._triggerDownload(zipBlob, `DANFE-selecionadas-${Date.now()}.zip`);
+                if (erros > 0) showToastSafe(`ZIP gerado com ${selecionadas.length - erros} PDF(s). ${erros} erro(s).`, 'warning');
+                else showToastSafe(`ZIP com ${selecionadas.length} DANFE(s) baixado!`, 'success');
+
             } else {
-                showToastSafe(`${selecionadas.length} DANFE(s) gerado(s) com sucesso!`, 'success');
+                // ── Abas separadas ────────────────────────────────────────
+                showToastSafe(`Abrindo ${selecionadas.length} DANFE(s) em abas...`, 'info');
+                let erros = 0;
+                for (const item of selecionadas) {
+                    try {
+                        const doc = documentos.find(d => d.id === item.docId);
+                        if (!doc) continue;
+                        let pdfUrl;
+                        if (item.provider === 'nuvem_fiscal') {
+                            const nfceId = item.nfceId || await resolverNfceId(doc);
+                            if (nfceId) {
+                                pdfUrl = item.status === '135'
+                                    ? await NuvemFiscal.baixarPDFCancelamento(nfceId)
+                                    : await NuvemFiscal.baixarPDF(nfceId);
+                            }
+                        }
+                        if (!pdfUrl) {
+                            const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                            pdfUrl = await FiscalService.baixarDANFE(item.chave, tipo);
+                        }
+                        const urlParaAbrir = pdfUrl instanceof Blob ? URL.createObjectURL(pdfUrl) : pdfUrl;
+                        window.open(urlParaAbrir, '_blank');
+                        await new Promise(r => setTimeout(r, 400));
+                    } catch (err) {
+                        console.error('Erro ao abrir DANFE', item.docId, err);
+                        erros++;
+                    }
+                }
+                if (erros > 0) showToastSafe(`${selecionadas.length - erros} aberto(s), ${erros} erro(s).`, 'warning');
+                else showToastSafe(`${selecionadas.length} DANFE(s) aberto(s)!`, 'success');
             }
         }
 
-        async function baixarXMLSelecionadasDocs() {
+        async function baixarXMLSelecionadasDocs(modo = 'separado') {
             const selecionadas = getSelecionadasDocs();
             if (!selecionadas.length) return;
-            showToastSafe(`Baixando XML de ${selecionadas.length} nota(s)...`, 'info');
-            let erros = 0;
-            for (const item of selecionadas) {
-                try {
-                    const doc = documentos.find(d => d.id === item.docId);
-                    if (!doc) continue;
-                    if (item.provider === 'nuvem_fiscal') {
-                        const nfceId = item.nfceId || await resolverNfceId(doc);
-                        if (nfceId) {
-                            if (item.status === '135') {
-                                await NuvemFiscal.baixarXMLCancelamento(nfceId);
-                            } else {
-                                await NuvemFiscal.baixarXML(nfceId);
-                            }
-                            await new Promise(r => setTimeout(r, 400));
-                            continue;
-                        }
-                        // Fallback: XML salvo no banco
-                        if (doc.xml_nota || doc.xml_retorno) {
-                            const xmlContent = doc.xml_nota || doc.xml_retorno;
-                            const blob = new Blob([xmlContent], { type: 'application/xml' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `NFCE-${doc.numero_documento || doc.chave_acesso}.xml`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                            await new Promise(r => setTimeout(r, 400));
-                            continue;
-                        }
-                        throw new Error('nfce_id não encontrado');
-                    }
-                    // Focus NFe ou outro provider
-                    const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
-                    await FiscalService.baixarXML(item.chave, tipo);
-                    await new Promise(r => setTimeout(r, 400));
-                } catch (err) {
-                    console.error('Erro ao baixar XML da nota', item.docId, err);
-                    erros++;
+
+            if (modo === 'zip') {
+                // ── ZIP de XMLs ───────────────────────────────────────────
+                if (typeof JSZip === 'undefined') {
+                    showToastSafe('JSZip não carregado. Tente novamente.', 'error'); return;
                 }
-            }
-            if (erros > 0) {
-                showToastSafe(`${selecionadas.length - erros} XML(s) baixado(s), ${erros} erro(s).`, 'warning');
+                showToastSafe(`Baixando ${selecionadas.length} XML(s), aguarde...`, 'info');
+                const zip = new JSZip();
+                let erros = 0;
+                for (const item of selecionadas) {
+                    try {
+                        const doc = documentos.find(d => d.id === item.docId);
+                        if (!doc) continue;
+                        let blob;
+                        if (item.provider === 'nuvem_fiscal') {
+                            const nfceId = item.nfceId || await resolverNfceId(doc);
+                            if (nfceId) {
+                                blob = item.status === '135'
+                                    ? await NuvemFiscal.obterXMLCancelamentoBlob(nfceId)
+                                    : await NuvemFiscal.obterXMLBlob(nfceId);
+                            } else if (doc.xml_nota || doc.xml_retorno) {
+                                blob = new Blob([doc.xml_nota || doc.xml_retorno], { type: 'application/xml' });
+                            } else {
+                                throw new Error('nfce_id não encontrado');
+                            }
+                        } else {
+                            // Focus NFe: não há endpoint de blob puro disponível; pular no ZIP
+                            throw new Error('Provider não suporta ZIP: ' + item.provider);
+                        }
+                        const prefixo = item.status === '135' ? 'NFCE-CANCEL' : 'NFCE';
+                        const nome = `${prefixo}-${doc.numero_documento || item.docId}.xml`;
+                        zip.file(nome, blob);
+                    } catch (err) {
+                        console.error('Erro ao obter XML', item.docId, err);
+                        erros++;
+                    }
+                }
+                const zipBlob = await zip.generateAsync({ type: 'blob' });
+                NuvemFiscal._triggerDownload(zipBlob, `XML-selecionados-${Date.now()}.zip`);
+                if (erros > 0) showToastSafe(`ZIP gerado com ${selecionadas.length - erros} XML(s). ${erros} erro(s).`, 'warning');
+                else showToastSafe(`ZIP com ${selecionadas.length} XML(s) baixado!`, 'success');
+
             } else {
-                showToastSafe(`${selecionadas.length} XML(s) baixado(s) com sucesso!`, 'success');
+                // ── Arquivos separados ────────────────────────────────────
+                showToastSafe(`Baixando ${selecionadas.length} XML(s)...`, 'info');
+                let erros = 0;
+                for (const item of selecionadas) {
+                    try {
+                        const doc = documentos.find(d => d.id === item.docId);
+                        if (!doc) continue;
+                        if (item.provider === 'nuvem_fiscal') {
+                            const nfceId = item.nfceId || await resolverNfceId(doc);
+                            if (nfceId) {
+                                if (item.status === '135') await NuvemFiscal.baixarXMLCancelamento(nfceId);
+                                else await NuvemFiscal.baixarXML(nfceId);
+                                await new Promise(r => setTimeout(r, 400));
+                                continue;
+                            }
+                            if (doc.xml_nota || doc.xml_retorno) {
+                                const blob = new Blob([doc.xml_nota || doc.xml_retorno], { type: 'application/xml' });
+                                NuvemFiscal._triggerDownload(blob, `NFCE-${doc.numero_documento || item.docId}.xml`);
+                                await new Promise(r => setTimeout(r, 400));
+                                continue;
+                            }
+                            throw new Error('nfce_id não encontrado');
+                        }
+                        const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                        await FiscalService.baixarXML(item.chave, tipo);
+                        await new Promise(r => setTimeout(r, 400));
+                    } catch (err) {
+                        console.error('Erro ao baixar XML', item.docId, err);
+                        erros++;
+                    }
+                }
+                if (erros > 0) showToastSafe(`${selecionadas.length - erros} XML(s) baixado(s), ${erros} erro(s).`, 'warning');
+                else showToastSafe(`${selecionadas.length} XML(s) baixado(s)!`, 'success');
             }
         }
 
