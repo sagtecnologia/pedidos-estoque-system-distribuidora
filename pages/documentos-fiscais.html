@@ -241,13 +241,11 @@
                 return;
             }
 
-            // Renderizar sidebar
-            if (typeof createSidebar === 'function') {
-                const sidebarContainer = document.getElementById('sidebar-container');
-                if (sidebarContainer) {
-                    sidebarContainer.innerHTML = createSidebar();
-                }
-            }
+            // Renderizar navbar e sidebar
+            document.getElementById('navbar').innerHTML = createNavbar();
+            document.getElementById('sidebar-container').innerHTML = createSidebar();
+            await initNavbar();
+            await initSidebar();
 
             await carregarDocumentos();
         });

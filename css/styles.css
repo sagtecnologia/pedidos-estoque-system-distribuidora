@@ -160,7 +160,22 @@
 
 /* Sidebar */
 .sidebar {
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, width 0.3s ease;
+}
+
+/* Sidebar escondida no desktop (toggle) */
+.sidebar.sidebar-collapsed {
+    transform: translateX(-100%);
+}
+
+/* Main content expande quando sidebar está escondida */
+main.sidebar-collapsed {
+    margin-left: 0 !important;
+    transition: margin-left 0.3s ease;
+}
+
+main {
+    transition: margin-left 0.3s ease;
 }
 
 /* Customizar scrollbar do sidebar */
@@ -189,12 +204,17 @@
     scrollbar-color: #cbd5e1 #f5f5f5;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1023px) {
     .sidebar {
         transform: translateX(-100%);
     }
     
     .sidebar.active {
+        transform: translateX(0);
+    }
+
+    /* Em mobile, sidebar-collapsed não deve interferir com active */
+    .sidebar.active.sidebar-collapsed {
         transform: translateX(0);
     }
 }

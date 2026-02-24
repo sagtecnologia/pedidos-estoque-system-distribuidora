@@ -8,7 +8,7 @@ function createNavbar() {
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
-                        <button id="sidebar-toggle" class="lg:hidden mr-4 text-gray-600 hover:text-gray-900">
+                        <button id="sidebar-toggle" class="mr-4 text-gray-600 hover:text-gray-900 focus:outline-none" title="Mostrar/Ocultar menu">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                             </svg>
@@ -85,14 +85,39 @@ async function initNavbar() {
         console.log('Usando configurações padrão da empresa');
     }
 
-    // Toggle sidebar em mobile
+    // Toggle sidebar (mobile + desktop)
     const sidebarToggle = document.getElementById('sidebar-toggle');
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => {
             const sidebar = document.getElementById('sidebar');
+            const mainContent = document.querySelector('main');
             if (sidebar) {
-                sidebar.classList.toggle('active');
+                const isMobile = window.innerWidth < 1024;
+                if (isMobile) {
+                    // Mobile: usa classe 'active' para mostrar
+                    sidebar.classList.toggle('active');
+                } else {
+                    // Desktop: usa classe 'sidebar-collapsed' para esconder
+                    sidebar.classList.toggle('sidebar-collapsed');
+                    if (mainContent) {
+                        mainContent.classList.toggle('sidebar-collapsed');
+                    }
+                    // Salvar preferência
+                    const collapsed = sidebar.classList.contains('sidebar-collapsed');
+                    localStorage.setItem('sidebarCollapsed', collapsed ? '1' : '0');
+                }
             }
         });
+    }
+
+    // Restaurar estado salvo do sidebar no desktop
+    if (window.innerWidth >= 1024) {
+        const collapsed = localStorage.getItem('sidebarCollapsed') === '1';
+        if (collapsed) {
+            const sidebar = document.getElementById('sidebar');
+            const mainContent = document.querySelector('main');
+            if (sidebar) sidebar.classList.add('sidebar-collapsed');
+            if (mainContent) mainContent.classList.add('sidebar-collapsed');
+        }
     }
 }
