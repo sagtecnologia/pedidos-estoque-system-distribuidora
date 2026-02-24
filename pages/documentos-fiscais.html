@@ -114,12 +114,31 @@
                 </div>
             </div>
 
+            <!-- Barra de seleção múltipla -->
+            <div id="barra-selecao-docs" class="hidden mb-3 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                <span id="texto-selecao-docs" class="text-sm font-medium text-blue-800">0 nota(s) selecionada(s)</span>
+                <div class="flex items-center gap-2">
+                    <button onclick="imprimirSelecionadasDocs()" class="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white text-sm px-3 py-1.5 rounded-lg transition">
+                        <i class="fas fa-print"></i> Imprimir todas
+                    </button>
+                    <button onclick="baixarXMLSelecionadasDocs()" class="flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white text-sm px-3 py-1.5 rounded-lg transition">
+                        <i class="fas fa-download"></i> Baixar XMLs
+                    </button>
+                    <button onclick="desselecionarTodasDocs()" class="flex items-center gap-1 bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm px-3 py-1.5 rounded-lg transition">
+                        <i class="fas fa-times"></i> Limpar
+                    </button>
+                </div>
+            </div>
+
             <!-- Tabela de Documentos -->
             <div class="bg-white rounded-lg shadow-md overflow-hidden">
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <input type="checkbox" id="select-all-docs" onchange="toggleSelectAllDocs(this)" class="w-4 h-4 text-blue-600 rounded" title="Selecionar todos">
+                                </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Número/Série</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chave de Acesso</th>
@@ -131,7 +150,7 @@
                         </thead>
                         <tbody id="tbody-documentos" class="bg-white divide-y divide-gray-200">
                             <tr>
-                                <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
                                     <i class="fas fa-spinner fa-spin mr-2"></i>Carregando...
                                 </td>
                             </tr>
@@ -303,11 +322,16 @@
         
         function renderizarTabela() {
             const tbody = document.getElementById('tbody-documentos');
+
+            // Resetar seleção ao re-renderizar
+            const selectAll = document.getElementById('select-all-docs');
+            if (selectAll) selectAll.checked = false;
+            document.getElementById('barra-selecao-docs').classList.add('hidden');
             
             if (documentosFiltrados.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="8" class="px-6 py-8 text-center text-gray-500">
                             <i class="fas fa-inbox text-4xl mb-2"></i>
                             <p>Nenhum documento fiscal encontrado</p>
                         </td>
@@ -316,8 +340,13 @@
                 return;
             }
 
-            tbody.innerHTML = documentosFiltrados.map(doc => `
+            tbody.innerHTML = documentosFiltrados.map(doc => {
+                const selecionavel = doc.chave_acesso && (doc.status_sefaz === '100' || doc.status_sefaz === '135');
+                return `
                 <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        ${selecionavel ? `<input type="checkbox" class="doc-checkbox w-4 h-4 text-blue-600 rounded" onchange="atualizarSelecaoDocs()" data-doc-id="${doc.id}" data-nfce-id="${doc.nfce_id || ''}" data-chave="${doc.chave_acesso || ''}" data-status="${doc.status_sefaz}" data-provider="${doc.api_provider || ''}">` : ''}
+                    </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 text-xs font-semibold rounded-full ${
                             doc.tipo_documento === 'NFCE' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
@@ -363,7 +392,135 @@
                         ` : ''}
                     </td>
                 </tr>
-            `).join('');
+            `}).join('');
+        }
+
+        // ========================================
+        // MULTI-SELECT
+        // ========================================
+
+        function toggleSelectAllDocs(checkbox) {
+            document.querySelectorAll('.doc-checkbox').forEach(cb => { cb.checked = checkbox.checked; });
+            atualizarSelecaoDocs();
+        }
+
+        function atualizarSelecaoDocs() {
+            const selecionadas = document.querySelectorAll('.doc-checkbox:checked');
+            const barra = document.getElementById('barra-selecao-docs');
+            const texto = document.getElementById('texto-selecao-docs');
+            if (selecionadas.length > 0) {
+                barra.classList.remove('hidden');
+                texto.textContent = `${selecionadas.length} nota(s) selecionada(s)`;
+            } else {
+                barra.classList.add('hidden');
+            }
+        }
+
+        function desselecionarTodasDocs() {
+            document.querySelectorAll('.doc-checkbox').forEach(cb => { cb.checked = false; });
+            const selectAll = document.getElementById('select-all-docs');
+            if (selectAll) selectAll.checked = false;
+            document.getElementById('barra-selecao-docs').classList.add('hidden');
+        }
+
+        function getSelecionadasDocs() {
+            return Array.from(document.querySelectorAll('.doc-checkbox:checked')).map(cb => ({
+                docId: cb.dataset.docId,
+                nfceId: cb.dataset.nfceId || null,
+                chave: cb.dataset.chave,
+                status: cb.dataset.status,
+                provider: cb.dataset.provider
+            }));
+        }
+
+        async function imprimirSelecionadasDocs() {
+            const selecionadas = getSelecionadasDocs();
+            if (!selecionadas.length) return;
+            showToastSafe(`Gerando DANFE de ${selecionadas.length} nota(s)...`, 'info');
+            let erros = 0;
+            for (const item of selecionadas) {
+                try {
+                    const doc = documentos.find(d => d.id === item.docId);
+                    if (!doc) continue;
+                    let pdfUrl;
+                    if (item.provider === 'nuvem_fiscal') {
+                        const nfceId = item.nfceId || await resolverNfceId(doc);
+                        if (nfceId) {
+                            pdfUrl = item.status === '135'
+                                ? await NuvemFiscal.baixarPDFCancelamento(nfceId)
+                                : await NuvemFiscal.baixarPDF(nfceId);
+                        }
+                    }
+                    if (!pdfUrl) {
+                        const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                        pdfUrl = await FiscalService.baixarDANFE(item.chave, tipo);
+                    }
+                    const urlParaAbrir = pdfUrl instanceof Blob ? URL.createObjectURL(pdfUrl) : pdfUrl;
+                    window.open(urlParaAbrir, '_blank');
+                    await new Promise(r => setTimeout(r, 400));
+                } catch (err) {
+                    console.error('Erro ao imprimir nota', item.docId, err);
+                    erros++;
+                }
+            }
+            if (erros > 0) {
+                showToastSafe(`${selecionadas.length - erros} impresso(s), ${erros} erro(s).`, 'warning');
+            } else {
+                showToastSafe(`${selecionadas.length} DANFE(s) gerado(s) com sucesso!`, 'success');
+            }
+        }
+
+        async function baixarXMLSelecionadasDocs() {
+            const selecionadas = getSelecionadasDocs();
+            if (!selecionadas.length) return;
+            showToastSafe(`Baixando XML de ${selecionadas.length} nota(s)...`, 'info');
+            let erros = 0;
+            for (const item of selecionadas) {
+                try {
+                    const doc = documentos.find(d => d.id === item.docId);
+                    if (!doc) continue;
+                    if (item.provider === 'nuvem_fiscal') {
+                        const nfceId = item.nfceId || await resolverNfceId(doc);
+                        if (nfceId) {
+                            if (item.status === '135') {
+                                await NuvemFiscal.baixarXMLCancelamento(nfceId);
+                            } else {
+                                await NuvemFiscal.baixarXML(nfceId);
+                            }
+                            await new Promise(r => setTimeout(r, 400));
+                            continue;
+                        }
+                        // Fallback: XML salvo no banco
+                        if (doc.xml_nota || doc.xml_retorno) {
+                            const xmlContent = doc.xml_nota || doc.xml_retorno;
+                            const blob = new Blob([xmlContent], { type: 'application/xml' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `NFCE-${doc.numero_documento || doc.chave_acesso}.xml`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            await new Promise(r => setTimeout(r, 400));
+                            continue;
+                        }
+                        throw new Error('nfce_id não encontrado');
+                    }
+                    // Focus NFe ou outro provider
+                    const tipo = doc.tipo_documento === 'NFCE' ? 'nfce' : 'nfe';
+                    await FiscalService.baixarXML(item.chave, tipo);
+                    await new Promise(r => setTimeout(r, 400));
+                } catch (err) {
+                    console.error('Erro ao baixar XML da nota', item.docId, err);
+                    erros++;
+                }
+            }
+            if (erros > 0) {
+                showToastSafe(`${selecionadas.length - erros} XML(s) baixado(s), ${erros} erro(s).`, 'warning');
+            } else {
+                showToastSafe(`${selecionadas.length} XML(s) baixado(s) com sucesso!`, 'success');
+            }
         }
 
         // ========================================
