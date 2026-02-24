@@ -776,14 +776,40 @@ class FiscalSystem {
                 let nfceId = docFiscal?.nfce_id;
 
                 // 2. Se não encontrou em documentos_fiscais, tentar em vendas
+                let vendaEncontrada = null;
                 if (!nfceId) {
                     const { data: venda } = await supabase
                         .from('vendas')
-                        .select('nfce_id')
+                        .select('id, nfce_id')
                         .eq('chave_acesso_nfce', chaveAcesso)
                         .maybeSingle();
                     
+                    vendaEncontrada = venda;
                     nfceId = venda?.nfce_id;
+                }
+
+                // 3. Fallback: buscar na Nuvem Fiscal por referencia (VENDA-{vendaId})
+                // Isso recupera notas emitidas antes do nfce_id ser salvo corretamente no banco
+                if (!nfceId && vendaEncontrada?.id) {
+                    try {
+                        console.warn('⚠️ [FiscalSystem] nfce_id ausente no banco. Tentando recuperar via API Nuvem Fiscal por referencia...');
+                        const referencia = `VENDA-${vendaEncontrada.id}`;
+                        const empresa = await supabase.from('empresa_config').select('cnpj').single();
+                        const cnpj = empresa?.data?.cnpj?.replace(/\D/g, '');
+                        if (cnpj) {
+                            const lista = await NuvemFiscal.listarNFCe(cnpj, NuvemFiscal.ambiente, 5);
+                            const notaEncontrada = lista?.data?.find(n => n.referencia === referencia);
+                            if (notaEncontrada?.id) {
+                                nfceId = notaEncontrada.id;
+                                console.log('✅ [FiscalSystem] nfce_id recuperado da API:', nfceId);
+                                // Salvar nfce_id no banco para futuras consultas
+                                await supabase.from('vendas').update({ nfce_id: nfceId }).eq('id', vendaEncontrada.id);
+                                console.log('✅ [FiscalSystem] nfce_id salvo na tabela vendas');
+                            }
+                        }
+                    } catch (erroBusca) {
+                        console.warn('⚠️ [FiscalSystem] Falha ao buscar nfce_id via API Nuvem Fiscal:', erroBusca.message);
+                    }
                 }
 
                 if (!nfceId) {
@@ -828,6 +854,7 @@ class FiscalSystem {
                 let nfceId = docFiscal?.nfce_id;
 
                 // Se não encontrou em documentos_fiscais, tentar vendas (notas normais do PDV)
+                let vendaEncontrada = null;
                 if (!nfceId) {
                     const { data: venda } = await supabase
                         .from('vendas')
@@ -835,7 +862,29 @@ class FiscalSystem {
                         .eq('chave_acesso_nfce', chaveAcesso)
                         .maybeSingle();
                     
+                    vendaEncontrada = venda;
                     nfceId = venda?.nfce_id;
+                }
+
+                // Fallback: buscar na Nuvem Fiscal por referencia quando nfce_id ausente no banco
+                if (!nfceId && vendaEncontrada?.id) {
+                    try {
+                        console.warn('⚠️ [FiscalSystem] nfce_id ausente. Tentando recuperar via API Nuvem Fiscal...');
+                        const referencia = `VENDA-${vendaEncontrada.id}`;
+                        const empresa = await supabase.from('empresa_config').select('cnpj').single();
+                        const cnpj = empresa?.data?.cnpj?.replace(/\D/g, '');
+                        if (cnpj) {
+                            const lista = await NuvemFiscal.listarNFCe(cnpj, NuvemFiscal.ambiente, 5);
+                            const notaEncontrada = lista?.data?.find(n => n.referencia === referencia);
+                            if (notaEncontrada?.id) {
+                                nfceId = notaEncontrada.id;
+                                console.log('✅ [FiscalSystem] nfce_id recuperado da API:', nfceId);
+                                await supabase.from('vendas').update({ nfce_id: nfceId }).eq('id', vendaEncontrada.id);
+                            }
+                        }
+                    } catch (erroBusca) {
+                        console.warn('⚠️ [FiscalSystem] Falha ao buscar nfce_id via API:', erroBusca.message);
+                    }
                 }
 
                 if (!nfceId) {
@@ -1075,15 +1124,39 @@ class FiscalSystem {
                 }
 
                 // 3. Buscar diretamente em vendas por chave_acesso_nfce
+                let vendaParaFallback = null;
                 if (!nfceId) {
                     const { data: venda } = await supabase
                         .from('vendas')
-                        .select('nfce_id')
+                        .select('id, nfce_id')
                         .eq('chave_acesso_nfce', referencia)
                         .maybeSingle();
                     if (venda?.nfce_id) {
                         nfceId = venda.nfce_id;
                         console.log('✅ nfce_id encontrado em vendas por chave_acesso:', nfceId);
+                    } else if (venda?.id) {
+                        vendaParaFallback = venda;
+                    }
+                }
+
+                // 4. Fallback: buscar na Nuvem Fiscal por referencia quando nfce_id ausente no banco
+                if (!nfceId && vendaParaFallback?.id) {
+                    try {
+                        console.warn('⚠️ [FiscalSystem] nfce_id ausente. Tentando recuperar via API Nuvem Fiscal...');
+                        const ref = `VENDA-${vendaParaFallback.id}`;
+                        const empresa = await supabase.from('empresa_config').select('cnpj').single();
+                        const cnpj = empresa?.data?.cnpj?.replace(/\D/g, '');
+                        if (cnpj) {
+                            const lista = await NuvemFiscal.listarNFCe(cnpj, NuvemFiscal.ambiente, 5);
+                            const notaEncontrada = lista?.data?.find(n => n.referencia === ref);
+                            if (notaEncontrada?.id) {
+                                nfceId = notaEncontrada.id;
+                                console.log('✅ [FiscalSystem] nfce_id recuperado da API:', nfceId);
+                                await supabase.from('vendas').update({ nfce_id: nfceId }).eq('id', vendaParaFallback.id);
+                            }
+                        }
+                    } catch (erroBusca) {
+                        console.warn('⚠️ [FiscalSystem] Falha ao buscar nfce_id via API:', erroBusca.message);
                     }
                 }
 

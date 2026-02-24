@@ -980,7 +980,11 @@ class NuvemFiscalService {
             const valorTotal = parseFloat(venda.valor_total || venda.total || subtotal - desconto);
             const troco = parseFloat(venda.troco || 0);
             
-            console.log('💰 [NuvemFiscal] Valores calculados:', { subtotal, desconto, valorTotal, troco });
+            // valorFiscal é o total fiscal correto: vProd - vDesc
+            // SEFAZ exige que vNF = vProd - vDesc (não pode usar valor_total que pode incluir taxa_cartao)
+            const valorFiscal = parseFloat((subtotal - desconto).toFixed(2));
+            
+            console.log('💰 [NuvemFiscal] Valores calculados:', { subtotal, desconto, valorTotal, valorFiscal, troco });
             
             // Validar e formatar código do município (7 dígitos obrigatório)
             console.log('🏙️ [NuvemFiscal] Dados municipio:', {
@@ -1585,7 +1589,7 @@ class NuvemFiscalService {
                             vPIS: NuvemFiscalService.formatarNumero(totaisFiscais.valor_pis),
                             vCOFINS: NuvemFiscalService.formatarNumero(totaisFiscais.valor_cofins),
                             vOutro: NuvemFiscalService.formatarNumero(0),
-                            vNF: NuvemFiscalService.formatarNumero(valorTotal),
+                            vNF: NuvemFiscalService.formatarNumero(valorFiscal),
                             vTotTrib: NuvemFiscalService.formatarNumero(totaisFiscais.total_impostos)
                         }
                     },
@@ -1596,7 +1600,7 @@ class NuvemFiscalService {
                         detPag: [{
                             tPag: this.mapearFormaPagamento(venda.forma_pagamento),
                             xPag: venda.forma_pagamento_descricao || this.obterDescricaoPagamento(venda.forma_pagamento),
-                            vPag: NuvemFiscalService.formatarNumero(valorTotal)
+                            vPag: NuvemFiscalService.formatarNumero(valorFiscal)
                         }],
                         vTroco: NuvemFiscalService.formatarNumero(troco)
                     }

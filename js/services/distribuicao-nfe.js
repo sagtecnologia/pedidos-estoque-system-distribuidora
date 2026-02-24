@@ -316,27 +316,30 @@ class DistribuicaoNFCeService {
             
             console.log('📅 [DistribuicaoNFCe] Datas SEFAZ para salvar:', { dataEmissaoSefaz, dataAutorizacaoSefaz });
             
-            const documentoFiscalData = resultadoFiscal.documentoFiscalData || {
+            // Sempre construir o objeto explicitamente para garantir que nfce_id e demais campos estão corretos
+            // Mesclar documentoFiscalData retornado pelo fiscal.js (se existir) com campos distribuição
+            const chaveAcessoFinal = resultadoFiscal.chave_nfe || resultadoFiscal.chave_acesso || resultadoFiscal.documentoFiscalData?.chave_acesso;
+            const nfceIdFinal = resultadoFiscal.nfce_id || resultadoFiscal.documentoFiscalData?.nfce_id || null;
+
+            const documentoFiscalData = {
                 venda_id: null, // ✅ NULL pois não há venda na distribuição
                 tipo_documento: 'NFCE',
-                numero_documento: String(resultadoFiscal.numero),
-                serie: parseInt(resultadoFiscal.serie || '1'),
-                chave_acesso: resultadoFiscal.chave_nfe || resultadoFiscal.chave_acesso,
-                protocolo_autorizacao: resultadoFiscal.protocolo,
+                numero_documento: String(resultadoFiscal.numero || resultadoFiscal.documentoFiscalData?.numero_documento || '0'),
+                serie: parseInt(resultadoFiscal.serie || resultadoFiscal.documentoFiscalData?.serie || '1'),
+                chave_acesso: chaveAcessoFinal,
+                protocolo_autorizacao: resultadoFiscal.protocolo || resultadoFiscal.documentoFiscalData?.protocolo_autorizacao,
                 status_sefaz: '100', // Autorizado
                 mensagem_sefaz: resultadoFiscal.mensagem || 'Autorizado o uso da NFC-e',
                 valor_total: vendaData.total,
                 natureza_operacao: 'DISTRIBUICAO',
                 data_emissao: dataEmissaoSefaz,
                 data_autorizacao: dataAutorizacaoSefaz,
-                xml_nota: resultadoFiscal.caminho_xml || null,
+                xml_nota: resultadoFiscal.caminho_xml || resultadoFiscal.documentoFiscalData?.xml_nota || null,
                 xml_retorno: JSON.stringify(resultadoFiscal),
                 tentativas_emissao: 1,
                 ultima_tentativa: new Date().toISOString(),
                 api_provider: resultadoFiscal.provider || 'nuvem_fiscal',
-                nfce_id: resultadoFiscal.nfce_id, // ✅ CRITICAL: ID da nota na Nuvem Fiscal/Focus NFe
-                origem_emissao: 'DISTRIBUICAO', // ✅ Identificar origem
-                observacoes: `DISTRIBUIÇÃO DE PRODUTOS\n${descricaoNota}\n${observacoes || ''}`
+                nfce_id: nfceIdFinal // ✅ CRITICAL: ID da nota na Nuvem Fiscal para impressão/consulta
             };
 
             let documentoFiscalId = null;

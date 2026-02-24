@@ -78,10 +78,26 @@
 
             <!-- Tabela -->
             <div class="bg-white rounded-lg shadow overflow-hidden">
+                <!-- Barra de ações em massa -->
+                <div id="barra-selecao" class="hidden px-6 py-3 bg-indigo-50 border-b border-indigo-200 flex items-center gap-4">
+                    <span class="text-sm font-medium text-indigo-800"><span id="qtd-selecionadas">0</span> nota(s) selecionada(s)</span>
+                    <button onclick="imprimirSelecionadas()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+                        <i class="fas fa-print"></i> Imprimir todas
+                    </button>
+                    <button onclick="baixarXMLSelecionadas()" class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+                        <i class="fas fa-file-code"></i> Baixar XMLs
+                    </button>
+                    <button onclick="desselecionarTodas()" class="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300">
+                        <i class="fas fa-times"></i> Limpar seleção
+                    </button>
+                </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="bg-gray-50">
                             <tr>
+                                <th class="px-4 py-3 text-left">
+                                    <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this.checked)" class="w-4 h-4 text-indigo-600 rounded cursor-pointer" title="Selecionar todas com NFC-e">
+                                </th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Número</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendedor</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
@@ -97,10 +113,11 @@
                             </tr>
                         </thead>
                         <tbody id="vendas-tbody" class="bg-white divide-y divide-gray-200">
-                            <tr><td colspan="12" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
+                            <tr><td colspan="13" class="px-6 py-4 text-center text-gray-500">Carregando...</td></tr>
                         </tbody>
                         <tfoot id="vendas-tfoot" class="bg-gray-50 border-t-2 border-gray-300">
                             <tr>
+                                <td></td>
                                 <td colspan="3" class="px-6 py-4 text-sm font-semibold text-gray-900 text-right">TOTAL:</td>
                                 <td class="px-6 py-4 text-sm font-bold text-gray-900" id="total-quantidade">0</td>
                                 <td class="px-6 py-4 text-sm font-bold text-gray-900" id="total-valor">R$ 0,00</td>
@@ -481,9 +498,10 @@
             const tbody = document.getElementById('vendas-tbody');
             
             if (vendas.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="12" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="13" class="px-6 py-4 text-center text-gray-500">Nenhuma venda encontrada</td></tr>';
                 document.getElementById('total-quantidade').textContent = '0';
                 document.getElementById('total-valor').textContent = 'R$ 0,00';
+                document.getElementById('barra-selecao').classList.add('hidden');
                 return;
             }
 
@@ -533,8 +551,16 @@
                     badgePagamento = `<i class="fas ${icon} text-${color}-600 ml-2" title="Pagamento ${venda.pagamento_status === 'PARCIAL' ? 'Parcial' : 'Pendente'}: ${formatCurrency(venda.valor_pendente || 0)}"></i>`;
                 }
                 
+                const temNfce = !!(venda.chave_acesso_nfce && venda.status_fiscal !== 'CANCELADA');
+
                 return `
-                <tr class="hover:bg-gray-50">
+                <tr class="hover:bg-gray-50" data-venda-id="${venda.id}">
+                    <td class="px-4 py-4">
+                        ${temNfce ? `<input type="checkbox" class="venda-cb w-4 h-4 text-indigo-600 rounded cursor-pointer"
+                            data-venda-id="${venda.id}"
+                            data-chave="${venda.chave_acesso_nfce || ''}"
+                            onchange="atualizarSelecao()">` : ''}
+                    </td>
                     <td class="px-6 py-4">
                         <div class="font-medium text-gray-900">${venda.numero}</div>
                     </td>
@@ -772,16 +798,58 @@
 
                 // Verificar sucesso
                 if (resultado.success || resultado.status === 'autorizado') {
-                    // Atualizar status da venda
+                    // Atualizar status da venda (incluindo nfce_id para consultas/impressão)
                     await supabase
                         .from('vendas')
                         .update({
                             status_fiscal: 'EMITIDA_NFCE',
                             numero_nfce: resultado.numero,
-                            chave_acesso_nfce: resultado.chave_nfe,
-                            protocolo_nfce: resultado.protocolo
+                            chave_acesso_nfce: resultado.chave_nfe || resultado.chave_acesso,
+                            protocolo_nfce: resultado.protocolo,
+                            nfce_id: resultado.nfce_id || null
                         })
                         .eq('id', vendaId);
+
+                    // Inserir registro em documentos_fiscais para aparecer na listagem e permitir impressão
+                    if (resultado.documentoFiscalData) {
+                        const docFiscalParaSalvar = {
+                            ...resultado.documentoFiscalData,
+                            venda_id: vendaId
+                        };
+                        const { error: erroDocFiscal } = await supabase
+                            .from('documentos_fiscais')
+                            .insert(docFiscalParaSalvar);
+                        if (erroDocFiscal) {
+                            console.warn('⚠️ Aviso: não foi possível salvar em documentos_fiscais:', erroDocFiscal.message);
+                        } else {
+                            console.log('✅ Documento fiscal salvo em documentos_fiscais');
+                        }
+                    } else {
+                        // Fallback: montar dados mínimos para documentos_fiscais mesmo sem documentoFiscalData
+                        const { error: erroDocFiscal } = await supabase
+                            .from('documentos_fiscais')
+                            .insert({
+                                venda_id: vendaId,
+                                tipo_documento: 'NFCE',
+                                numero_documento: String(resultado.numero || '0'),
+                                serie: parseInt(resultado.serie || '1'),
+                                chave_acesso: resultado.chave_nfe || resultado.chave_acesso,
+                                protocolo_autorizacao: resultado.protocolo,
+                                status_sefaz: '100',
+                                mensagem_sefaz: 'Autorizado o uso da NFC-e',
+                                valor_total: venda.total,
+                                natureza_operacao: 'VENDA',
+                                data_emissao: resultado.data_emissao || new Date().toISOString(),
+                                data_autorizacao: resultado.data_autorizacao || new Date().toISOString(),
+                                tentativas_emissao: 1,
+                                ultima_tentativa: new Date().toISOString(),
+                                api_provider: 'nuvem_fiscal',
+                                nfce_id: resultado.nfce_id || null
+                            });
+                        if (erroDocFiscal) {
+                            console.warn('⚠️ Aviso: não foi possível salvar em documentos_fiscais (fallback):', erroDocFiscal.message);
+                        }
+                    }
 
                     alert(`✅ NFC-e emitida com sucesso!
 
@@ -835,7 +903,93 @@ Deseja baixar o DANFE (PDF)?`);
                     alert('Esta venda não possui chave de acesso da NFC-e');
                     return;
                 }
-                
+
+                // ── Garantir registro em documentos_fiscais ────────────────────────
+                const { data: docExistente } = await supabase
+                    .from('documentos_fiscais')
+                    .select('id')
+                    .eq('chave_acesso', chaveAcesso)
+                    .eq('tipo_documento', 'NFCE')
+                    .maybeSingle();
+
+                if (!docExistente) {
+                    console.log('📝 Registro ausente em documentos_fiscais — inserindo...');
+                    try {
+                        // Buscar dados completos da venda para montar o registro
+                        const { data: vendaCompleta, error: erroVendaCompleta } = await supabase
+                            .from('vendas')
+                            .select('id, total, numero_nfce, protocolo_nfce, nfce_id, status_fiscal, created_at')
+                            .eq('id', vendaId)
+                            .single();
+
+                        if (erroVendaCompleta) {
+                            console.warn('⚠️ Erro ao buscar venda completa:', erroVendaCompleta.message);
+                        }
+
+                        // Tentar obter dados extras da Nuvem Fiscal para datas/protocolo precisos
+                        let nfceId = vendaCompleta?.nfce_id;
+                        let dataEmissao = vendaCompleta?.created_at || new Date().toISOString();
+                        let protocolo = vendaCompleta?.protocolo_nfce || null;
+                        let numero = vendaCompleta?.numero_nfce || '0';
+                        let serie = 1;
+
+                        if (!nfceId) {
+                            // Tentar recuperar nfce_id via API (mesmo fallback do fiscal.js)
+                            try {
+                                const { data: empConfig } = await supabase.from('empresa_config').select('cnpj, api_fiscal_provider').single();
+                                if (empConfig?.api_fiscal_provider === 'nuvem_fiscal' && empConfig?.cnpj) {
+                                    const cnpj = empConfig.cnpj.replace(/\D/g, '');
+                                    const lista = await NuvemFiscal.listarNFCe(cnpj, NuvemFiscal.ambiente, 5);
+                                    const notaEncontrada = lista?.data?.find(n => n.referencia === `VENDA-${vendaId}`);
+                                    if (notaEncontrada?.id) {
+                                        nfceId = notaEncontrada.id;
+                                        numero = notaEncontrada.numero || numero;
+                                        serie = parseInt(notaEncontrada.serie || serie);
+                                        dataEmissao = notaEncontrada.data_emissao || dataEmissao;
+                                        protocolo = notaEncontrada.autorizacao?.numero_protocolo || protocolo;
+                                        // Persistir nfce_id na venda
+                                        await supabase.from('vendas').update({ nfce_id: nfceId }).eq('id', vendaId);
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('⚠️ Não foi possível recuperar nfce_id via API:', e.message);
+                            }
+                        }
+
+                        const { error: erroInsert } = await supabase
+                            .from('documentos_fiscais')
+                            .insert({
+                                venda_id: vendaId,
+                                tipo_documento: 'NFCE',
+                                numero_documento: String(numero),
+                                serie: serie,
+                                chave_acesso: chaveAcesso,
+                                protocolo_autorizacao: protocolo,
+                                status_sefaz: '100',
+                                mensagem_sefaz: 'Autorizado o uso da NFC-e',
+                                valor_total: Number(vendaCompleta?.total) || null,
+                                natureza_operacao: 'VENDA',
+                                data_emissao: dataEmissao,
+                                data_autorizacao: dataEmissao,
+                                tentativas_emissao: 1,
+                                ultima_tentativa: new Date().toISOString(),
+                                api_provider: 'nuvem_fiscal',
+                                nfce_id: nfceId || null
+                            });
+
+                        if (erroInsert) {
+                            console.warn('⚠️ Falha ao inserir em documentos_fiscais:', erroInsert.message);
+                        } else {
+                            console.log('✅ Registro inserido com sucesso em documentos_fiscais');
+                        }
+                    } catch (erroSync) {
+                        console.warn('⚠️ Erro ao sincronizar documentos_fiscais:', erroSync.message);
+                    }
+                } else {
+                    console.log('✅ Registro já existe em documentos_fiscais:', docExistente.id);
+                }
+                // ──────────────────────────────────────────────────────────────────
+
                 console.log('🔍 Consultando NFC-e com chave:', chaveAcesso);
                 
                 // Consultar nota usando a chave de acesso
@@ -859,6 +1013,108 @@ Deseja baixar o DANFE (PDF)?`);
                 showLoading(false);
             }
         }
+
+        // ── Multi-select helpers ───────────────────────────────────────────────
+        function toggleSelectAll(checked) {
+            document.querySelectorAll('.venda-cb').forEach(cb => cb.checked = checked);
+            atualizarSelecao();
+        }
+
+        function atualizarSelecao() {
+            const cbs = document.querySelectorAll('.venda-cb');
+            const selecionadas = document.querySelectorAll('.venda-cb:checked');
+            document.getElementById('qtd-selecionadas').textContent = selecionadas.length;
+            const barra = document.getElementById('barra-selecao');
+            if (selecionadas.length > 0) {
+                barra.classList.remove('hidden');
+            } else {
+                barra.classList.add('hidden');
+            }
+            // Atualizar estado do "select all"
+            const selectAll = document.getElementById('select-all-cb');
+            if (selectAll) {
+                selectAll.checked = cbs.length > 0 && selecionadas.length === cbs.length;
+                selectAll.indeterminate = selecionadas.length > 0 && selecionadas.length < cbs.length;
+            }
+        }
+
+        function desselecionarTodas() {
+            document.querySelectorAll('.venda-cb').forEach(cb => cb.checked = false);
+            const selectAll = document.getElementById('select-all-cb');
+            if (selectAll) { selectAll.checked = false; selectAll.indeterminate = false; }
+            atualizarSelecao();
+        }
+
+        function getSelecionadas() {
+            return Array.from(document.querySelectorAll('.venda-cb:checked')).map(cb => ({
+                vendaId: cb.dataset.vendaId,
+                chave: cb.dataset.chave
+            })).filter(v => v.chave);
+        }
+
+        async function imprimirSelecionadas() {
+            const selecionadas = getSelecionadas();
+            if (selecionadas.length === 0) { showToast('Nenhuma nota selecionada', 'warning'); return; }
+            showToast(`Abrindo ${selecionadas.length} nota(s)... Permita pop-ups no navegador.`, 'info');
+            showLoading(true);
+            let erros = 0;
+            for (const { vendaId, chave } of selecionadas) {
+                try {
+                    const resultado = await FiscalService.consultarDocumento(chave, 'nfce');
+                    if (resultado.caminho_danfe === 'USE_OBTER_PDF_METHOD' && resultado.obterPDF) {
+                        const pdfUrl = await resultado.obterPDF();
+                        window.open(pdfUrl, '_blank');
+                    } else if (resultado.caminho_danfe) {
+                        window.open(resultado.caminho_danfe, '_blank');
+                    }
+                    await new Promise(r => setTimeout(r, 600)); // pequeno delay entre janelas
+                } catch (e) {
+                    console.error('Erro ao imprimir nota', chave, e);
+                    erros++;
+                }
+            }
+            showLoading(false);
+            if (erros > 0) showToast(`${erros} nota(s) com erro ao abrir`, 'warning');
+            else showToast('✅ Todas as notas abertas!', 'success');
+        }
+
+        async function baixarXMLSelecionadas() {
+            const selecionadas = getSelecionadas();
+            if (selecionadas.length === 0) { showToast('Nenhuma nota selecionada', 'warning'); return; }
+            showToast(`Baixando XML de ${selecionadas.length} nota(s)...`, 'info');
+            showLoading(true);
+            let erros = 0;
+            for (const { vendaId, chave } of selecionadas) {
+                try {
+                    const xmlContent = await FiscalService.baixarXML(chave, 'nfce');
+                    // xmlContent pode ser string XML ou Blob
+                    let blob;
+                    if (typeof xmlContent === 'string') {
+                        blob = new Blob([xmlContent], { type: 'application/xml' });
+                    } else if (xmlContent instanceof Blob) {
+                        blob = xmlContent;
+                    } else {
+                        blob = new Blob([JSON.stringify(xmlContent)], { type: 'application/xml' });
+                    }
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `nfce-${chave}.xml`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    await new Promise(r => setTimeout(r, 400));
+                } catch (e) {
+                    console.error('Erro ao baixar XML', chave, e);
+                    erros++;
+                }
+            }
+            showLoading(false);
+            if (erros > 0) showToast(`${erros} XML(s) com erro ao baixar`, 'warning');
+            else showToast('✅ Todos os XMLs baixados!', 'success');
+        }
+        // ───────────────────────────────────────────────────────────────────────
 
         // Formatar forma de pagamento para exibição
         function formatarFormaPagamento(forma) {

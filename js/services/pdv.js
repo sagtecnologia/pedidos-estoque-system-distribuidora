@@ -1983,14 +1983,15 @@ class PDVSystem {
                 console.log('✅ [PDV] NFC-e autorizada! Atualizando venda...');
                 
                 // Atualizar venda com dados fiscais
+                const chaveAcessoFinal = resultado.chave_nfe || resultado.chave_acesso;
                 const { error: erroUpdate } = await supabase
                     .from('vendas')
                     .update({
                         status_fiscal: 'EMITIDA_NFCE',
                         numero_nfce: resultado.numero,
-                        chave_acesso_nfce: resultado.chave_nfe,
+                        chave_acesso_nfce: chaveAcessoFinal,
                         protocolo_nfce: resultado.protocolo,
-                        nfce_id: resultado.nfce_id
+                        nfce_id: resultado.nfce_id || null
                     })
                     .eq('id', this.vendaAtual.venda_id);
 
@@ -2015,6 +2016,37 @@ class PDVSystem {
                     } catch (erroDoc) {
                         console.warn('⚠️ Erro ao salvar documento fiscal:', erroDoc);
                     }
+                } else {
+                    // Fallback: montar dados mínimos para documentos_fiscais
+                    try {
+                        const { error: erroDocFiscal } = await supabase
+                            .from('documentos_fiscais')
+                            .insert([{
+                                venda_id: this.vendaAtual.venda_id,
+                                tipo_documento: 'NFCE',
+                                numero_documento: String(resultado.numero || '0'),
+                                serie: parseInt(resultado.serie || '1'),
+                                chave_acesso: chaveAcessoFinal,
+                                protocolo_autorizacao: resultado.protocolo,
+                                status_sefaz: '100',
+                                mensagem_sefaz: 'Autorizado o uso da NFC-e',
+                                valor_total: venda.total,
+                                natureza_operacao: 'VENDA',
+                                data_emissao: resultado.data_emissao || new Date().toISOString(),
+                                data_autorizacao: resultado.data_autorizacao || new Date().toISOString(),
+                                tentativas_emissao: 1,
+                                ultima_tentativa: new Date().toISOString(),
+                                api_provider: 'nuvem_fiscal',
+                                nfce_id: resultado.nfce_id || null
+                            }]);
+                        if (erroDocFiscal) {
+                            console.warn('⚠️ [PDV] Erro ao salvar documento fiscal (fallback):', erroDocFiscal.message);
+                        } else {
+                            console.log('✅ [PDV] Documento fiscal salvo via fallback');
+                        }
+                    } catch (erroDoc) {
+                        console.warn('⚠️ [PDV] Erro ao salvar documento fiscal (fallback):', erroDoc.message);
+                    }
                 }
 
                 // Sucesso!
@@ -2033,7 +2065,7 @@ class PDVSystem {
                     );
                     if (visualizar) {
                         try {
-                            const chaveAcesso = resultado.chave_nfe;
+                            const chaveAcesso = chaveAcessoFinal;
                             if (!chaveAcesso) {
                                 throw new Error('Chave de acesso não disponível');
                             }

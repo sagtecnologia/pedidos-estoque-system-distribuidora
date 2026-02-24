@@ -742,12 +742,33 @@
                 const { nfce_id, chave_nfe, numero_nfce, documento_fiscal_id } = estadoGlobal.ultimaEmissao;
                 
                 console.log('📋 [ImprimirDANFE] Dados extraídos:', { nfce_id, chave_nfe, numero_nfce, documento_fiscal_id });
-                
-                // Se não tiver nfce_id no estado global, tentar buscar do banco
-                let refParaImprimir = nfce_id;
-                
-                if (!refParaImprimir && documento_fiscal_id) {
-                    console.log('🔍 [ImprimirDANFE] nfce_id não encontrado no estado, buscando do banco...');
+
+                mostrarMensagem('🖨️ Gerando DANFE...', 'info');
+
+                // Estratégia: se temos nfce_id, consultar diretamente na API Nuvem Fiscal
+                // (evita busca por chave_acesso no banco que pode não encontrar)
+                if (nfce_id) {
+                    try {
+                        console.log('📤 [ImprimirDANFE] Consultando diretamente por nfce_id:', nfce_id);
+                        const docNFCe = await NuvemFiscal.consultarNFCe(nfce_id);
+                        if (docNFCe?.obterPDF) {
+                            const pdfUrl = await docNFCe.obterPDF();
+                            window.open(pdfUrl, '_blank');
+                            mostrarMensagem('✅ DANFE gerado com sucesso!', 'success');
+                        } else {
+                            throw new Error('Método de PDF não disponível na resposta');
+                        }
+                        return;
+                    } catch (errNfceId) {
+                        console.warn('⚠️ [ImprimirDANFE] Falha ao usar nfce_id direto, tentando via chave:', errNfceId.message);
+                    }
+                }
+
+                // Fallback: usar chave de acesso com FiscalSystem.baixarDANFE
+                let chaveParaImprimir = chave_nfe;
+
+                if (!chaveParaImprimir && documento_fiscal_id) {
+                    console.log('🔍 [ImprimirDANFE] Buscando chave_acesso pelo documento_fiscal_id...');
                     try {
                         const { data: docFiscal, error } = await supabase
                             .from('documentos_fiscais')
@@ -756,42 +777,32 @@
                             .single();
                         
                         if (!error && docFiscal) {
-                            refParaImprimir = docFiscal.nfce_id || docFiscal.chave_acesso;
-                            console.log('✅ [ImprimirDANFE] Referência encontrada no banco:', refParaImprimir);
+                            if (docFiscal.nfce_id) {
+                                // Tentar novamente com nfce_id do banco
+                                const docNFCe = await NuvemFiscal.consultarNFCe(docFiscal.nfce_id);
+                                if (docNFCe?.obterPDF) {
+                                    const pdfUrl = await docNFCe.obterPDF();
+                                    window.open(pdfUrl, '_blank');
+                                    mostrarMensagem('✅ DANFE gerado com sucesso!', 'success');
+                                    return;
+                                }
+                            }
+                            chaveParaImprimir = docFiscal.chave_acesso;
                         }
                     } catch (err) {
                         console.warn('⚠️ [ImprimirDANFE] Erro ao buscar do banco:', err);
                     }
                 }
-                
-                // Se ainda não tiver, usar chave de acesso como fallback
-                if (!refParaImprimir && chave_nfe) {
-                    refParaImprimir = chave_nfe;
-                    console.log('📝 [ImprimirDANFE] Usando chave de acesso como fallback:', refParaImprimir);
-                }
-                
-                if (!refParaImprimir) {
-                    alert('❌ Dados insuficientes para impressão.\n\nNão foi possível encontrar:\n- ID da nota na API (nfce_id)\n- Chave de acesso\n- ID do documento fiscal\n\nTente buscar o documento na tela de Documentos Fiscais.');
+
+                if (!chaveParaImprimir) {
+                    alert('❌ Dados insuficientes para impressão.\n\nNão foi possível encontrar:\n- ID da nota na API (nfce_id)\n- Chave de acesso\n\nTente buscar o documento na tela de Documentos Fiscais.');
                     return;
                 }
 
-                mostrarMensagem('🖨️ Gerando DANFE...', 'info');
-                
-                const tipo = 'nfce';
-                
                 try {
-                    console.log('📤 [ImprimirDANFE] Solicitando DANFE - Ref:', refParaImprimir, 'Tipo:', tipo);
-                    
-                    // Usar FiscalSystem (o serviço está importado como fiscal.js)
-                    const pdfUrl = await FiscalSystem.baixarDANFE(refParaImprimir, tipo);
-                    
-                    // Se for um Blob, converter para URL
-                    let urlParaAbrir = pdfUrl;
-                    if (pdfUrl instanceof Blob) {
-                        urlParaAbrir = URL.createObjectURL(pdfUrl);
-                    }
-                    
-                    console.log('✅ [ImprimirDANFE] DANFE gerado com sucesso!');
+                    console.log('📤 [ImprimirDANFE] Baixando DANFE via chave_acesso:', chaveParaImprimir);
+                    const pdfUrl = await FiscalSystem.baixarDANFE(chaveParaImprimir, 'nfce');
+                    let urlParaAbrir = pdfUrl instanceof Blob ? URL.createObjectURL(pdfUrl) : pdfUrl;
                     window.open(urlParaAbrir, '_blank');
                     mostrarMensagem('✅ DANFE gerado com sucesso!', 'success');
                 } catch (err) {
