@@ -3,966 +3,1231 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Catálogo de Produtos - Solicitar Pedido</title>
+    <title>Cardápio Digital - Faça seu Pedido</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        .produto-card {
-            transition: transform 0.2s, box-shadow 0.2s;
+        * { font-family: 'Inter', sans-serif; }
+        
+        :root {
+            --primary: #e11d48;
+            --primary-dark: #be123c;
+            --primary-light: #fecdd3;
+            --accent: #f97316;
+            --bg-warm: #fffbf5;
         }
-        .produto-card:hover {
+
+        body {
+            background: var(--bg-warm);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Header gradiente premium */
+        .header-gradient {
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .header-gradient::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 40px;
+            background: var(--bg-warm);
+            border-radius: 50% 50% 0 0;
+        }
+
+        /* Cards de produto */
+        .product-card {
+            background: #fff;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #f3f4f6;
+        }
+        .product-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.1);
         }
-        .carrinho-float {
-            animation: pulse 2s infinite;
+        .product-card.in-cart {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px var(--primary-light);
         }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
+
+        /* Categorias scrolláveis */
+        .categories-scroll {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 0;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
         }
-        .modal-backdrop {
+        .categories-scroll::-webkit-scrollbar { display: none; }
+
+        .cat-chip {
+            flex-shrink: 0;
+            padding: 8px 20px;
+            border-radius: 999px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid #e5e7eb;
+            background: #fff;
+            color: #4b5563;
+            white-space: nowrap;
+        }
+        .cat-chip:hover { border-color: var(--primary); color: var(--primary); }
+        .cat-chip.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        /* Botão flutuante do carrinho */
+        .cart-fab {
             position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.5);
+            bottom: 24px;
+            right: 24px;
+            z-index: 100;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: #fff;
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            z-index: 9000;
-            overflow-y: auto;
+            box-shadow: 0 8px 24px rgba(225, 29, 72, 0.4);
+            cursor: pointer;
+            transition: all 0.3s;
+            animation: fabPulse 2.5s infinite;
+        }
+        .cart-fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 32px rgba(225, 29, 72, 0.5);
+        }
+        @keyframes fabPulse {
+            0%, 100% { box-shadow: 0 8px 24px rgba(225, 29, 72, 0.4); }
+            50% { box-shadow: 0 8px 32px rgba(225, 29, 72, 0.6); }
+        }
+        .cart-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--accent);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 3px solid var(--bg-warm);
+        }
+
+        /* Drawer lateral (carrinho) */
+        .drawer-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        .drawer-overlay.open { opacity: 1; visibility: visible; }
+
+        .drawer-panel {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            bottom: 0;
+            width: 100%;
+            max-width: 480px;
+            background: #fff;
+            z-index: 201;
+            transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .drawer-panel.open { right: 0; }
+
+        /* Modal de finalização */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 300;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             padding: 1rem;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
         }
-        .modal-backdrop.hidden {
-            display: none;
+        .modal-overlay.open { opacity: 1; visibility: visible; }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 20px;
+            max-width: 520px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            transform: translateY(30px);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
+        .modal-overlay.open .modal-content { transform: translateY(0); }
+
+        /* Steps indicator */
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            padding: 16px 0;
+        }
+        .step-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e5e7eb;
+            transition: all 0.3s;
+        }
+        .step-dot.active { background: var(--primary); width: 28px; border-radius: 5px; }
+        .step-dot.done { background: #10b981; }
+
+        /* Quantity controller */
+        .qty-control {
+            display: flex;
+            align-items: center;
+            gap: 0;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        .qty-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f9fafb;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 700;
+            color: #4b5563;
+            transition: all 0.15s;
+        }
+        .qty-btn:hover { background: #f3f4f6; color: var(--primary); }
+        .qty-btn:active { background: #e5e7eb; }
+        .qty-value {
+            width: 40px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 15px;
+            color: #111827;
+        }
+
+        /* Input moderno */
+        .input-modern {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.2s;
+            outline: none;
+            background: #fafafa;
+        }
+        .input-modern:focus {
+            border-color: var(--primary);
+            background: #fff;
+            box-shadow: 0 0 0 3px var(--primary-light);
+        }
+        .input-modern.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px #fee2e2;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #1f2937;
+            color: #fff;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 999;
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            max-width: 90vw;
+            text-align: center;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+        .toast.success { background: #059669; }
+        .toast.error { background: #dc2626; }
+
+        /* Animação de entrada dos cards */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in-up { animation: fadeInUp 0.4s ease-out forwards; }
+
+        /* Skeleton loading */
+        .skeleton {
+            background: linear-gradient(90deg, #f3f4f6 25%, #e5e7eb 50%, #f3f4f6 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 8px;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        /* Sucesso */
+        .success-checkmark {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981, #059669);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto;
+            animation: scaleIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        @keyframes scaleIn {
+            0% { transform: scale(0); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+
+        /* Confetti animation */
+        @keyframes confetti-fall {
+            0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        .confetti-piece {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            z-index: 400;
+            animation: confetti-fall 3s linear forwards;
+        }
+
+        /* Responsivo mobile-first */
+        @media (max-width: 640px) {
+            .cart-fab { bottom: 16px; right: 16px; width: 56px; height: 56px; }
+            .drawer-panel { max-width: 100%; }
+        }
+
+        /* Scrollbar bonita */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
     </style>
 </head>
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
-    <!-- Header -->
-    <header class="bg-white shadow-lg">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <div class="text-center">
-                <h1 class="text-4xl font-bold text-gray-900 mb-2">
-                    🛒 Catálogo de Produtos
-                </h1>
-                <p class="text-gray-600 text-lg">
-                    Selecione os produtos desejados e envie sua solicitação
-                </p>
-                <p class="text-sm text-gray-500 mt-2">
-                    ⏱️ Pedidos ficam disponíveis para análise por 24 horas
-                </p>
-            </div>
+<body>
+
+    <!-- ============ HEADER ============ -->
+    <header class="header-gradient">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-14 text-center relative z-10">
+            <div id="empresa-logo" class="mb-3"></div>
+            <h1 id="empresa-nome" class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                Cardápio Digital
+            </h1>
+            <p class="text-indigo-200 mt-2 text-sm sm:text-base font-medium">
+                <i class="fas fa-utensils mr-1"></i> Escolha seus produtos e faça seu pedido
+            </p>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <!-- Filtros -->
-        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">🏷️ Filtrar por Marca</label>
-                    <select id="filter-marca" onchange="aplicarFiltros()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                        <option value="">Todas as marcas</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">🔍 Buscar Produto</label>
-                    <input type="text" id="busca-produto" onkeyup="aplicarFiltros()" placeholder="Digite o nome do produto..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="flex items-end">
-                    <button onclick="limparFiltros()" class="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition">
-                        🔄 Limpar Filtros
-                    </button>
-                </div>
+    <!-- ============ BARRA DE BUSCA + CATEGORIAS ============ -->
+    <div class="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3">
+            <!-- Busca -->
+            <div class="relative mb-3">
+                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input 
+                    type="text" 
+                    id="input-busca" 
+                    placeholder="Buscar produto..." 
+                    class="w-full pl-11 pr-10 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition"
+                    oninput="aplicarFiltros()"
+                >
+                <button id="btn-limpar-busca" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden" onclick="limparBusca()">
+                    <i class="fas fa-times-circle"></i>
+                </button>
+            </div>
+            <!-- Categorias -->
+            <div class="categories-scroll" id="categorias-container">
+                <div class="cat-chip active" data-cat="todas" onclick="filtrarCategoria('todas')">Todos</div>
             </div>
         </div>
+    </div>
 
-        <!-- Grid de Produtos -->
-        <div id="produtos-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div class="col-span-full text-center py-12">
-                <div class="spinner mx-auto mb-4"></div>
-                <p class="text-gray-600">Carregando produtos...</p>
-            </div>
+    <!-- ============ GRID DE PRODUTOS ============ -->
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-28">
+        <!-- Contador de resultados -->
+        <div id="resultado-count" class="text-sm text-gray-500 mb-4 font-medium"></div>
+
+        <!-- Grid -->
+        <div id="produtos-grid" class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            <!-- Skeletons de carregamento -->
+            <div class="product-card"><div class="skeleton h-40"></div><div class="p-4"><div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-3 w-1/2 mb-3"></div><div class="skeleton h-6 w-1/3"></div></div></div>
+            <div class="product-card"><div class="skeleton h-40"></div><div class="p-4"><div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-3 w-1/2 mb-3"></div><div class="skeleton h-6 w-1/3"></div></div></div>
+            <div class="product-card"><div class="skeleton h-40"></div><div class="p-4"><div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-3 w-1/2 mb-3"></div><div class="skeleton h-6 w-1/3"></div></div></div>
+            <div class="product-card"><div class="skeleton h-40"></div><div class="p-4"><div class="skeleton h-4 w-3/4 mb-2"></div><div class="skeleton h-3 w-1/2 mb-3"></div><div class="skeleton h-6 w-1/3"></div></div></div>
+        </div>
+
+        <!-- Estado vazio -->
+        <div id="estado-vazio" class="hidden text-center py-16">
+            <div class="text-6xl mb-4">🔍</div>
+            <h3 class="text-xl font-bold text-gray-700 mb-2">Nenhum produto encontrado</h3>
+            <p class="text-gray-500">Tente buscar com outros termos</p>
         </div>
     </main>
 
-    <!-- Botão Carrinho Flutuante -->
-    <div id="carrinho-float" class="fixed bottom-6 right-6 hidden">
-        <button onclick="abrirCarrinho()" class="bg-blue-600 text-white px-6 py-4 rounded-full shadow-2xl hover:bg-blue-700 transition transform hover:scale-105 flex items-center space-x-2">
-            <span class="text-2xl">🛒</span>
-            <span class="font-bold">Carrinho</span>
-            <span id="qtd-itens-badge" class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">0</span>
-        </button>
+    <!-- ============ BOTÃO FLUTUANTE DO CARRINHO ============ -->
+    <div id="cart-fab" class="cart-fab" style="display: none;" onclick="abrirCarrinho()">
+        <i class="fas fa-shopping-bag text-xl"></i>
+        <span id="cart-badge" class="cart-badge">0</span>
     </div>
 
-    <!-- Modal do Carrinho -->
-    <div id="modal-carrinho" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50">
-                <h3 class="text-2xl font-bold text-gray-900">🛒 Seu Carrinho</h3>
-                <button onclick="fecharCarrinho()" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <div id="carrinho-itens" class="px-6 py-4">
-                <p class="text-center text-gray-500 py-8">Seu carrinho está vazio</p>
-            </div>
-            <div class="px-6 py-4 border-t bg-gray-50">
-                <div class="flex justify-between items-center mb-4">
-                    <span class="text-xl font-bold">Total:</span>
-                    <span id="carrinho-total" class="text-2xl font-bold text-blue-600">R$ 0,00</span>
+    <!-- ============ DRAWER DO CARRINHO ============ -->
+    <div id="drawer-overlay" class="drawer-overlay" onclick="fecharCarrinho()"></div>
+    <div id="drawer-panel" class="drawer-panel">
+        <!-- Header do Drawer -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center">
+                    <i class="fas fa-shopping-bag text-rose-600"></i>
                 </div>
-                <button onclick="abrirFormularioPedido()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold text-lg transition">
-                    ✅ Finalizar Pedido
-                </button>
+                <div>
+                    <h2 class="font-bold text-lg text-gray-900">Seu Pedido</h2>
+                    <p id="cart-item-count" class="text-xs text-gray-500">0 itens</p>
+                </div>
+            </div>
+            <button onclick="fecharCarrinho()" class="w-10 h-10 rounded-xl hover:bg-gray-100 flex items-center justify-center transition">
+                <i class="fas fa-times text-gray-500"></i>
+            </button>
+        </div>
+
+        <!-- Itens do Carrinho -->
+        <div id="cart-items" class="flex-1 overflow-y-auto px-5 py-4">
+            <div class="text-center py-12 text-gray-400">
+                <i class="fas fa-shopping-bag text-4xl mb-3 block opacity-40"></i>
+                <p class="font-medium">Seu pedido está vazio</p>
+                <p class="text-sm mt-1">Adicione produtos do cardápio</p>
             </div>
         </div>
-    </div>
 
-    <!-- Modal Finalizar Pedido -->
-    <div id="modal-finalizar" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center px-6 py-4 border-b bg-green-50">
-                <h3 class="text-2xl font-bold text-gray-900">📋 Finalizar Solicitação</h3>
-                <button onclick="fecharFormularioPedido()" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
+        <!-- Footer do Carrinho -->
+        <div class="border-t border-gray-100 px-5 py-4 bg-gray-50/80">
+            <div class="flex justify-between items-center mb-4">
+                <span class="text-gray-600 font-medium">Total do pedido</span>
+                <span id="cart-total" class="text-2xl font-extrabold text-gray-900">R$ 0,00</span>
             </div>
-            <form id="form-pedido-publico" class="px-6 py-6" onsubmit="enviarPedido(event)">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            👤 Nome Completo *
-                        </label>
-                        <input type="text" id="nome-solicitante" required 
-                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
-                               placeholder="Digite seu nome completo">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            📧 Email (opcional)
-                        </label>
-                        <input type="email" id="email-contato" 
-                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
-                               placeholder="seu@email.com">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            📱 Telefone (opcional)
-                        </label>
-                        <input type="tel" id="telefone-contato" 
-                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
-                               placeholder="(00) 00000-0000">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-2">
-                            💬 Observações (opcional)
-                        </label>
-                        <textarea id="observacoes-pedido" rows="3" 
-                                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" 
-                                  placeholder="Alguma observação sobre seu pedido?"></textarea>
-                    </div>
-                </div>
-
-                <!-- Resumo do Pedido -->
-                <div class="mt-6 p-4 bg-blue-50 rounded-lg">
-                    <h4 class="font-bold text-gray-900 mb-3">📦 Resumo do Pedido:</h4>
-                    <div id="resumo-itens" class="space-y-2 mb-3"></div>
-                    <div class="border-t pt-3 flex justify-between items-center">
-                        <span class="font-bold text-lg">Total:</span>
-                        <span id="resumo-total" class="text-xl font-bold text-blue-600">R$ 0,00</span>
-                    </div>
-                </div>
-
-                <div class="flex space-x-3 mt-6">
-                    <button type="button" onclick="fecharFormularioPedido()" class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
-                        Voltar
-                    </button>
-                    <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
-                        🚀 Enviar Solicitação
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal Sucesso -->
-    <div id="modal-sucesso" class="modal-backdrop hidden">
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-8 text-center">
-            <div class="text-6xl mb-4">✅</div>
-            <h3 class="text-2xl font-bold text-gray-900 mb-4">Pedido Enviado com Sucesso!</h3>
-            <p class="text-gray-600 mb-6">
-                Seu pedido foi recebido e será analisado em breve.
-            </p>
-            <div class="bg-blue-50 p-4 rounded-lg mb-6">
-                <p class="text-sm font-medium text-gray-700 mb-2">Número do Pedido:</p>
-                <p id="numero-pedido-sucesso" class="text-2xl font-bold text-blue-600 mb-3"></p>
-                <p class="text-xs text-gray-500">Guarde este número para acompanhamento</p>
-            </div>
-            <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-bold">
-                Fazer Novo Pedido
+            <button onclick="iniciarFinalizacao()" id="btn-finalizar" class="w-full py-4 rounded-2xl font-bold text-white text-base transition-all disabled:opacity-50 disabled:cursor-not-allowed" style="background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); box-shadow: 0 4px 14px rgba(225,29,72,0.3);" disabled>
+                <i class="fas fa-arrow-right mr-2"></i> Continuar
             </button>
         </div>
     </div>
 
-    <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center" style="z-index: 99999 !important;">
-        <div class="bg-white p-6 rounded-lg shadow-2xl">
-            <div class="spinner mx-auto"></div>
-            <p class="mt-4 text-gray-700 font-medium">Processando...</p>
+    <!-- ============ MODAL DE FINALIZAÇÃO (Multi-step) ============ -->
+    <div id="modal-finalizar" class="modal-overlay">
+        <div class="modal-content">
+            <!-- Step Indicator -->
+            <div class="step-indicator" id="step-indicator">
+                <div class="step-dot active" data-step="1"></div>
+                <div class="step-dot" data-step="2"></div>
+                <div class="step-dot" data-step="3"></div>
+            </div>
+
+            <!-- ====== STEP 1: Dados do Cliente ====== -->
+            <div id="step-1" class="px-6 pb-6">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-3">
+                        <i class="fas fa-user text-indigo-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900">Seus Dados</h3>
+                    <p class="text-sm text-gray-500 mt-1">Precisamos saber quem está pedindo</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                            Nome completo <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="cliente-nome" class="input-modern pl-11" placeholder="Ex: João Silva" required>
+                        </div>
+                        <p id="erro-nome" class="text-xs text-red-500 mt-1 hidden">Informe seu nome</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                            Telefone / WhatsApp <span class="text-rose-500">*</span>
+                        </label>
+                        <div class="relative">
+                            <i class="fas fa-phone absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="tel" id="cliente-telefone" class="input-modern pl-11" placeholder="(00) 00000-0000" required oninput="mascaraTelefone(this)">
+                        </div>
+                        <p id="erro-telefone" class="text-xs text-red-500 mt-1 hidden">Informe seu telefone</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                            Observações <span class="text-gray-400 font-normal">(opcional)</span>
+                        </label>
+                        <textarea id="cliente-obs" class="input-modern" rows="3" placeholder="Ex: Sem cebola, ponto da carne, troco para..."></textarea>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button onclick="fecharModal()" class="flex-1 py-3.5 rounded-xl border-2 border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 transition">
+                        Voltar
+                    </button>
+                    <button onclick="irParaResumo()" class="flex-1 py-3.5 rounded-xl font-semibold text-white transition" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
+                        Revisar Pedido <i class="fas fa-arrow-right ml-1"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ====== STEP 2: Resumo do Pedido ====== -->
+            <div id="step-2" class="px-6 pb-6 hidden">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3">
+                        <i class="fas fa-clipboard-list text-amber-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900">Resumo do Pedido</h3>
+                    <p class="text-sm text-gray-500 mt-1">Confira tudo antes de confirmar</p>
+                </div>
+
+                <!-- Dados do cliente -->
+                <div class="bg-indigo-50 rounded-xl p-4 mb-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fas fa-user-circle text-indigo-500"></i>
+                        <span class="font-semibold text-sm text-indigo-900" id="resumo-nome"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-phone text-indigo-400 text-sm"></i>
+                        <span class="text-sm text-indigo-700" id="resumo-telefone"></span>
+                    </div>
+                    <div id="resumo-obs-container" class="mt-2 hidden">
+                        <div class="flex items-start gap-2">
+                            <i class="fas fa-comment text-indigo-400 text-sm mt-0.5"></i>
+                            <span class="text-sm text-indigo-700" id="resumo-obs"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Itens do pedido -->
+                <div class="border border-gray-100 rounded-xl overflow-hidden mb-4">
+                    <div class="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                        <h4 class="font-semibold text-sm text-gray-700"><i class="fas fa-box mr-1"></i> Itens do Pedido</h4>
+                    </div>
+                    <div id="resumo-itens" class="divide-y divide-gray-50"></div>
+                    <div class="px-4 py-3 bg-rose-50 border-t border-rose-100 flex justify-between items-center">
+                        <span class="font-bold text-gray-900">Total</span>
+                        <span id="resumo-total" class="text-xl font-extrabold text-rose-600"></span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="voltarParaDados()" class="flex-1 py-3.5 rounded-xl border-2 border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 transition">
+                        <i class="fas fa-arrow-left mr-1"></i> Voltar
+                    </button>
+                    <button onclick="confirmarPedido()" id="btn-confirmar" class="flex-1 py-3.5 rounded-xl font-semibold text-white transition relative overflow-hidden" style="background: linear-gradient(135deg, #059669, #047857);">
+                        <span id="btn-confirmar-text"><i class="fas fa-check mr-1"></i> Confirmar Pedido</span>
+                        <span id="btn-confirmar-loading" class="hidden"><i class="fas fa-spinner fa-spin mr-1"></i> Enviando...</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ====== STEP 3: Sucesso ====== -->
+            <div id="step-3" class="px-6 pb-8 hidden">
+                <div class="text-center py-4">
+                    <div class="success-checkmark mb-4">
+                        <i class="fas fa-check text-white text-3xl"></i>
+                    </div>
+                    <h3 class="text-2xl font-extrabold text-gray-900 mb-2">Pedido Confirmado!</h3>
+                    <p class="text-gray-500 text-sm mb-6">Seu pedido foi recebido com sucesso</p>
+
+                    <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 mb-6 text-left">
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm text-gray-500 font-medium">Número do pedido</span>
+                            <span id="sucesso-numero" class="text-lg font-extrabold text-indigo-700"></span>
+                        </div>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm text-gray-500 font-medium">Total</span>
+                            <span id="sucesso-total" class="text-lg font-bold text-gray-900"></span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-500 font-medium">Status</span>
+                            <span class="inline-flex items-center gap-1 text-sm font-semibold text-green-700 bg-green-100 px-3 py-1 rounded-full">
+                                <i class="fas fa-clock text-xs"></i> Aguardando
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+                        <div class="flex gap-3">
+                            <i class="fas fa-bell text-amber-500 mt-0.5"></i>
+                            <div>
+                                <p class="text-sm font-semibold text-amber-800">Fique atento!</p>
+                                <p class="text-xs text-amber-700 mt-1">Aguarde a confirmação do estabelecimento. Seu pedido já está sendo analisado pela equipe.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="novosPedidos()" class="w-full py-3.5 rounded-xl font-semibold text-white transition" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
+                        <i class="fas fa-plus mr-1"></i> Fazer Novo Pedido
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- ============ LOADING GLOBAL ============ -->
+    <div id="loading-global" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[999] hidden">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl text-center">
+            <i class="fas fa-spinner fa-spin text-3xl text-rose-600 mb-3 block"></i>
+            <p class="text-gray-700 font-medium">Processando...</p>
+        </div>
+    </div>
+
+    <!-- ============ TOAST ============ -->
+    <div id="toast" class="toast"></div>
+
+    <!-- ============ SCRIPTS ============ -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config.js"></script>
-    <script src="js/utils.js"></script>
-    <script src="js/services/pre-pedidos.js"></script>
-    
     <script>
+        // ===== ESTADO DA APLICAÇÃO =====
+        let todosProdutos = [];
+        let produtosFiltrados = [];
+        let categorias = [];
         let carrinho = [];
-        let produtos = [];
-        let sabores = [];
-        let modalCarregado = false;
+        let categoriaAtual = 'todas';
+        let stepAtual = 1;
 
-        // Verificar se DOM está carregado
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', inicializar);
-        } else {
-            inicializar();
-        }
-
-        function inicializar() {
-            console.log('DOM carregado, inicializando...');
-            modalCarregado = true;
-            console.log('Modal existe?', document.getElementById('modal-carrinho'));
+        // ===== INICIALIZAÇÃO =====
+        document.addEventListener('DOMContentLoaded', () => {
             carregarDados();
-        }
+        });
 
+        // ===== CARREGAR DADOS =====
         async function carregarDados() {
             try {
-                // Carregar marcas
-                const marcas = await listarMarcasPublicas();
-                const selectMarca = document.getElementById('filter-marca');
-                selectMarca.innerHTML = '<option value="">Todas as marcas</option>' +
-                    marcas.map(m => `<option value="${m}">${m}</option>`).join('');
+                // Carregar config da empresa, produtos e categorias em paralelo
+                const [empresaResult, produtosResult, categoriasResult] = await Promise.all([
+                    supabase.from('empresa_config').select('nome_empresa, logo_url').limit(1),
+                    supabase.from('produtos').select(`
+                        id, nome, descricao, preco_venda, estoque_atual, ativo, imagem_url,
+                        marca, unidade, categoria_id,
+                        categoria:categorias(id, nome)
+                    `).eq('ativo', true).gt('estoque_atual', 0).order('nome'),
+                    supabase.from('categorias').select('id, nome').eq('ativo', true).order('nome')
+                ]);
 
-                // Carregar produtos e sabores
-                produtos = await listarProdutosPublicos();
-                sabores = await listarSaboresPublicos();
+                // Configurar empresa
+                if (empresaResult.data && empresaResult.data.length > 0) {
+                    const empresa = empresaResult.data[0];
+                    if (empresa.nome_empresa) {
+                        document.getElementById('empresa-nome').textContent = empresa.nome_empresa;
+                        document.title = `${empresa.nome_empresa} - Cardápio Digital`;
+                    }
+                    if (empresa.logo_url) {
+                        document.getElementById('empresa-logo').innerHTML = `
+                            <img src="${empresa.logo_url}" alt="Logo" class="h-16 w-16 object-contain rounded-full mx-auto border-2 border-white/30 bg-white/10 p-1">
+                        `;
+                    }
+                }
 
-                renderizarProdutos();
+                // Processar produtos
+                todosProdutos = (produtosResult.data || []).map(p => ({
+                    ...p,
+                    categoria_nome: p.categoria?.nome || 'Outros'
+                }));
+
+                // Processar categorias dos produtos existentes
+                const catsUsadas = new Set(todosProdutos.map(p => p.categoria_nome));
+                categorias = (categoriasResult.data || [])
+                    .filter(c => catsUsadas.has(c.nome))
+                    .map(c => c.nome);
+                
+                renderizarCategorias();
+                aplicarFiltros();
+
             } catch (error) {
-                console.error('Erro ao carregar:', error);
-                document.getElementById('produtos-container').innerHTML = `
-                    <div class="col-span-full text-center py-12">
-                        <p class="text-red-600">Erro ao carregar produtos. Tente novamente.</p>
+                console.error('Erro ao carregar dados:', error);
+                document.getElementById('produtos-grid').innerHTML = `
+                    <div class="col-span-full text-center py-16">
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-400 mb-3 block"></i>
+                        <p class="text-gray-600 font-medium">Erro ao carregar cardápio</p>
+                        <button onclick="carregarDados()" class="mt-3 px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">Tentar novamente</button>
                     </div>
                 `;
             }
         }
 
-        function aplicarFiltros() {
-            const marca = document.getElementById('filter-marca').value;
-            const busca = document.getElementById('busca-produto').value.toLowerCase();
+        // ===== CATEGORIAS =====
+        function renderizarCategorias() {
+            const container = document.getElementById('categorias-container');
+            container.innerHTML = `<div class="cat-chip active" data-cat="todas" onclick="filtrarCategoria('todas')">
+                <i class="fas fa-th-large mr-1"></i> Todos
+            </div>`;
+            
+            // Ícones para categorias comuns
+            const catIcons = {
+                'bebidas': 'fa-glass-water', 'lanches': 'fa-burger', 'pizzas': 'fa-pizza-slice',
+                'doces': 'fa-cookie', 'salgados': 'fa-bread-slice', 'combos': 'fa-layer-group',
+                'porções': 'fa-bowl-food', 'sucos': 'fa-blender', 'cervejas': 'fa-beer-mug-empty',
+                'refrigerantes': 'fa-bottle-water', 'sobremesas': 'fa-ice-cream',
+                'pratos': 'fa-plate-wheat', 'açaí': 'fa-bowl-rice'
+            };
 
-            let produtosFiltrados = produtos;
-
-            if (marca) {
-                produtosFiltrados = produtosFiltrados.filter(p => p.marca === marca);
-            }
-
-            if (busca) {
-                produtosFiltrados = produtosFiltrados.filter(p => 
-                    p.nome.toLowerCase().includes(busca) || 
-                    (p.descricao && p.descricao.toLowerCase().includes(busca))
-                );
-            }
-
-            renderizarProdutos(produtosFiltrados);
+            categorias.forEach(cat => {
+                const iconKey = Object.keys(catIcons).find(k => cat.toLowerCase().includes(k));
+                const icon = catIcons[iconKey] || 'fa-tag';
+                container.innerHTML += `
+                    <div class="cat-chip" data-cat="${cat}" onclick="filtrarCategoria('${cat}')">
+                        <i class="fas ${icon} mr-1"></i> ${cat}
+                    </div>
+                `;
+            });
         }
 
-        function limparFiltros() {
-            document.getElementById('filter-marca').value = '';
-            document.getElementById('busca-produto').value = '';
+        function filtrarCategoria(cat) {
+            categoriaAtual = cat;
+            document.querySelectorAll('.cat-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.cat === cat);
+            });
+            aplicarFiltros();
+        }
+
+        // ===== FILTROS =====
+        function aplicarFiltros() {
+            const busca = document.getElementById('input-busca').value.toLowerCase().trim();
+            const btnLimpar = document.getElementById('btn-limpar-busca');
+            btnLimpar.classList.toggle('hidden', !busca);
+
+            produtosFiltrados = todosProdutos.filter(p => {
+                const matchCategoria = categoriaAtual === 'todas' || p.categoria_nome === categoriaAtual;
+                const matchBusca = !busca || 
+                    p.nome.toLowerCase().includes(busca) || 
+                    (p.descricao && p.descricao.toLowerCase().includes(busca)) ||
+                    (p.marca && p.marca.toLowerCase().includes(busca));
+                return matchCategoria && matchBusca;
+            });
+
             renderizarProdutos();
         }
 
-        function renderizarProdutos(produtosRender = produtos) {
-            const container = document.getElementById('produtos-container');
+        function limparBusca() {
+            document.getElementById('input-busca').value = '';
+            aplicarFiltros();
+        }
 
-            if (produtosRender.length === 0) {
-                container.innerHTML = `
-                    <div class="col-span-full text-center py-12">
-                        <p class="text-gray-600 text-lg">Nenhum produto encontrado</p>
-                    </div>
-                `;
+        // ===== RENDERIZAR PRODUTOS =====
+        function renderizarProdutos() {
+            const grid = document.getElementById('produtos-grid');
+            const vazio = document.getElementById('estado-vazio');
+            const count = document.getElementById('resultado-count');
+
+            if (produtosFiltrados.length === 0) {
+                grid.innerHTML = '';
+                vazio.classList.remove('hidden');
+                count.textContent = '';
                 return;
             }
 
-            container.innerHTML = produtosRender.map(produto => {
-                const statusBadge = produto.status_estoque === 'BAIXO' 
-                    ? '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">Estoque Baixo</span>'
-                    : '<span class="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">Disponível</span>';
+            vazio.classList.add('hidden');
+            count.textContent = `${produtosFiltrados.length} produto${produtosFiltrados.length > 1 ? 's' : ''} encontrado${produtosFiltrados.length > 1 ? 's' : ''}`;
 
-                const saboresProduto = sabores.filter(s => s.produto_id === produto.id);
-                const temSabores = saboresProduto.length > 0;
+            grid.innerHTML = produtosFiltrados.map((p, i) => {
+                const qtdNoCarrinho = getQtdNoCarrinho(p.id);
+                const inCart = qtdNoCarrinho > 0;
+                const imgSrc = p.imagem_url || '';
+                const hasImg = !!imgSrc;
 
                 return `
-                    <div class="produto-card bg-white rounded-lg shadow-md overflow-hidden">
-                        <div class="p-6">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <p class="text-xs text-gray-500 uppercase">${produto.marca}</p>
-                                    <h3 class="text-xl font-bold text-gray-900">${produto.nome}</h3>
+                <div class="product-card fade-in-up ${inCart ? 'in-cart' : ''}" style="animation-delay: ${i * 0.04}s" id="card-${p.id}">
+                    ${hasImg ? `
+                        <div class="relative h-40 bg-gray-100">
+                            <img src="${imgSrc}" alt="${p.nome}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'flex items-center justify-center h-full bg-gradient-to-br from-rose-50 to-amber-50\\'><i class=\\'fas fa-box-open text-3xl text-rose-300\\'></i></div>'">
+                            ${inCart ? `<div class="absolute top-2 right-2 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded-full">${qtdNoCarrinho}x</div>` : ''}
+                        </div>
+                    ` : `
+                        <div class="relative h-32 bg-gradient-to-br from-rose-50 to-amber-50 flex items-center justify-center">
+                            <i class="fas fa-box-open text-4xl text-rose-200"></i>
+                            ${inCart ? `<div class="absolute top-2 right-2 bg-rose-600 text-white text-xs font-bold px-2 py-1 rounded-full">${qtdNoCarrinho}x</div>` : ''}
+                        </div>
+                    `}
+                    <div class="p-3 sm:p-4">
+                        <div class="flex items-start justify-between gap-1 mb-1">
+                            <h3 class="font-bold text-gray-900 text-sm sm:text-base leading-tight line-clamp-2">${p.nome}</h3>
+                        </div>
+                        ${p.marca ? `<p class="text-xs text-gray-400 font-medium mb-1">${p.marca}</p>` : ''}
+                        ${p.descricao ? `<p class="text-xs text-gray-500 line-clamp-2 mb-2">${p.descricao}</p>` : ''}
+                        <div class="flex items-end justify-between mt-auto">
+                            <div>
+                                <p class="text-lg sm:text-xl font-extrabold text-rose-600">${formatCurrency(p.preco_venda)}</p>
+                                <p class="text-[10px] text-gray-400">${p.unidade || 'UN'}</p>
+                            </div>
+                            ${inCart ? `
+                                <div class="qty-control">
+                                    <button class="qty-btn" onclick="event.stopPropagation(); alterarQtd('${p.id}', -1)">−</button>
+                                    <span class="qty-value">${qtdNoCarrinho}</span>
+                                    <button class="qty-btn" onclick="event.stopPropagation(); alterarQtd('${p.id}', 1)">+</button>
                                 </div>
-                                ${statusBadge}
-                            </div>
-                            ${produto.descricao ? `<p class="text-sm text-gray-600 mb-3">${produto.descricao}</p>` : ''}
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="text-2xl font-bold text-blue-600">${formatCurrency(produto.preco_venda)}</span>
-                                <span class="text-sm text-gray-500">Estoque: ${produto.estoque_atual}</span>
-                            </div>
-                            ${temSabores ? `
-                                <button onclick="abrirSabores('${produto.id}')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">
-                                    Ver Sabores (${saboresProduto.length})
-                                </button>
                             ` : `
-                                <div class="flex space-x-2">
-                                    <input type="number" id="qtd-${produto.id}" data-estoque="${produto.estoque_atual}" min="0" max="${produto.estoque_atual}" value="0" class="w-20 px-2 py-2 border rounded-lg text-center" oninput="validarQuantidadeProduto(this)">
-                                    <button onclick="adicionarAoCarrinho('${produto.id}')" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition">
-                                        Adicionar
-                                    </button>
-                                </div>
+                                <button onclick="event.stopPropagation(); adicionarAoCarrinho('${p.id}')" class="flex items-center gap-1 px-3 py-2 rounded-xl text-white text-sm font-semibold transition-all active:scale-95" style="background: linear-gradient(135deg, var(--primary), var(--primary-dark));">
+                                    <i class="fas fa-plus text-xs"></i>
+                                </button>
                             `}
                         </div>
                     </div>
-                `;
+                </div>`;
             }).join('');
         }
 
-        function abrirSabores(produtoId) {
-            const produto = produtos.find(p => p.id === produtoId);
-            const saboresProduto = sabores.filter(s => s.produto_id === produtoId);
-
-            const html = saboresProduto.map(sabor => `
-                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
-                    <div class="flex-1">
-                        <p class="font-medium">${sabor.sabor}</p>
-                        <p class="text-sm text-gray-600">${formatCurrency(sabor.preco_venda)} | Estoque: ${sabor.quantidade}</p>
-                    </div>
-                    <div>
-                        <label class="text-xs text-gray-500">Quantidade</label>
-                        <input type="number" id="qtd-sabor-${sabor.id}" data-sabor-id="${sabor.id}" data-produto-id="${produtoId}" data-estoque="${sabor.quantidade}" min="0" max="${sabor.quantidade}" value="0" class="w-20 px-2 py-2 border rounded-lg text-center" oninput="validarQuantidadeSabor(this)">
-                    </div>
-                </div>
-            `).join('');
-
-            const modal = document.createElement('div');
-            modal.className = 'modal-backdrop';
-            modal.id = 'modal-sabores-' + produtoId;
-            modal.style.cssText = 'position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; overflow-y: auto; padding: 1rem;';
-            modal.innerHTML = `
-                <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 my-4" style="max-height: 85vh; display: flex; flex-direction: column;">
-                    <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50 flex-shrink-0">
-                        <h3 class="text-xl font-bold text-gray-900">${produto.nome}</h3>
-                        <button onclick="document.getElementById('modal-sabores-${produtoId}').remove()" class="text-gray-400 hover:text-gray-600 flex-shrink-0">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-                    <div class="px-6 py-4 overflow-y-auto" style="flex: 1;">
-                        ${html}
-                    </div>
-                    <div class="px-6 py-4 border-t bg-gray-50 flex-shrink-0">
-                        <div class="flex space-x-3">
-                            <button onclick="document.getElementById('modal-sabores-${produtoId}').remove()" class="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 font-medium">
-                                Cancelar
-                            </button>
-                            <button onclick="adicionarSaboresSelecionados('${produtoId}')" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 font-bold">
-                                Adicionar ao Carrinho
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            modal.onclick = (e) => {
-                if (e.target === modal) modal.remove();
-            };
-            document.body.appendChild(modal);
-        }
-
-        // Validar quantidade em tempo real
-        function validarQuantidadeProduto(input) {
-            const estoque = parseInt(input.dataset.estoque) || 0;
-            let valor = parseInt(input.value) || 0;
-            
-            // Não permitir valores negativos
-            if (valor < 0) {
-                input.value = 0;
-                input.classList.remove('border-red-500', 'border-2');
-                return;
-            }
-            
-            // Limitar ao estoque disponível
-            if (valor > estoque) {
-                input.value = estoque;
-                // Deixar campo vermelho
-                input.classList.add('border-red-500', 'border-2');
-                // Mostrar mensagem de aviso
-                showToast(`⚠️ Máximo disponível: ${estoque} unidades`, 'warning');
-            } else {
-                // Remover vermelho se valor for válido
-                input.classList.remove('border-red-500', 'border-2');
-            }
-        }
-
-        function validarQuantidadeSabor(input) {
-            const estoque = parseInt(input.dataset.estoque) || 0;
-            let valor = parseInt(input.value) || 0;
-            
-            // Não permitir valores negativos
-            if (valor < 0) {
-                input.value = 0;
-                input.classList.remove('border-red-500', 'border-2');
-                return;
-            }
-            
-            // Limitar ao estoque disponível
-            if (valor > estoque) {
-                input.value = estoque;
-                // Deixar campo vermelho
-                input.classList.add('border-red-500', 'border-2');
-                // Mostrar mensagem de aviso
-                showToast(`⚠️ Máximo disponível: ${estoque} unidades`, 'warning');
-            } else {
-                // Remover vermelho se valor for válido
-                input.classList.remove('border-red-500', 'border-2');
-            }
+        // ===== CARRINHO =====
+        function getQtdNoCarrinho(produtoId) {
+            const item = carrinho.find(c => c.produto_id === produtoId);
+            return item ? item.quantidade : 0;
         }
 
         function adicionarAoCarrinho(produtoId) {
-            const produto = produtos.find(p => p.id === produtoId);
-            const qtd = parseInt(document.getElementById(`qtd-${produtoId}`).value) || 0;
+            const produto = todosProdutos.find(p => p.id === produtoId);
+            if (!produto) return;
 
-            if (qtd === 0) {
-                alert('Informe a quantidade desejada');
+            if (produto.estoque_atual <= 0) {
+                showToast('Produto sem estoque disponível', 'error');
                 return;
             }
 
-            if (qtd > produto.estoque_atual) {
-                alert(`Quantidade solicitada (${qtd}) excede o estoque disponível (${produto.estoque_atual})`);
-                return;
-            }
-
-            // Verificar se produto sem sabor já existe no carrinho
-            const itemExistente = carrinho.find(item => 
-                item.produto_id === produtoId && item.sabor_id === null
-            );
-
-            if (itemExistente) {
-                // Se já existe, verificar se a soma não excede o estoque
-                const novaQuantidade = itemExistente.quantidade + qtd;
-                if (novaQuantidade > produto.estoque_atual) {
-                    alert(`Quantidade total (${novaQuantidade}) excede o estoque disponível (${produto.estoque_atual})`);
+            const existente = carrinho.find(c => c.produto_id === produtoId);
+            if (existente) {
+                if (existente.quantidade >= produto.estoque_atual) {
+                    showToast(`Máximo disponível: ${Math.floor(produto.estoque_atual)}`, 'error');
                     return;
                 }
-                // Somar à quantidade existente
-                itemExistente.quantidade = novaQuantidade;
-                showToast(`Quantidade de ${produto.nome} atualizada no carrinho!`, 'success');
+                existente.quantidade++;
             } else {
-                // Adicionar novo item
                 carrinho.push({
                     produto_id: produtoId,
-                    sabor_id: null,
                     nome: produto.nome,
                     marca: produto.marca,
-                    sabor: null,
-                    quantidade: qtd,
-                    preco_unitario: produto.preco_venda,
-                    estoque_disponivel: produto.estoque_atual
+                    preco_unitario: parseFloat(produto.preco_venda),
+                    quantidade: 1,
+                    estoque: produto.estoque_atual,
+                    unidade: produto.unidade || 'UN'
                 });
-                showToast(`${produto.nome} adicionado ao carrinho!`, 'success');
             }
 
-            atualizarCarrinho();
+            atualizarUI();
+            showToast(`${produto.nome} adicionado!`, 'success');
         }
 
-        function adicionarSaboresSelecionados(produtoId) {
-            const produto = produtos.find(p => p.id === produtoId);
-            const saboresProduto = sabores.filter(s => s.produto_id === produtoId);
-            
-            let adicionados = 0;
-            let atualizados = 0;
-            let erros = [];
+        function alterarQtd(produtoId, delta) {
+            const existente = carrinho.find(c => c.produto_id === produtoId);
+            if (!existente) return;
 
-            saboresProduto.forEach(sabor => {
-                const inputElement = document.getElementById(`qtd-sabor-${sabor.id}`);
-                if (!inputElement) return;
-                
-                const qtd = parseInt(inputElement.value) || 0;
-                
-                if (qtd > 0) {
-                    // Verificar se sabor já existe no carrinho
-                    const itemExistente = carrinho.find(item => 
-                        item.produto_id === produtoId && item.sabor_id === sabor.id
-                    );
-
-                    if (itemExistente) {
-                        // Se já existe, verificar se a soma não excede o estoque
-                        const novaQuantidade = itemExistente.quantidade + qtd;
-                        if (novaQuantidade > sabor.quantidade) {
-                            erros.push(`${sabor.sabor}: quantidade total (${novaQuantidade}) excede estoque (${sabor.quantidade})`);
-                        } else {
-                            // Somar à quantidade existente
-                            itemExistente.quantidade = novaQuantidade;
-                            atualizados++;
-                        }
-                    } else {
-                        // Novo item
-                        if (qtd > sabor.quantidade) {
-                            erros.push(`${sabor.sabor}: quantidade (${qtd}) excede estoque (${sabor.quantidade})`);
-                        } else {
-                            carrinho.push({
-                                produto_id: produtoId,
-                                sabor_id: sabor.id,
-                                nome: produto.nome,
-                                marca: produto.marca,
-                                sabor: sabor.sabor,
-                                quantidade: qtd,
-                                preco_unitario: sabor.preco_venda,
-                                estoque_disponivel: sabor.quantidade
-                            });
-                            adicionados++;
-                        }
-                    }
-                }
-            });
-
-            if (erros.length > 0) {
-                alert('Erros encontrados:\n\n' + erros.join('\n'));
+            const novaQtd = existente.quantidade + delta;
+            if (novaQtd <= 0) {
+                carrinho = carrinho.filter(c => c.produto_id !== produtoId);
+            } else if (novaQtd > existente.estoque) {
+                showToast(`Máximo disponível: ${Math.floor(existente.estoque)}`, 'error');
                 return;
-            }
-
-            if (adicionados === 0 && atualizados === 0) {
-                alert('Informe a quantidade para pelo menos um sabor');
-                return;
-            }
-
-            // Fechar modal específico
-            const modalElement = document.getElementById('modal-sabores-' + produtoId);
-            if (modalElement) {
-                modalElement.remove();
-            }
-            
-            atualizarCarrinho();
-            const total = adicionados + atualizados;
-            const mensagem = [];
-            if (adicionados > 0) mensagem.push(`${adicionados} ${adicionados === 1 ? 'sabor adicionado' : 'sabores adicionados'}`);
-            if (atualizados > 0) mensagem.push(`${atualizados} ${atualizados === 1 ? 'sabor atualizado' : 'sabores atualizados'}`);
-            showToast(mensagem.join(' e ') + ' no carrinho!', 'success');
-        }
-
-        function adicionarSaborAoCarrinho(produtoId, saborId) {
-            const produto = produtos.find(p => p.id === produtoId);
-            const sabor = sabores.find(s => s.id === saborId);
-            const qtd = parseInt(document.getElementById(`qtd-sabor-${saborId}`).value) || 0;
-
-            if (qtd === 0) {
-                alert('Informe a quantidade desejada');
-                return;
-            }
-
-            if (qtd > sabor.quantidade) {
-                alert(`Quantidade solicitada (${qtd}) excede o estoque disponível (${sabor.quantidade})`);
-                return;
-            }
-
-            // Verificar se sabor já existe no carrinho
-            const itemExistente = carrinho.find(item => 
-                item.produto_id === produtoId && item.sabor_id === saborId
-            );
-
-            if (itemExistente) {
-                // Se já existe, verificar se a soma não excede o estoque
-                const novaQuantidade = itemExistente.quantidade + qtd;
-                if (novaQuantidade > sabor.quantidade) {
-                    alert(`Quantidade total (${novaQuantidade}) excede o estoque disponível (${sabor.quantidade})`);
-                    return;
-                }
-                // Somar à quantidade existente
-                itemExistente.quantidade = novaQuantidade;
-                showToast(`Quantidade de ${produto.nome} - ${sabor.sabor} atualizada!`, 'success');
             } else {
-                // Adicionar novo item
-                carrinho.push({
-                    produto_id: produtoId,
-                    sabor_id: saborId,
-                    nome: produto.nome,
-                    marca: produto.marca,
-                    sabor: sabor.sabor,
-                    quantidade: qtd,
-                    preco_unitario: sabor.preco_venda,
-                    estoque_disponivel: sabor.quantidade
-                });
-                showToast(`${produto.nome} - ${sabor.sabor} adicionado!`, 'success');
+                existente.quantidade = novaQtd;
             }
 
-            atualizarCarrinho();
-            document.querySelector('.modal-backdrop').remove();
+            atualizarUI();
         }
 
-        function atualizarCarrinho() {
-            const qtdTotal = carrinho.reduce((sum, item) => sum + item.quantidade, 0);
-            const valorTotal = carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
+        function removerDoCarrinho(produtoId) {
+            const item = carrinho.find(c => c.produto_id === produtoId);
+            carrinho = carrinho.filter(c => c.produto_id !== produtoId);
+            atualizarUI();
+            if (item) showToast(`${item.nome} removido`, 'error');
+        }
 
-            const badgeElement = document.getElementById('qtd-itens-badge');
-            const totalElement = document.getElementById('carrinho-total');
-            const floatElement = document.getElementById('carrinho-float');
-            
-            if (badgeElement) badgeElement.textContent = qtdTotal;
-            if (totalElement) totalElement.textContent = formatCurrency(valorTotal);
-            
-            if (floatElement) {
-                if (qtdTotal > 0) {
-                    floatElement.classList.remove('hidden');
-                } else {
-                    floatElement.classList.add('hidden');
-                }
-            }
+        function getTotal() {
+            return carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
+        }
 
+        function getTotalItens() {
+            return carrinho.reduce((sum, item) => sum + item.quantidade, 0);
+        }
+
+        // ===== ATUALIZAR TODA A UI =====
+        function atualizarUI() {
+            const total = getTotal();
+            const totalItens = getTotalItens();
+
+            // FAB
+            const fab = document.getElementById('cart-fab');
+            fab.style.display = totalItens > 0 ? 'flex' : 'none';
+            document.getElementById('cart-badge').textContent = totalItens;
+
+            // Total no drawer
+            document.getElementById('cart-total').textContent = formatCurrency(total);
+            document.getElementById('cart-item-count').textContent = `${totalItens} ${totalItens === 1 ? 'item' : 'itens'}`;
+
+            // Botão finalizar
+            document.getElementById('btn-finalizar').disabled = totalItens === 0;
+
+            // Renderizar itens no drawer
             renderizarItensCarrinho();
+
+            // Atualizar indicadores nos cards de produto
+            renderizarProdutos();
         }
 
         function renderizarItensCarrinho() {
-            const container = document.getElementById('carrinho-itens');
-            
-            if (!container) {
-                console.warn('Container carrinho-itens não encontrado');
-                return;
-            }
-            
+            const container = document.getElementById('cart-items');
+
             if (carrinho.length === 0) {
-                container.innerHTML = '<p class="text-center text-gray-500 py-8">Seu carrinho está vazio</p>';
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-400">
+                        <i class="fas fa-shopping-bag text-4xl mb-3 block opacity-40"></i>
+                        <p class="font-medium">Seu pedido está vazio</p>
+                        <p class="text-sm mt-1">Adicione produtos do cardápio</p>
+                    </div>
+                `;
                 return;
             }
 
-            container.innerHTML = carrinho.map((item, index) => `
-                <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg mb-2">
-                    <div class="flex-1">
-                        <p class="font-medium">${item.nome}</p>
-                        ${item.sabor ? `<p class="text-sm text-gray-600">${item.sabor}</p>` : ''}
-                        <p class="text-sm text-blue-600">${item.quantidade}x ${formatCurrency(item.preco_unitario)}</p>
+            container.innerHTML = carrinho.map(item => `
+                <div class="flex items-center gap-3 py-3 border-b border-gray-50 last:border-0">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-gray-900 text-sm truncate">${item.nome}</p>
+                        ${item.marca ? `<p class="text-xs text-gray-400">${item.marca}</p>` : ''}
+                        <p class="text-sm font-bold text-rose-600 mt-0.5">${formatCurrency(item.preco_unitario)}</p>
                     </div>
-                    <div class="flex items-center space-x-3">
-                        <p class="font-bold">${formatCurrency(item.quantidade * item.preco_unitario)}</p>
-                        <button onclick="removerDoCarrinho(${index})" class="text-red-600 hover:text-red-800">
-                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                            </svg>
+                    <div class="flex items-center gap-2">
+                        <div class="qty-control">
+                            <button class="qty-btn" onclick="alterarQtd('${item.produto_id}', -1)">−</button>
+                            <span class="qty-value">${item.quantidade}</span>
+                            <button class="qty-btn" onclick="alterarQtd('${item.produto_id}', 1)">+</button>
+                        </div>
+                        <div class="text-right min-w-[70px]">
+                            <p class="font-bold text-sm text-gray-900">${formatCurrency(item.quantidade * item.preco_unitario)}</p>
+                        </div>
+                        <button onclick="removerDoCarrinho('${item.produto_id}')" class="w-8 h-8 rounded-lg hover:bg-red-50 flex items-center justify-center text-gray-300 hover:text-red-500 transition">
+                            <i class="fas fa-trash-alt text-xs"></i>
                         </button>
                     </div>
                 </div>
             `).join('');
         }
 
-        function removerDoCarrinho(index) {
-            carrinho.splice(index, 1);
-            atualizarCarrinho();
-        }
-
+        // ===== DRAWER DO CARRINHO =====
         function abrirCarrinho() {
-            console.log('Função abrirCarrinho chamada');
-            console.log('Modal carregado?', modalCarregado);
-            
-            // Aguardar um pouco se ainda não carregou
-            if (!modalCarregado) {
-                console.log('Aguardando carregamento do modal...');
-                setTimeout(() => abrirCarrinho(), 100);
-                return;
-            }
-            
-            let modal = document.getElementById('modal-carrinho');
-            console.log('Modal encontrado:', modal);
-            
-            // Se não encontrou, criar dinamicamente
-            if (!modal) {
-                console.warn('Modal não encontrado, criando dinamicamente...');
-                criarModalCarrinho();
-                modal = document.getElementById('modal-carrinho');
-            }
-            
-            if (!modal) {
-                console.error('Falhou ao criar modal!');
-                alert('Erro: Não foi possível abrir o carrinho. Recarregue a página.');
-                return;
-            }
-            
-            // Renderizar itens antes de abrir
-            renderizarItensCarrinho();
-            atualizarTotaisCarrinho();
-            
-            modal.classList.remove('hidden');
-            console.log('Modal aberto com sucesso');
-        }
-
-        function atualizarTotaisCarrinho() {
-            const valorTotal = carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
-            const totalElement = document.getElementById('carrinho-total');
-            if (totalElement) {
-                totalElement.textContent = formatCurrency(valorTotal);
-            }
-        }
-
-        function criarModalCarrinho() {
-            const modalHTML = `
-                <div id="modal-carrinho" class="modal-backdrop hidden">
-                    <div class="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                        <div class="flex justify-between items-center px-6 py-4 border-b bg-blue-50">
-                            <h3 class="text-2xl font-bold text-gray-900">🛒 Seu Carrinho</h3>
-                            <button onclick="fecharCarrinho()" class="text-gray-400 hover:text-gray-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <div id="carrinho-itens" class="px-6 py-4">
-                            <p class="text-center text-gray-500 py-8">Seu carrinho está vazio</p>
-                        </div>
-                        <div class="px-6 py-4 border-t bg-gray-50">
-                            <div class="flex justify-between items-center mb-4">
-                                <span class="text-xl font-bold">Total:</span>
-                                <span id="carrinho-total" class="text-2xl font-bold text-blue-600">R$ 0,00</span>
-                            </div>
-                            <button onclick="abrirFormularioPedido()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-bold text-lg transition">
-                                ✅ Finalizar Pedido
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            console.log('Modal criado dinamicamente');
+            document.getElementById('drawer-overlay').classList.add('open');
+            document.getElementById('drawer-panel').classList.add('open');
+            document.body.style.overflow = 'hidden';
         }
 
         function fecharCarrinho() {
-            const modal = document.getElementById('modal-carrinho');
-            if (!modal) {
-                console.error('Modal do carrinho não encontrado!');
-                return;
-            }
-            modal.classList.add('hidden');
+            document.getElementById('drawer-overlay').classList.remove('open');
+            document.getElementById('drawer-panel').classList.remove('open');
+            document.body.style.overflow = '';
         }
 
-        function abrirFormularioPedido() {
-            if (carrinho.length === 0) {
-                alert('Adicione itens ao carrinho primeiro!');
-                return;
+        // ===== MODAL FINALIZAÇÃO =====
+        function iniciarFinalizacao() {
+            if (carrinho.length === 0) return;
+            fecharCarrinho();
+            stepAtual = 1;
+            atualizarSteps();
+            document.getElementById('modal-finalizar').classList.add('open');
+            document.body.style.overflow = 'hidden';
+            // Limpar campos
+            document.getElementById('cliente-nome').value = '';
+            document.getElementById('cliente-telefone').value = '';
+            document.getElementById('cliente-obs').value = '';
+            limparErros();
+        }
+
+        function fecharModal() {
+            document.getElementById('modal-finalizar').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        function atualizarSteps() {
+            document.querySelectorAll('[data-step]').forEach(dot => {
+                const s = parseInt(dot.dataset.step);
+                dot.classList.remove('active', 'done');
+                if (s === stepAtual) dot.classList.add('active');
+                else if (s < stepAtual) dot.classList.add('done');
+            });
+            document.getElementById('step-1').classList.toggle('hidden', stepAtual !== 1);
+            document.getElementById('step-2').classList.toggle('hidden', stepAtual !== 2);
+            document.getElementById('step-3').classList.toggle('hidden', stepAtual !== 3);
+        }
+
+        function irParaResumo() {
+            // Validar
+            const nome = document.getElementById('cliente-nome').value.trim();
+            const telefone = document.getElementById('cliente-telefone').value.trim();
+            let valido = true;
+
+            limparErros();
+
+            if (!nome || nome.length < 2) {
+                document.getElementById('cliente-nome').classList.add('error');
+                document.getElementById('erro-nome').classList.remove('hidden');
+                valido = false;
+            }
+            if (!telefone || telefone.replace(/\D/g, '').length < 10) {
+                document.getElementById('cliente-telefone').classList.add('error');
+                document.getElementById('erro-telefone').classList.remove('hidden');
+                valido = false;
             }
 
-            // Verificar se modal existe, senão criar
-            let modal = document.getElementById('modal-finalizar');
-            if (!modal) {
-                console.warn('Modal finalizar não encontrado, criando dinamicamente...');
-                criarModalFinalizar();
-                modal = document.getElementById('modal-finalizar');
-            }
+            if (!valido) return;
 
-            if (!modal) {
-                alert('Erro ao abrir formulário. Recarregue a página.');
-                return;
-            }
-
-            const valorTotal = carrinho.reduce((sum, item) => sum + (item.quantidade * item.preco_unitario), 0);
+            // Preencher resumo
+            document.getElementById('resumo-nome').textContent = nome;
+            document.getElementById('resumo-telefone').textContent = telefone;
             
-            const resumo = carrinho.map(item => `
-                <div class="flex justify-between text-sm">
-                    <span>${item.nome}${item.sabor ? ` - ${item.sabor}` : ''} (${item.quantidade}x)</span>
-                    <span class="font-medium">${formatCurrency(item.quantidade * item.preco_unitario)}</span>
+            const obs = document.getElementById('cliente-obs').value.trim();
+            if (obs) {
+                document.getElementById('resumo-obs').textContent = obs;
+                document.getElementById('resumo-obs-container').classList.remove('hidden');
+            } else {
+                document.getElementById('resumo-obs-container').classList.add('hidden');
+            }
+
+            // Itens
+            document.getElementById('resumo-itens').innerHTML = carrinho.map(item => `
+                <div class="flex items-center justify-between px-4 py-3">
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-semibold text-gray-900 truncate">${item.nome}</p>
+                        <p class="text-xs text-gray-400">${item.quantidade}x ${formatCurrency(item.preco_unitario)}</p>
+                    </div>
+                    <p class="font-bold text-sm text-gray-900 ml-3">${formatCurrency(item.quantidade * item.preco_unitario)}</p>
                 </div>
             `).join('');
 
-            const resumoElement = document.getElementById('resumo-itens');
-            const totalElement = document.getElementById('resumo-total');
-            
-            if (resumoElement) resumoElement.innerHTML = resumo;
-            if (totalElement) totalElement.textContent = formatCurrency(valorTotal);
+            document.getElementById('resumo-total').textContent = formatCurrency(getTotal());
 
-            fecharCarrinho();
-            modal.classList.remove('hidden');
+            stepAtual = 2;
+            atualizarSteps();
         }
 
-        function criarModalFinalizar() {
-            const modalHTML = `
-                <div id="modal-finalizar" class="modal-backdrop hidden">
-                    <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-                        <div class="flex justify-between items-center px-6 py-4 border-b bg-green-50">
-                            <h3 class="text-2xl font-bold text-gray-900">📋 Finalizar Solicitação</h3>
-                            <button onclick="fecharFormularioPedido()" class="text-gray-400 hover:text-gray-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                            </button>
-                        </div>
-                        <form id="form-pedido-publico" onsubmit="enviarPedido(event)" class="px-6 py-6">
-                            <div class="mb-6">
-                                <h4 class="font-semibold text-gray-900 mb-3">📦 Resumo do Pedido</h4>
-                                <div id="resumo-itens" class="space-y-2 bg-gray-50 p-4 rounded-lg mb-3"></div>
-                                <div class="flex justify-between text-lg font-bold border-t pt-3">
-                                    <span>Total:</span>
-                                    <span id="resumo-total" class="text-green-600">R$ 0,00</span>
-                                </div>
-                            </div>
-
-                            <div class="space-y-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome Completo *</label>
-                                    <input type="text" id="nome-solicitante" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Email (opcional)</label>
-                                    <input type="email" id="email-contato" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Telefone/WhatsApp (opcional)</label>
-                                    <input type="tel" id="telefone-contato" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-2">Observações (opcional)</label>
-                                    <textarea id="observacoes-pedido" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"></textarea>
-                                </div>
-                            </div>
-
-                            <div class="flex space-x-3 mt-6 pt-4 border-t">
-                                <button type="button" onclick="fecharFormularioPedido()" class="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 font-medium">
-                                    Voltar
-                                </button>
-                                <button type="submit" class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-bold">
-                                    Enviar Solicitação
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            console.log('Modal finalizar criado dinamicamente');
+        function voltarParaDados() {
+            stepAtual = 1;
+            atualizarSteps();
         }
 
-        function criarModalSucesso() {
-            const modalHTML = `
-                <div id="modal-sucesso" class="modal-backdrop hidden">
-                    <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-8 text-center">
-                        <div class="text-6xl mb-4">✅</div>
-                        <h3 class="text-2xl font-bold text-gray-900 mb-4">Pedido Enviado com Sucesso!</h3>
-                        <p class="text-gray-600 mb-6">
-                            Seu pedido foi recebido e será analisado em breve.
-                        </p>
-                        <div class="bg-blue-50 p-4 rounded-lg mb-6">
-                            <p class="text-sm font-medium text-gray-700 mb-2">Número do Pedido:</p>
-                            <p id="numero-pedido-sucesso" class="text-2xl font-bold text-blue-600 mb-3"></p>
-                            <p class="text-xs text-gray-500">Guarde este número para acompanhamento</p>
-                        </div>
-                        <button onclick="location.reload()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 font-bold">
-                            Fazer Novo Pedido
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            console.log('Modal sucesso criado dinamicamente');
+        function limparErros() {
+            document.getElementById('cliente-nome').classList.remove('error');
+            document.getElementById('cliente-telefone').classList.remove('error');
+            document.getElementById('erro-nome').classList.add('hidden');
+            document.getElementById('erro-telefone').classList.add('hidden');
         }
 
-        function fecharFormularioPedido() {
-            const modal = document.getElementById('modal-finalizar');
-            if (modal) {
-                modal.classList.add('hidden');
-            }
-        }
-
-        async function enviarPedido(event) {
-            event.preventDefault();
-
-            const nome = document.getElementById('nome-solicitante').value.trim();
-            const email = document.getElementById('email-contato').value.trim();
-            const telefone = document.getElementById('telefone-contato').value.trim();
-            const observacoes = document.getElementById('observacoes-pedido').value.trim();
-
-            if (!nome) {
-                alert('Por favor, informe seu nome');
-                return;
-            }
-
-            if (carrinho.length === 0) {
-                alert('Adicione itens ao carrinho');
-                return;
-            }
+        // ===== CONFIRMAR PEDIDO =====
+        async function confirmarPedido() {
+            const btnText = document.getElementById('btn-confirmar-text');
+            const btnLoading = document.getElementById('btn-confirmar-loading');
+            const btn = document.getElementById('btn-confirmar');
 
             try {
-                showLoading(true);
+                btn.disabled = true;
+                btnText.classList.add('hidden');
+                btnLoading.classList.remove('hidden');
 
-                const resultado = await criarPrePedido({
-                    nome: nome,
-                    email: email || null,
-                    telefone: telefone || null,
-                    observacoes: observacoes || null,
-                    itens: carrinho
-                });
+                const nome = document.getElementById('cliente-nome').value.trim();
+                const telefone = document.getElementById('cliente-telefone').value.trim();
+                const obs = document.getElementById('cliente-obs').value.trim();
 
-                showLoading(false);
-                fecharFormularioPedido();
+                // 1. Gerar número da comanda
+                const numeroComanda = await gerarNumeroComanda();
 
-                // Verificar se modal de sucesso existe
-                let modalSucesso = document.getElementById('modal-sucesso');
-                if (!modalSucesso) {
-                    criarModalSucesso();
-                    modalSucesso = document.getElementById('modal-sucesso');
-                }
+                // 2. Criar comanda do tipo delivery
+                const { data: comandaData, error: erroComanda } = await supabase
+                    .from('comandas')
+                    .insert({
+                        numero_comanda: numeroComanda,
+                        tipo: 'delivery',
+                        numero_mesa: null,
+                        cliente_id: null,
+                        cliente_nome: `${nome} - ${telefone}`,
+                        status: 'aberta',
+                        data_abertura: new Date().toISOString(),
+                        observacoes: obs 
+                            ? `📱 Pedido Online | Cliente: ${nome} | Tel: ${telefone} | Obs: ${obs}` 
+                            : `📱 Pedido Online | Cliente: ${nome} | Tel: ${telefone}`
+                    })
+                    .select();
 
-                const numeroPedidoElement = document.getElementById('numero-pedido-sucesso');
-                if (numeroPedidoElement) {
-                    numeroPedidoElement.textContent = resultado.prePedido.numero;
-                }
+                if (erroComanda) throw erroComanda;
                 
-                if (modalSucesso) {
-                    modalSucesso.classList.remove('hidden');
+                const comanda = comandaData && comandaData.length > 0 ? comandaData[0] : null;
+                if (!comanda) throw new Error('Falha ao criar comanda');
+
+                // 3. Adicionar itens à comanda
+                const itensComanda = [];
+                for (const item of carrinho) {
+                    itensComanda.push({
+                        comanda_id: comanda.id,
+                        produto_id: item.produto_id,
+                        nome_produto: item.nome,
+                        quantidade: item.quantidade,
+                        preco_unitario: item.preco_unitario,
+                        subtotal: item.quantidade * item.preco_unitario,
+                        status: 'pendente'
+                    });
                 }
+
+                const { error: erroItens } = await supabase
+                    .from('comanda_itens')
+                    .insert(itensComanda);
+
+                if (erroItens) throw erroItens;
+
+                // 4. Atualizar totais da comanda
+                const subtotal = carrinho.reduce((sum, i) => sum + (i.quantidade * i.preco_unitario), 0);
+                await supabase
+                    .from('comandas')
+                    .update({
+                        subtotal: subtotal,
+                        valor_total: subtotal,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', comanda.id);
+
+                // 5. Mostrar sucesso
+                document.getElementById('sucesso-numero').textContent = numeroComanda;
+                document.getElementById('sucesso-total').textContent = formatCurrency(subtotal);
+
+                stepAtual = 3;
+                atualizarSteps();
+
+                // Confetti!
+                lancarConfetti();
 
                 // Limpar carrinho
                 carrinho = [];
-                atualizarCarrinho();
+                atualizarUI();
 
             } catch (error) {
-                showLoading(false);
-                alert('Erro ao enviar pedido: ' + error.message);
+                console.error('Erro ao confirmar pedido:', error);
+                showToast('Erro ao enviar pedido. Tente novamente.', 'error');
+            } finally {
+                btn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnLoading.classList.add('hidden');
             }
         }
 
-        function showLoading(show) {
-            document.getElementById('loading').classList.toggle('hidden', !show);
+        // ===== GERAR NÚMERO DA COMANDA =====
+        async function gerarNumeroComanda() {
+            try {
+                const { data: comandas } = await supabase
+                    .from('comandas')
+                    .select('numero_comanda')
+                    .like('numero_comanda', 'CMD-%')
+                    .order('id', { ascending: false });
+
+                if (!comandas || comandas.length === 0) return 'CMD-0001';
+
+                const numerosUsados = new Set();
+                comandas.forEach(c => {
+                    const match = c.numero_comanda.match(/CMD-(\d+)/);
+                    if (match) numerosUsados.add(parseInt(match[1]));
+                });
+
+                let proxNumero = 1;
+                while (numerosUsados.has(proxNumero)) proxNumero++;
+
+                return `CMD-${String(proxNumero).padStart(4, '0')}`;
+            } catch (e) {
+                console.error('Erro ao gerar número:', e);
+                return `CMD-${Date.now().toString().slice(-6)}`;
+            }
         }
 
-        function showToast(message, type = 'info') {
-            const toast = document.createElement('div');
-            toast.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white ${
-                type === 'success' ? 'bg-green-600' : 
-                type === 'error' ? 'bg-red-600' : 
-                type === 'warning' ? 'bg-orange-500' : 'bg-blue-600'
-            }`;
-            toast.style.zIndex = '99999';
-            toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+        // ===== NOVO PEDIDO =====
+        function novosPedidos() {
+            fecharModal();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
+        // ===== CONFETTI =====
+        function lancarConfetti() {
+            const colors = ['#e11d48', '#f97316', '#8b5cf6', '#10b981', '#3b82f6', '#eab308'];
+            for (let i = 0; i < 50; i++) {
+                const piece = document.createElement('div');
+                piece.className = 'confetti-piece';
+                piece.style.left = Math.random() * 100 + 'vw';
+                piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+                piece.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+                piece.style.width = (Math.random() * 8 + 6) + 'px';
+                piece.style.height = (Math.random() * 8 + 6) + 'px';
+                piece.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                piece.style.animationDelay = Math.random() * 0.5 + 's';
+                document.body.appendChild(piece);
+                setTimeout(() => piece.remove(), 4000);
+            }
+        }
+
+        // ===== MÁSCARA DE TELEFONE =====
+        function mascaraTelefone(input) {
+            let v = input.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.slice(0, 11);
+            if (v.length > 6) {
+                v = `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
+            } else if (v.length > 2) {
+                v = `(${v.slice(0,2)}) ${v.slice(2)}`;
+            } else if (v.length > 0) {
+                v = `(${v}`;
+            }
+            input.value = v;
+        }
+
+        // ===== UTILITÁRIOS =====
         function formatCurrency(value) {
             return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value || 0);
         }
 
-        // Debug function removed
+        function showToast(msg, type = '') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.className = 'toast ' + type;
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2500);
+        }
     </script>
 </body>
 </html>

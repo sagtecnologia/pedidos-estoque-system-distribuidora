@@ -238,6 +238,40 @@
                             <label class="block text-sm font-semibold text-gray-700 mb-2">Descrição</label>
                             <textarea id="produto-descricao" rows="3" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                         </div>
+
+                        <!-- IMAGEM DO PRODUTO -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">
+                                <i class="fas fa-image mr-2 text-blue-600"></i>Imagem do Produto
+                            </label>
+                            <div id="produto-imagem-container" class="relative">
+                                <!-- Preview da imagem -->
+                                <div id="produto-imagem-preview" class="hidden mb-3">
+                                    <div class="relative inline-block">
+                                        <img id="produto-imagem-img" src="" alt="Preview" 
+                                             class="w-40 h-40 object-cover rounded-lg border-2 border-gray-200 shadow-sm">
+                                        <button type="button" onclick="removerImagemProduto()" 
+                                                class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-600 transition shadow"
+                                                title="Remover imagem">
+                                            <i class="fas fa-times text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <!-- Área de upload -->
+                                <div id="produto-imagem-dropzone" 
+                                     class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition"
+                                     onclick="document.getElementById('produto-imagem-input').click()">
+                                    <i class="fas fa-cloud-upload-alt text-3xl text-gray-400 mb-2"></i>
+                                    <p class="text-sm text-gray-600">Clique ou arraste uma imagem aqui</p>
+                                    <p class="text-xs text-gray-400 mt-1">PNG, JPG ou WEBP • Máx. 2MB</p>
+                                </div>
+                                <input type="file" id="produto-imagem-input" accept="image/png,image/jpeg,image/webp" class="hidden" onchange="previewImagemProduto(this)">
+                                <!-- Loading -->
+                                <div id="produto-imagem-loading" class="hidden mt-2 flex items-center gap-2 text-sm text-blue-600">
+                                    <i class="fas fa-spinner fa-spin"></i> Enviando imagem...
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1221,6 +1255,127 @@
         document.getElementById('search')?.addEventListener('keyup', filterProdutos);
         document.getElementById('categoria-filter')?.addEventListener('change', filterProdutos);
 
+        // ======== IMAGEM DO PRODUTO ========
+        let produtoImagemFile = null;       // arquivo selecionado para upload
+        let produtoImagemUrlAtual = null;   // URL da imagem existente (edição)
+        let produtoImagemRemovida = false;  // flag para remover imagem no save
+
+        function setupDropzone() {
+            const dropzone = document.getElementById('produto-imagem-dropzone');
+            if (!dropzone) return;
+
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.classList.add('border-blue-500', 'bg-blue-50');
+            });
+            dropzone.addEventListener('dragleave', () => {
+                dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+            });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+                const file = e.dataTransfer.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    document.getElementById('produto-imagem-input').files = e.dataTransfer.files;
+                    previewImagemProduto(document.getElementById('produto-imagem-input'));
+                }
+            });
+        }
+        setupDropzone();
+
+        function previewImagemProduto(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showToast('❌ Apenas imagens são permitidas', 'error');
+                return;
+            }
+            if (file.size > 2 * 1024 * 1024) {
+                showToast('❌ A imagem deve ter no máximo 2MB', 'error');
+                input.value = '';
+                return;
+            }
+
+            produtoImagemFile = file;
+            produtoImagemRemovida = false;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                document.getElementById('produto-imagem-img').src = e.target.result;
+                document.getElementById('produto-imagem-preview').classList.remove('hidden');
+                document.getElementById('produto-imagem-dropzone').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removerImagemProduto() {
+            produtoImagemFile = null;
+            produtoImagemRemovida = true;
+            document.getElementById('produto-imagem-input').value = '';
+            document.getElementById('produto-imagem-img').src = '';
+            document.getElementById('produto-imagem-preview').classList.add('hidden');
+            document.getElementById('produto-imagem-dropzone').classList.remove('hidden');
+        }
+
+        function resetImagemProduto() {
+            produtoImagemFile = null;
+            produtoImagemUrlAtual = null;
+            produtoImagemRemovida = false;
+            document.getElementById('produto-imagem-input').value = '';
+            document.getElementById('produto-imagem-img').src = '';
+            document.getElementById('produto-imagem-preview').classList.add('hidden');
+            document.getElementById('produto-imagem-dropzone').classList.remove('hidden');
+        }
+
+        function mostrarImagemExistente(url) {
+            if (!url) return;
+            produtoImagemUrlAtual = url;
+            document.getElementById('produto-imagem-img').src = url;
+            document.getElementById('produto-imagem-preview').classList.remove('hidden');
+            document.getElementById('produto-imagem-dropzone').classList.add('hidden');
+        }
+
+        async function uploadImagemProduto(file) {
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            const fileName = `produto-${Date.now()}-${Math.random().toString(36).substr(2, 8)}.${fileExt}`;
+
+            const { data, error } = await supabase.storage
+                .from('product-images')
+                .upload(fileName, file, {
+                    cacheControl: '3600',
+                    upsert: false
+                });
+
+            if (error) {
+                if (error.message?.toLowerCase().includes('bucket') || error.message?.toLowerCase().includes('not found')) {
+                    throw new Error(
+                        'O bucket "product-images" não existe no Supabase Storage. ' +
+                        'Acesse o painel do Supabase → Storage → New bucket → nome: product-images → ative "Public bucket" → salve.'
+                    );
+                }
+                throw error;
+            }
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('product-images')
+                .getPublicUrl(fileName);
+
+            return publicUrl;
+        }
+
+        async function deletarImagemStorage(url) {
+            try {
+                if (!url || !url.includes('product-images')) return;
+                const fileName = url.split('/product-images/').pop();
+                if (fileName) {
+                    await supabase.storage.from('product-images').remove([fileName]);
+                }
+            } catch (err) {
+                console.warn('Aviso: não foi possível deletar imagem antiga do storage:', err);
+            }
+        }
+
         // ======== MODAL PRODUTO ========
         async function openModalProduto() {
             selectedProductId = null;
@@ -1236,6 +1391,7 @@
                 console.log('Erro ao gerar código automático');
             }
 
+            resetImagemProduto();
             switchTab('tab-basico');
             openModal('modal-produto');
         }
@@ -1265,6 +1421,12 @@
             document.getElementById('produto-embalagem').value = produto.embalagem || '';
             document.getElementById('produto-qtd-embalagem').value = produto.quantidade_embalagem || 1;
             document.getElementById('produto-descricao').value = produto.descricao || '';
+
+            // Imagem
+            resetImagemProduto();
+            if (produto.imagem_url) {
+                mostrarImagemExistente(produto.imagem_url);
+            }
 
             // Estoque
             document.getElementById('produto-estoque').value = produto.estoque_atual || '';
@@ -1365,6 +1527,31 @@
 
             try {
                 showLoading(true);
+
+                // Upload de imagem se houver nova
+                if (produtoImagemFile) {
+                    document.getElementById('produto-imagem-loading')?.classList.remove('hidden');
+                    try {
+                        // Deletar imagem antiga se existir
+                        if (produtoImagemUrlAtual) {
+                            await deletarImagemStorage(produtoImagemUrlAtual);
+                        }
+                        const novaUrl = await uploadImagemProduto(produtoImagemFile);
+                        data.imagem_url = novaUrl;
+                    } catch (uploadErr) {
+                        console.error('Erro ao fazer upload da imagem:', uploadErr);
+                        showToast('❌ Erro ao enviar imagem: ' + uploadErr.message, 'error');
+                        return;
+                    } finally {
+                        document.getElementById('produto-imagem-loading')?.classList.add('hidden');
+                    }
+                } else if (produtoImagemRemovida) {
+                    // Remover imagem do storage e do banco
+                    if (produtoImagemUrlAtual) {
+                        await deletarImagemStorage(produtoImagemUrlAtual);
+                    }
+                    data.imagem_url = null;
+                }
                 
                 // Validar código de barras antes de salvar
                 if (data.codigo_barras) {

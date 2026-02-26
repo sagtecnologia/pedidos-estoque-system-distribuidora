@@ -29,6 +29,10 @@
                         <p class="text-gray-600 mt-1">Visão geral da distribuidora</p>
                     </div>
                     <div class="flex gap-2">
+                        <button onclick="copiarLinkPedidoPublico()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition shadow-md">
+                            <i class="fas fa-link"></i>
+                            <span>Copiar Link Pedidos</span>
+                        </button>
                         <a href="pdv.html" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition shadow-md">
                             <i class="fas fa-cash-register"></i>
                             <span>Abrir PDV</span>
@@ -987,6 +991,26 @@
         function formatDateTime(dateStr) {
             if (!dateStr) return '-';
             return new Date(dateStr).toLocaleString('pt-BR');
+        }
+
+        function copiarLinkPedidoPublico() {
+            // Construir URL da página pública
+            const origin = window.location.origin;
+            const linkPublico = `${origin}/pedido-publico.html`;
+            
+            // Copiar para clipboard
+            navigator.clipboard.writeText(linkPublico).then(() => {
+                showToast('✅ Link copiado: ' + linkPublico, 'success');
+            }).catch(() => {
+                // Fallback para navegadores antigos
+                const textarea = document.createElement('textarea');
+                textarea.value = linkPublico;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showToast('✅ Link copiado para a área de transferência!', 'success');
+            });
         }
     </script>
 </body>
