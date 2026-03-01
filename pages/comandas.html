@@ -390,6 +390,8 @@
         let tipoFiltroAtual = "todas";
         let adicionandoItemComanda = false; // ✅ Flag para evitar race condition
         let sincronizandoComanda = false; // ✅ Flag para evitar múltiplas sincronizações simultâneas
+        let sincronizacaoPendente = false; // ✅ Flag para re-sincronizar após sync atual terminar
+        let debounceSync = null; // ✅ Debounce para agrupar mudanças rápidas
         let itensLocaisComanda = []; // 🚀 Array local para operações instantâneas (como PDV)
         let historicoComandas = []; // 📅 Histórico de comandas fechadas/canceladas
         let historicoFiltrado = []; // 🔍 Histórico filtrado por cliente
@@ -720,10 +722,7 @@
                 console.log(`📦 [${new Date().toLocaleTimeString()}] Produto adicionado: ${produto.nome} (qty: ${quantidade})`);
 
                 // 🚀 SINCRONIZAR COM BANCO EM BACKGROUND (não bloqueia UX)
-                sincronizarItensBanco(comandaAtual.id).catch(err => {
-                    console.error('❌ Erro ao sincronizar com banco:', err);
-                    mostrarMensagem('Aviso', 'Item adicionado localmente, mas erro ao sincronizar', 'aviso');
-                });
+                agendarSincronizacao(comandaAtual.id);
 
                 // Limpar timeout se chegou aqui sem erro
                 clearTimeout(timeoutId);
@@ -817,7 +816,7 @@
             itensLocaisComanda = itensLocaisComanda.filter(i => i.produto_id !== produtoId);
             renderizarItensComandaLocal();
             atualizarTotaisLocal();
-            sincronizarItensBanco(comandaAtual.id).catch(err => console.error('Erro ao sincronizar:', err));
+            agendarSincronizacao(comandaAtual.id);
         }
 
         // 🚀 ALTERAR QUANTIDADE LOCALMENTE
@@ -833,7 +832,7 @@
                 item.subtotal = item.preco_unitario * novaQuantidade;
                 renderizarItensComandaLocal();
                 atualizarTotaisLocal();
-                sincronizarItensBanco(comandaAtual.id).catch(err => console.error('Erro ao sincronizar:', err));
+                agendarSincronizacao(comandaAtual.id);
             }
         }
 
@@ -846,16 +845,30 @@
                 item.subtotal = novoPreco * item.quantidade;
                 renderizarItensComandaLocal();
                 atualizarTotaisLocal();
-                sincronizarItensBanco(comandaAtual.id).catch(err => console.error('Erro ao sincronizar:', err));
+                agendarSincronizacao(comandaAtual.id);
             }
+        }
+
+        // 🚀 AGENDAR SINCRONIZAÇÃO COM DEBOUNCE (evita múltiplas chamadas rápidas)
+        function agendarSincronizacao(comandaId) {
+            if (debounceSync) {
+                clearTimeout(debounceSync);
+            }
+            debounceSync = setTimeout(() => {
+                debounceSync = null;
+                sincronizarItensBanco(comandaId).catch(err => {
+                    console.error('Erro ao sincronizar:', err);
+                });
+            }, 400); // Aguarda 400ms após a última mudança antes de sincronizar
         }
 
         // 🚀 SINCRONIZAR ITENS LOCAIS COM BANCO (background)
         async function sincronizarItensBanco(comandaId) {
             try {
-                // ⛔ EVITAR MÚLTIPLAS SINCRONIZAÇÕES SIMULTÂNEAS (CAUSA DUPLICAÇÃO!)
+                // ⛔ SE JÁ ESTÁ SINCRONIZANDO, MARCAR PARA RE-SINCRONIZAR DEPOIS
                 if (sincronizandoComanda) {
-                    console.warn('⚠️ Sincronização já em andamento, ignorando nova chamada');
+                    console.warn('⚠️ Sincronização já em andamento, marcando para re-sincronizar...');
+                    sincronizacaoPendente = true;
                     return;
                 }
 
@@ -864,17 +877,25 @@
                 
                 const { data: { user } } = await supabase.auth.getUser();
 
-                // ✅ FILTRAR APENAS ITENS VÁLIDOS (com produto_id e nome_produto)
-                const itensValidos = itensLocaisComanda.filter(item => 
-                    item.status !== "cancelado" && 
-                    item.produto_id && 
-                    item.nome_produto
-                );
+                // ✅ CAPTURAR SNAPSHOT DOS ITENS NESTE MOMENTO (evitar race condition com referências mutáveis)
+                const itensSnapshot = itensLocaisComanda
+                    .filter(item => 
+                        item.status !== "cancelado" && 
+                        item.produto_id && 
+                        item.nome_produto
+                    )
+                    .map(item => ({
+                        produto_id: item.produto_id,
+                        nome_produto: item.nome_produto,
+                        quantidade: item.quantidade,
+                        preco_unitario: item.preco_unitario,
+                        subtotal: item.preco_unitario * item.quantidade, // Recalcular para garantir consistência
+                        observacoes: item.observacoes
+                    }));
 
                 // ⚠️ PROTEÇÃO: Se não há itens válidos, não deletar tudo (evita comanda vazia)
-                if (itensValidos.length === 0) {
+                if (itensSnapshot.length === 0) {
                     console.warn('⚠️ Nenhum item válido para sincronizar. Mantendo comanda intacta.');
-                    sincronizandoComanda = false;
                     return;
                 }
 
@@ -887,8 +908,8 @@
 
                 if (erroDelete) throw erroDelete;
 
-                // ✅ INSERIR TODOS OS ITENS VÁLIDOS
-                const itensParaSalvar = itensValidos.map(item => ({
+                // ✅ INSERIR TODOS OS ITENS DO SNAPSHOT
+                const itensParaSalvar = itensSnapshot.map(item => ({
                     comanda_id: comandaId,
                     produto_id: item.produto_id,
                     nome_produto: item.nome_produto,
@@ -906,8 +927,8 @@
 
                 if (erroInsert) throw erroInsert;
 
-                // 📊 Recalcular totais da comanda
-                const subtotal = itensValidos.reduce((sum, item) => sum + (item.subtotal || 0), 0);
+                // 📊 Recalcular totais da comanda USANDO O MESMO SNAPSHOT (garante consistência)
+                const subtotal = itensSnapshot.reduce((sum, item) => sum + (item.subtotal || 0), 0);
                 const { error: errorUpdate } = await supabase
                     .from('comandas')
                     .update({
@@ -921,17 +942,9 @@
                 
                 console.log('✅ Sincronização concluída com sucesso');
                 
-                // 🔄 Reload automático após sincronização
-                console.log('⏱️ Agendando reload em 300ms para refletir mudanças...');
+                // 🔄 Reload automático após sincronização (apenas 1 vez)
                 setTimeout(async () => {
                     console.log(`🔄 [${new Date().toLocaleTimeString()}] Recarregando comandas após sincronização...`);
-                    await carregarComandas();
-                }, 300);
-                
-                // 🔄 Reload automático após sincronização
-                console.log('⏱️ Agendando reload em 500ms para refletir mudanças...');
-                setTimeout(async () => {
-                    console.log('🔄 Recarregando comandas após sincronização...');
                     await carregarComandas();
                 }, 500);
             } catch (erro) {
@@ -939,6 +952,18 @@
                 mostrarMensagem('Erro', 'Erro ao sincronizar com banco: ' + erro.message, 'erro');
             } finally {
                 sincronizandoComanda = false;
+                
+                // ✅ SE HOUVE MUDANÇA DURANTE A SINCRONIZAÇÃO, RE-SINCRONIZAR COM DADOS ATUAIS
+                if (sincronizacaoPendente) {
+                    sincronizacaoPendente = false;
+                    console.log('🔄 Re-sincronizando (havia mudanças pendentes)...');
+                    // Usar setTimeout curto para evitar stack overflow
+                    setTimeout(() => {
+                        sincronizarItensBanco(comandaId).catch(err => {
+                            console.error('❌ Erro na re-sincronização:', err);
+                        });
+                    }, 100);
+                }
             }
         }
 
@@ -1890,6 +1915,29 @@
         }
 
         async function fecharModalDetalhes() {
+            // 🚀 Forçar sincronização pendente antes de fechar
+            if (debounceSync) {
+                clearTimeout(debounceSync);
+                debounceSync = null;
+                if (comandaAtual?.id) {
+                    try {
+                        await sincronizarItensBanco(comandaAtual.id);
+                    } catch (err) {
+                        console.error('Erro ao sincronizar ao fechar:', err);
+                    }
+                }
+            }
+            // Aguardar sync em andamento terminar
+            if (sincronizandoComanda) {
+                await new Promise(resolve => {
+                    const check = setInterval(() => {
+                        if (!sincronizandoComanda) {
+                            clearInterval(check);
+                            resolve();
+                        }
+                    }, 100);
+                });
+            }
             document.getElementById("modalDetalhesComanda").classList.add("hidden");
             // Atualizar grid de comandas ao fechar
             await carregarComandas();
