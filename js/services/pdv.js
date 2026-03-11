@@ -827,7 +827,8 @@ class PDVSystem {
             const quantidadeJaAdicionada = itemExistenteIdx >= 0 ? this.itensCarrinho[itemExistenteIdx].quantidade : 0;
             const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
 
-            if (quantidadeTotalNecessaria > estoqueDisponivel && !false) { // permitir_venda_zerado
+            // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
+            if (produto.exige_estoque !== false && quantidadeTotalNecessaria > estoqueDisponivel) { // permitir_venda_zerado
                 const mensagem = `Quantidade solicitada:\n` +
                                 `  • Já adicionado neste PDV: ${quantidadeJaAdicionada.toFixed(2)}\n` +
                                 `  • Novo: ${quantidade.toFixed(2)}\n` +

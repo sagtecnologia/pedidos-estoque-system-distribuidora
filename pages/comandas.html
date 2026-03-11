@@ -1542,7 +1542,8 @@
                             desconto,
                             status,
                             observacoes,
-                            usuario_id
+                            usuario_id,
+                            produtos(exige_estoque)
                         )
                     `)
                     .eq('id', comandaIdOriginal)
@@ -1593,6 +1594,11 @@
                 // ✅ PASSO 2: Validar estoque para TODOS os itens ANTES de qualquer ação
                 console.log('🔍 Step 2: Validando estoque para todos os itens...');
                 for (let item of itensOriginais) {
+                    // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
+                    if (item.produtos?.exige_estoque === false) {
+                        console.log(`ℹ️ Item ${item.nome_produto} não exige validação de estoque, pulando`);
+                        continue;
+                    }
                     const estoqueDisponivel = await ServicoComandasService.calcularEstoqueDisponivel(item.produto_id);
                     console.log(`  - ${item.nome_produto}: solicitado ${item.quantidade}, disponível ${estoqueDisponivel}`);
                     

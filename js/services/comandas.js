@@ -265,7 +265,7 @@ class ServicoComandas {
             if (!produto) {
                 const { data: produtos, error: erroProduto } = await supabase
                     .from('produtos')
-                    .select('id, nome, preco_venda, estoque_atual')
+                    .select('id, nome, preco_venda, estoque_atual, exige_estoque')
                     .eq('id', produtoId)
                     .limit(1);
 
@@ -299,7 +299,8 @@ class ServicoComandas {
             const quantidadeJaAdicionada = itemExistente ? itemExistente.quantidade : 0;
             const quantidadeTotalNecessaria = quantidadeJaAdicionada + quantidade;
 
-            if (quantidadeTotalNecessaria > estoqueDisponivel) {
+            // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
+            if (produto.exige_estoque !== false && quantidadeTotalNecessaria > estoqueDisponivel) {
                 throw new Error(
                     `Estoque insuficiente para ${produto.nome}\n` +
                     `Já adicionado nesta comanda: ${quantidadeJaAdicionada.toFixed(2)}\n` +

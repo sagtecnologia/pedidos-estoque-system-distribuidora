@@ -739,7 +739,7 @@ class EstoqueService {
             const produtoIds = itens.map(item => item.produto_id);
             const { data: produtos, error: errProdutos } = await supabase
                 .from('produtos')
-                .select('id, nome, estoque_atual, unidade')
+                .select('id, nome, estoque_atual, unidade, exige_estoque')
                 .in('id', produtoIds);
 
             if (errProdutos) {
@@ -758,6 +758,12 @@ class EstoqueService {
                 
                 if (!produto) {
                     errosEstoque.push(`Produto não encontrado para item ${item.id}`);
+                    continue;
+                }
+
+                // 🔓 Pular validação se exige_estoque = false (serviços, vouchers, etc)
+                if (produto.exige_estoque === false) {
+                    console.log(`ℹ️ [ESTOQUE] Produto ${produto.nome} não exige controle de estoque, pulando validação`);
                     continue;
                 }
 
@@ -783,6 +789,12 @@ class EstoqueService {
                 const produto = produtosMap.get(item.produto_id);
                 
                 if (!produto) continue;
+
+                // 🔓 Pular movimentação se exige_estoque = false (serviços, vouchers, etc)
+                if (produto.exige_estoque === false) {
+                    console.log(`ℹ️ [ESTOQUE] Produto ${produto.nome} não exige controle de estoque, pulando movimentação`);
+                    continue;
+                }
 
                 const quantidadeSaida = parseFloat(item.quantidade) || 0;
                 const estoqueAtual = parseFloat(produto.estoque_atual) || 0;
