@@ -52,15 +52,15 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Início</label>
-                        <input type="datetime-local" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                        <input type="datetime-local" id="filter-data-inicio" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Data/Hora Fim</label>
-                        <input type="datetime-local" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg" onchange="aplicarFiltros()">
+                        <input type="datetime-local" id="filter-data-fim" class="w-full px-4 py-2 border border-gray-300 rounded-lg">
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <button onclick="aplicarFiltros()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <button onclick="filtrarNoBanco()" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
                         <i class="fas fa-search mr-2"></i>Filtrar
                     </button>
                     <button onclick="limparFiltros()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition">
@@ -383,9 +383,10 @@
     </main>
 
     <div id="loading" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white p-6 rounded-lg">
+        <div class="bg-white p-6 rounded-lg text-center min-w-[260px]">
             <div class="spinner mx-auto"></div>
-            <p class="mt-4 text-gray-700">Carregando...</p>
+            <p class="mt-4 text-gray-700 font-medium" id="loading-msg">Carregando...</p>
+            <p class="mt-1 text-xs text-gray-400" id="loading-sub"></p>
         </div>
     </div>
 
@@ -413,6 +414,13 @@
             dataFim: ''
         };
 
+        function setLoadingMsg(msg, sub = '') {
+            const el = document.getElementById('loading-msg');
+            const elSub = document.getElementById('loading-sub');
+            if (el) el.textContent = msg;
+            if (elSub) elSub.textContent = sub;
+        }
+
         (async () => {
             await checkAuth();
             document.getElementById('navbar').innerHTML = createNavbar();
@@ -420,11 +428,11 @@
             await initNavbar();
             await initSidebar();
             
-            // Definir datas padrão (APENAS HOJE) em formato datetime-local com timezone de Brasília
+            // Definir datas padrão: SOMENTE HOJE (carga inicial rápida)
             const hoje = new Date();
             const hojeInicio = new Date(hoje);
+            hojeInicio.setHours(0, 0, 0, 0);    // 00:00 do dia de hoje
             const hojeFim = new Date(hoje);
-            hojeInicio.setHours(0, 0, 0, 0);   // 00:00 do dia de hoje
             hojeFim.setHours(23, 59, 0, 0);     // 23:59 do dia de hoje
             
             // Formatar para datetime-local (YYYY-MM-DDTHH:mm) com timezone de Brasília
@@ -499,13 +507,35 @@
                     selectMarca.innerHTML += `<option value="${id}">${nome}</option>`;
                 });
 
-                // 🚀 OTIMIZAÇÃO: Carregar vendas e itens em queries separadas (sem relacionamento automático)
-                const { data: vendasData, error: erroVendas } = await supabase
-                    .from('vendas')
-                    .select('*')
-                    .eq('status', 'FINALIZADA')
-                    .order('created_at', { ascending: false })
-                    .limit(100000);
+                // 🚀 Carregar vendas do período filtrado com PAGINAÇÃO (sem limite de registros)
+                // Os filtros de data são aplicados DIRETO NO BANCO para não carregar dados desnecessários
+                let vendasData = [];
+                let erroVendas = null;
+                {
+                    let from = 0;
+                    const PAGE_SIZE = 1000;
+                    let pagina = 1;
+                    while (true) {
+                        setLoadingMsg('Carregando vendas do período...', `Página ${pagina} — ${vendasData.length} registros`);
+                        // Montar query com filtro de data no banco
+                        let q = supabase
+                            .from('vendas')
+                            .select('*')
+                            .or('status.eq.FINALIZADA,status.eq.FINALIZADO,status_venda.eq.FINALIZADA')
+                            .order('data_venda', { ascending: false })
+                            .range(from, from + PAGE_SIZE - 1);
+                        // Filtro de data direto no banco (Brasília = UTC-3)
+                        if (filtroAtual.dataInicio) q = q.gte('data_venda', filtroAtual.dataInicio + ':00-03:00');
+                        if (filtroAtual.dataFim)    q = q.lte('data_venda', filtroAtual.dataFim    + ':00-03:00');
+                        const { data: pageData, error: pageError } = await q;
+                        if (pageError) { erroVendas = pageError; break; }
+                        vendasData = vendasData.concat(pageData || []);
+                        if (!pageData || pageData.length < PAGE_SIZE) break;
+                        from += PAGE_SIZE;
+                        pagina++;
+                    }
+                    console.log(`📦 Total de vendas no período: ${vendasData.length}`);
+                }
 
                 if (erroVendas) {
                     console.error('Erro ao carregar vendas:', erroVendas);
@@ -518,32 +548,42 @@
                     
                     if (vendasIds.length > 0) {
                         const BATCH_SIZE = 300;
+                        const totalLotes = Math.ceil(vendasIds.length / BATCH_SIZE);
                         for (let i = 0; i < vendasIds.length; i += BATCH_SIZE) {
+                            const loteNum = Math.floor(i / BATCH_SIZE) + 1;
+                            setLoadingMsg('Carregando itens das vendas...', `Lote ${loteNum} de ${totalLotes} — ${itensData.length} itens carregados`);
                             const batchIds = vendasIds.slice(i, i + BATCH_SIZE);
-                            const { data: batchItens, error: erroItens } = await supabase
-                                .from('venda_itens')
-                                .select(`
-                                    id,
-                                    venda_id,
-                                    produto_id,
-                                    quantidade,
-                                    preco_unitario,
-                                    subtotal,
-                                    preco_custo,
-                                    lote_id
-                                `)
-                                .in('venda_id', batchIds)
-                                .limit(10000);
-                            
-                            if (erroItens) {
-                                console.error(`Erro ao carregar itens (lote ${i / BATCH_SIZE + 1}):`, erroItens);
-                            } else {
+                            // Paginar itens também para não ser cortado pelo max_rows do Supabase
+                            let fromItens = 0;
+                            const PAGE_ITENS = 1000;
+                            while (true) {
+                                const { data: batchItens, error: erroItens } = await supabase
+                                    .from('venda_itens')
+                                    .select(`
+                                        id,
+                                        venda_id,
+                                        produto_id,
+                                        quantidade,
+                                        preco_unitario,
+                                        subtotal,
+                                        preco_custo,
+                                        lote_id
+                                    `)
+                                    .in('venda_id', batchIds)
+                                    .range(fromItens, fromItens + PAGE_ITENS - 1);
+                                if (erroItens) {
+                                    console.error(`Erro ao carregar itens (lote ${loteNum}):`, erroItens);
+                                    break;
+                                }
                                 itensData = itensData.concat(batchItens || []);
+                                if (!batchItens || batchItens.length < PAGE_ITENS) break;
+                                fromItens += PAGE_ITENS;
                             }
                         }
                     }
                     
                     console.log(`📦 Total de venda_itens carregados: ${itensData.length} (de ${vendasIds.length} vendas)`);
+                    setLoadingMsg('Processando dados...', `${vendasIds.length} vendas · ${itensData.length} itens`);
 
                     const itensPorVenda = {};
                     itensData.forEach(item => {
@@ -673,6 +713,7 @@
                     }
                 }
                 
+                setLoadingMsg('Renderizando análises...');
                 calcularResumo();
                 renderizarTabAtiva();
             } catch (error) {
@@ -683,36 +724,37 @@
             }
         }
 
+        // Filtros em memória (categoria/marca/produto) — sem nova busca no banco
         function aplicarFiltros() {
+            filtroAtual.categoria = document.getElementById('filter-categoria').value;
+            filtroAtual.marca = document.getElementById('filter-marca').value;
+            filtroAtual.produto = document.getElementById('filter-produto').value;
+            calcularResumo();
+            renderizarTabAtiva();
+        }
+
+        // Busca no banco com o período informado — chamado pelo botão Filtrar
+        async function filtrarNoBanco() {
             filtroAtual.categoria = document.getElementById('filter-categoria').value;
             filtroAtual.marca = document.getElementById('filter-marca').value;
             filtroAtual.produto = document.getElementById('filter-produto').value;
             filtroAtual.dataInicio = document.getElementById('filter-data-inicio').value;
             filtroAtual.dataFim = document.getElementById('filter-data-fim').value;
-            
-            console.log('🎯 [APLICAR FILTROS] Filtros atualizados:', {
-                categoria: filtroAtual.categoria,
-                marca: filtroAtual.marca,
-                produto: filtroAtual.produto,
-                dataInicio: filtroAtual.dataInicio,
-                dataFim: filtroAtual.dataFim
-            });
-            
-            calcularResumo();
-            renderizarTabAtiva();
+            console.log('🔍 [FILTRAR NO BANCO] Período:', filtroAtual.dataInicio, '→', filtroAtual.dataFim);
+            await carregarDados();
         }
 
-        function limparFiltros() {
+        async function limparFiltros() {
             document.getElementById('filter-categoria').value = '';
             document.getElementById('filter-marca').value = '';
             document.getElementById('filter-produto').value = '';
             
-            // Limpar para mostrar APENAS HOJE (como padrão, igual tela de vendas)
+            // Limpar: voltar para HOJE
             const hoje = new Date();
             const hojeInicio = new Date(hoje);
+            hojeInicio.setHours(0, 0, 0, 0);
             const hojeFim = new Date(hoje);
-            hojeInicio.setHours(0, 0, 0, 0);   // 00:00 do dia de hoje
-            hojeFim.setHours(23, 59, 0, 0);     // 23:59 do dia de hoje
+            hojeFim.setHours(23, 59, 0, 0);
             
             // Formatar para datetime-local (YYYY-MM-DDTHH:mm) com timezone de Brasília
             const formatarDateTime = (d) => {
@@ -736,9 +778,9 @@
             
             document.getElementById('filter-data-inicio').value = formatarDateTime(hojeInicio);
             document.getElementById('filter-data-fim').value = formatarDateTime(hojeFim);
-            
-            // 🔥 Aplicar filtros vai ler os valores dos inputs e atualizar filtroAtual
-            aplicarFiltros();
+
+            // Buscar no banco com as datas limpas (hoje)
+            await filtrarNoBanco();
         }
 
         // ========== FUNÇÃO HELPER PARA CALCULAR CUSTO ==========
@@ -767,6 +809,10 @@
             return 0;
         }
 
+        function getVendaDataReferencia(venda) {
+            return venda?.data_venda || venda?.created_at || null;
+        }
+
         function filtrarVendas() {
             let resultado = [...vendas];
             
@@ -777,13 +823,13 @@
                 console.log('📅 Primeira venda:', {
                     id: vendas[0].id,
                     created_at: vendas[0].created_at,
-                    dataBrasilia: getDateBrasilia(vendas[0].created_at),
+                    dataBrasilia: getDateBrasilia(getVendaDataReferencia(vendas[0])),
                     total: vendas[0].total
                 });
                 console.log('📅 Última venda:', {
                     id: vendas[vendas.length-1].id,
                     created_at: vendas[vendas.length-1].created_at,
-                    dataBrasilia: getDateBrasilia(vendas[vendas.length-1].created_at),
+                    dataBrasilia: getDateBrasilia(getVendaDataReferencia(vendas[vendas.length-1])),
                     total: vendas[vendas.length-1].total
                 });
             }
@@ -800,7 +846,7 @@
                 });
                 
                 resultado = resultado.filter(venda => {
-                    const dataBrasilia = getDateBrasilia(venda.created_at);
+                    const dataBrasilia = getDateBrasilia(getVendaDataReferencia(venda));
                     const datNum = parseInt(dataBrasilia.replace(/-/g, ''));
                     
                     const passouFiltro = (dataInicioNum === null || datNum >= dataInicioNum) && 
@@ -928,7 +974,7 @@
             const vendasPorDia = {};
             
             vendasFiltradas.forEach(venda => {
-                const data = getDateBrasilia(venda.created_at);
+                const data = getDateBrasilia(getVendaDataReferencia(venda));
                 if (!data) return;
                 
                 if (!vendasPorDia[data]) vendasPorDia[data] = 0;
@@ -1116,7 +1162,7 @@
             const dadosPorDia = {};
             
             vendasFiltradas.forEach(venda => {
-                const data = getDateBrasilia(venda.created_at);
+                const data = getDateBrasilia(getVendaDataReferencia(venda));
                 if (!data) return;
                 
                 if (!dadosPorDia[data]) dadosPorDia[data] = { receita: 0, custo: 0 };
@@ -1407,7 +1453,7 @@
             }
             
             vendasFiltradas.forEach(venda => {
-                const hora = getHourBrasilia(venda.created_at);
+                const hora = getHourBrasilia(getVendaDataReferencia(venda));
                 
                 (venda.venda_itens || []).forEach(item => {
                     const produto = item.produtos;
@@ -1758,7 +1804,7 @@
             // Vendas (entradas)
             filtrarVendas().forEach(venda => {
                 movimentacoes.push({
-                    data: venda.created_at,
+                    data: getVendaDataReferencia(venda),
                     tipo: 'ENTRADA',
                     descricao: `Venda ${venda.numero}`,
                     entrada: venda.total || 0,
