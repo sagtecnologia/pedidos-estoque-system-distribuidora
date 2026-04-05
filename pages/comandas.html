@@ -281,6 +281,10 @@
                             id="busca-produto-comanda" 
                             placeholder="Codigo de barras ou nome do produto"
                             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                            autocomplete="off"
+                            autocorrect="off"
+                            autocapitalize="off"
+                            spellcheck="false"
                         >
                         <div id="dropdown-sugestoes-comanda" class="absolute z-50 w-full bg-white border border-gray-300 rounded-lg shadow-lg mt-1 hidden max-h-64 overflow-y-auto"></div>
                     </div>
@@ -2061,6 +2065,11 @@
             const dropdownSugestoes = document.getElementById("dropdown-sugestoes-comanda");
 
             if (!inputBusca) return;
+
+            inputBusca.setAttribute("autocomplete", "off");
+            inputBusca.setAttribute("autocorrect", "off");
+            inputBusca.setAttribute("autocapitalize", "off");
+            inputBusca.setAttribute("spellcheck", "false");
 
             // Input para sugestoes
             inputBusca.addEventListener("input", async (e) => {

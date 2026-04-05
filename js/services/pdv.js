@@ -1375,6 +1375,11 @@ class PDVSystem {
             inputBusca.parentNode.replaceChild(novoInputBusca, inputBusca);
             const inputBuscaNovo = document.getElementById('busca-produto');
 
+            inputBuscaNovo.setAttribute('autocomplete', 'off');
+            inputBuscaNovo.setAttribute('autocorrect', 'off');
+            inputBuscaNovo.setAttribute('autocapitalize', 'off');
+            inputBuscaNovo.setAttribute('spellcheck', 'false');
+
             // Criar dropdown de sugestões
             let dropdownSugestoes = document.getElementById('dropdown-sugestoes');
             if (!dropdownSugestoes) {
