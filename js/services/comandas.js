@@ -889,36 +889,55 @@ class ServicoComandas {
      */
     async gerarNumeroComanda() {
         try {
-            // Buscar todas as comandas existentes (abertas, fechadas e canceladas)
-            const { data: comandas } = await supabase
+            // ⚠️ BUGFIX: Verificar TODOS os números de comanda que existem no banco
+            // (A constraint de chave única bloqueia em qualquer status, não apenas abertas)
+            const { data: todasComandasComNumero } = await supabase
                 .from('comandas')
                 .select('numero_comanda')
                 .like('numero_comanda', 'CMD-%')
-                .order('id', { ascending: false });
+                .order('id', { ascending: false })
+                .limit(10000); // Puxar até 10k registros
 
-            if (!comandas || comandas.length === 0) {
+            if (!todasComandasComNumero || todasComandasComNumero.length === 0) {
                 return 'CMD-0001';
             }
 
-            // Extrair todos os números já usados
+            // Extrair TODOS os números já usados (em qualquer status: aberta, fechada, cancelada)
             const numerosUsados = new Set();
-            comandas.forEach(c => {
+            todasComandasComNumero.forEach(c => {
                 const match = c.numero_comanda.match(/CMD-(\d+)/);
                 if (match) {
                     numerosUsados.add(parseInt(match[1]));
                 }
             });
 
-            // Encontrar o próximo número disponível (menor número não usado)
+            // Encontrar o próximo número disponível (primeiro número não usado)
             let proxNumero = 1;
             while (numerosUsados.has(proxNumero)) {
                 proxNumero++;
             }
 
-            return `CMD-${String(proxNumero).padStart(4, '0')}`;
+            const novoNumero = `CMD-${String(proxNumero).padStart(4, '0')}`;
+            
+            // ✅ VERIFICAÇÃO FINAL: Garantir que o número não foi inserido por outra requisição
+            // entre o SELECT e agora (double-check para evitar race condition)
+            const { data: verificacao } = await supabase
+                .from('comandas')
+                .select('id')
+                .eq('numero_comanda', novoNumero)
+                .limit(1);
+            
+            if (verificacao && verificacao.length > 0) {
+                console.warn(`⚠️ Número ${novoNumero} foi inserido por outra requisição! Usando timestamp como fallback.`);
+                const timestamp = Date.now().toString().slice(-6);
+                return `CMD-${timestamp}`;
+            }
+            
+            console.log(`✅ Número gerado: ${novoNumero} (Números usados: ${numerosUsados.size})`);
+            return novoNumero;
         } catch (erro) {
             console.error('Erro ao gerar número de comanda:', erro);
-            // Fallback: usar timestamp para garantir unicidade
+            // Fallback: usar timestamp para garantir unicidade absoluta
             const timestamp = Date.now().toString().slice(-6);
             return `CMD-${timestamp}`;
         }

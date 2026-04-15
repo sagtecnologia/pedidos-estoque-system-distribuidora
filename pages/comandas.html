@@ -1618,37 +1618,61 @@
                 console.log(`✅ Estoque validado com sucesso para todos os itens`);
                 
                 // ✅ PASSO 3: Criar nova comanda (APENAS APÓS VALIDAÇÕES)
-                console.log('📝 Step 3: Criando nova comanda...');
+                console.log('📝 Step 3: Criando nova comanda com retry automático...');
                 const { data: { user } } = await supabase.auth.getUser();
                 
-                // 🔢 Gerar novo número de comanda único (não usar REAB- que causa duplicação)
-                const numeroComandaNovoReabertura = await ServicoComandasService.gerarNumeroComanda();
-                console.log(`🔢 Novo número gerado: ${numeroComandaNovoReabertura}`);
+                // 🔄 RETRY COM BACKOFF: Se der erro de duplicate key, tenta novamente
+                let novaComanda = null;
+                let erroInsert = null;
+                let tentativas = 0;
+                const maxTentativas = 3;
                 
-                const { data: novaComanda, error: erroInsert } = await supabase
-                    .from('comandas')
-                    .insert({
-                        numero_comanda: numeroComandaNovoReabertura,
-                        numero_mesa: comandaOriginal.numero_mesa,
-                        tipo: comandaOriginal.tipo,
-                        cliente_id: comandaOriginal.cliente_id,
-                        cliente_nome: comandaOriginal.cliente_nome,
-                        status: 'aberta',
-                        data_abertura: new Date().toISOString(),
-                        subtotal: 0,
-                        desconto: 0,
-                        acrescimo: 0,
-                        valor_total: 0
-                    })
-                    .select('*')
-                    .single();
+                while (tentativas < maxTentativas && !novaComanda) {
+                    tentativas++;
+                    
+                    // 🔢 Gerar novo número de comanda (a cada tentativa, gera novo número)
+                    const numeroComandaNovoReabertura = await ServicoComandasService.gerarNumeroComanda();
+                    console.log(`🔢 Tentativa ${tentativas}: Novo número gerado: ${numeroComandaNovoReabertura}`);
+                    
+                    const resultado = await supabase
+                        .from('comandas')
+                        .insert({
+                            numero_comanda: numeroComandaNovoReabertura,
+                            numero_mesa: comandaOriginal.numero_mesa,
+                            tipo: comandaOriginal.tipo,
+                            cliente_id: comandaOriginal.cliente_id,
+                            cliente_nome: comandaOriginal.cliente_nome,
+                            status: 'aberta',
+                            data_abertura: new Date().toISOString(),
+                            subtotal: 0,
+                            desconto: 0,
+                            acrescimo: 0,
+                            valor_total: 0
+                        })
+                        .select('*')
+                        .single();
+                    
+                    erroInsert = resultado.error;
+                    novaComanda = resultado.data;
+                    
+                    // Se deu erro de chave duplicada, aguarda e tenta novamente
+                    if (erroInsert && erroInsert.message?.includes('duplicate key')) {
+                        console.warn(`⚠️ Tentativa ${tentativas} falhou com chave duplicada. Aguardando 500ms para nova tentativa...`);
+                        if (tentativas < maxTentativas) {
+                            await new Promise(resolve => setTimeout(resolve, 500 * tentativas)); // Backoff crescente
+                        }
+                    } else if (erroInsert) {
+                        // Erro diferente, não retry
+                        throw new Error(`Falha ao criar comanda: ${erroInsert?.message || 'Resposta inválida do servidor'}`);
+                    }
+                }
                 
-                if (erroInsert || !novaComanda) {
-                    throw new Error(`Falha ao criar comanda: ${erroInsert?.message || 'Resposta inválida do servidor'}`);
+                if (!novaComanda) {
+                    throw new Error(`Falha ao criar comanda após ${maxTentativas} tentativas: ${erroInsert?.message || 'Erro desconhecido'}`);
                 }
                 
                 novaComandaId = novaComanda.id; // Guardar para rollback
-                console.log(`✅ Nova comanda criada: ${novaComanda.numero_comanda} (ID: ${novaComanda.id})`);
+                console.log(`✅ Nova comanda criada: ${novaComanda.numero_comanda} (ID: ${novaComanda.id}) - Tentativa ${tentativas}`);
                 
                 // ✅ PASSO 4: Adicionar itens à nova comanda
                 console.log('📦 Step 4: Adicionando itens à nova comanda...');
