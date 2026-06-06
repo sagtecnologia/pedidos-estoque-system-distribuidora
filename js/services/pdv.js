@@ -2042,7 +2042,7 @@ class PDVSystem {
                                 data_autorizacao: resultado.data_autorizacao || new Date().toISOString(),
                                 tentativas_emissao: 1,
                                 ultima_tentativa: new Date().toISOString(),
-                                api_provider: 'nuvem_fiscal',
+                                api_provider: resultado.provider || 'focus_nfe',
                                 nfce_id: resultado.nfce_id || null
                             }]);
                         if (erroDocFiscal) {

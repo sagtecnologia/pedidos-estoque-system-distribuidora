@@ -277,6 +277,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-2">Selecione o Provedor *</label>
                                 <select id="api_fiscal_provider" onchange="toggleProviderFields()" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent bg-white">
+                                    <option value="sefaz_direta">SEFAZ Direta (certificado A1)</option>
                                     <option value="focus_nfe">Focus NFe (~R$ 150/mês)</option>
                                     <option value="nuvem_fiscal">Nuvem Fiscal (Gratuito até 1.000/mês)</option>
                                 </select>
@@ -381,6 +382,45 @@
                         </div>
                     </div>
 
+                    <!-- Campos SEFAZ Direta -->
+                    <div id="sefaz-direta-fields" class="mb-6 hidden">
+                        <h4 class="text-md font-semibold text-gray-800 mb-3">
+                            <i class="fas fa-landmark mr-2"></i>Configurações SEFAZ Direta
+                        </h4>
+                        <div class="grid grid-cols-1 gap-4">
+                            <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <p class="text-sm text-emerald-900 font-medium mb-2">Emissão sem intermediador</p>
+                                <p class="text-sm text-emerald-800">
+                                    Usa o certificado A1 da empresa, CSC e os dados fiscais cadastrados para assinar o XML e enviar a NFC-e diretamente ao webservice da SEFAZ.
+                                </p>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">UF Autorizadora</label>
+                                    <div id="sefaz-direta-uf-info" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-700">
+                                        <i class="fas fa-map-marker-alt mr-2 text-emerald-600"></i>Definida pelo campo UF da empresa
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-1">A integração usa a UF cadastrada na empresa para resolver o autorizador.</p>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Status da Conexão</label>
+                                    <div id="sefaz-direta-status" class="px-4 py-2 bg-gray-100 rounded-lg text-gray-600">
+                                        <i class="fas fa-circle text-gray-400 mr-2"></i> Não testado
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <button type="button" onclick="testarConexaoSefazDireta()" class="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                                    <i class="fas fa-broadcast-tower mr-2"></i>Testar Status SEFAZ Direta
+                                </button>
+                                <p class="text-xs text-gray-500 mt-1">Valida certificado, mTLS e disponibilidade do serviço da SEFAZ para a empresa configurada.</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Configurações comuns (Séries e Números) -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
@@ -452,9 +492,14 @@
                         </div>
 
                         <div class="mt-4">
-                            <button type="button" onclick="enviarCertificado()" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
-                                <i class="fas fa-upload mr-2"></i>Enviar Certificado para Focus NFe
-                            </button>
+                            <div class="flex flex-col md:flex-row gap-3">
+                                <button type="button" onclick="salvarCertificadoLocal()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+                                    <i class="fas fa-save mr-2"></i>Salvar Certificado no Sistema
+                                </button>
+                                <button type="button" id="btn-enviar-certificado-focus" onclick="enviarCertificado()" class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700">
+                                    <i class="fas fa-upload mr-2"></i>Enviar Certificado para Focus NFe
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -714,6 +759,7 @@
     <script src="../js/rbac.js"></script>
     <script src="../js/services/empresa.js"></script>
     <script src="../js/services/nuvem-fiscal.js"></script>
+    <script src="../js/services/sefaz-direta.js"></script>
     <script src="../js/services/cep-service.js"></script>
     <script src="../js/services/cnpj-service.js"></script>
     <script src="../components/navbar.js"></script>
@@ -1049,6 +1095,9 @@
                         document.getElementById('logo-preview').innerHTML = `<img src="${config.logo_url}" class="w-full h-full object-cover">`;
                         document.getElementById('btn-remove-logo').classList.remove('hidden');
                     }
+                } else {
+                    document.getElementById('api_fiscal_provider').value = 'focus_nfe';
+                    toggleProviderFields();
                 }
             } catch (error) {
                 console.error('Erro ao carregar configurações:', error);
@@ -1304,6 +1353,76 @@
             }
         }
 
+        async function salvarCertificadoLocal() {
+            const fileInput = document.getElementById('certificado_input');
+            const senha = document.getElementById('certificado_senha').value?.trim();
+
+            if (!fileInput.files || !fileInput.files[0]) {
+                showToast('Selecione o arquivo do certificado (.pfx)', 'error');
+                return;
+            }
+
+            if (!senha) {
+                showToast('Informe a senha do certificado', 'error');
+                return;
+            }
+
+            try {
+                showLoading(true);
+                const file = fileInput.files[0];
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+
+                await new Promise((resolve, reject) => {
+                    reader.onload = async () => {
+                        try {
+                            const base64 = reader.result.split(',')[1];
+                            const validacao = await SefazDireta.validarCertificadoLocal(base64, senha);
+
+                            await updateEmpresaConfig({
+                                certificado_digital: base64,
+                                senha_certificado: senha,
+                                certificado_validade: validacao.validade || null
+                            });
+
+                            const validadeInfo = validacao.validade
+                                ? ` - Validade: ${new Date(validacao.validade).toLocaleDateString('pt-BR')}`
+                                : '';
+
+                            document.getElementById('certificado-info').innerHTML = `
+                                <div class="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <i class="fas fa-certificate text-green-600"></i>
+                                            <span class="text-sm text-green-700 font-medium">Certificado salvo no sistema com sucesso!</span>
+                                        </div>
+                                        <div class="text-xs text-green-600 mt-1">
+                                            ${file.name}${validadeInfo}
+                                        </div>
+                                    </div>
+                                    <button onclick="removerCertificado()" class="text-red-600 hover:text-red-800">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            `;
+
+                            showToast('Certificado salvo e validado com sucesso!', 'success');
+                            resolve();
+                        } catch (error) {
+                            reject(error);
+                        }
+                    };
+
+                    reader.onerror = () => reject(new Error('Erro ao ler arquivo do certificado'));
+                });
+            } catch (error) {
+                console.error('Erro ao salvar certificado local:', error);
+                showToast('Erro ao salvar certificado: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
         async function removerCertificado() {
             if (!confirm('Deseja realmente remover o certificado?')) return;
             
@@ -1351,13 +1470,42 @@
             const provider = document.getElementById('api_fiscal_provider').value;
             const focusFields = document.getElementById('focus-nfe-fields');
             const nuvemFields = document.getElementById('nuvem-fiscal-fields');
+            const sefazFields = document.getElementById('sefaz-direta-fields');
+            const focusButton = document.getElementById('btn-enviar-certificado-focus');
+            const uf = document.getElementById('estado')?.value || '(não informada)';
 
-            if (provider === 'nuvem_fiscal') {
-                focusFields.classList.add('hidden');
-                nuvemFields.classList.remove('hidden');
-            } else {
-                focusFields.classList.remove('hidden');
-                nuvemFields.classList.add('hidden');
+            focusFields.classList.toggle('hidden', provider !== 'focus_nfe');
+            nuvemFields.classList.toggle('hidden', provider !== 'nuvem_fiscal');
+            sefazFields.classList.toggle('hidden', provider !== 'sefaz_direta');
+
+            if (focusButton) {
+                focusButton.classList.toggle('hidden', provider !== 'focus_nfe');
+            }
+
+            const infoUf = document.getElementById('sefaz-direta-uf-info');
+            if (infoUf) {
+                infoUf.innerHTML = `<i class="fas fa-map-marker-alt mr-2 text-emerald-600"></i>UF da empresa: ${uf}`;
+            }
+        }
+
+        async function testarConexaoSefazDireta() {
+            try {
+                showLoading(true);
+                const resultado = await SefazDireta.consultarStatusServico();
+                const statusEl = document.getElementById('sefaz-direta-status');
+                const mensagem = `${resultado.cStat || '-'} - ${resultado.xMotivo || 'Sem retorno'}`;
+
+                statusEl.className = 'px-4 py-2 bg-green-100 rounded-lg text-green-700';
+                statusEl.innerHTML = `<i class="fas fa-check-circle mr-2"></i>${mensagem}`;
+                showToast('Conexão com a SEFAZ direta validada com sucesso!', 'success');
+            } catch (error) {
+                console.error('Erro ao testar SEFAZ direta:', error);
+                const statusEl = document.getElementById('sefaz-direta-status');
+                statusEl.className = 'px-4 py-2 bg-red-100 rounded-lg text-red-700';
+                statusEl.innerHTML = `<i class="fas fa-times-circle mr-2"></i>${error.message}`;
+                showToast('Erro ao testar SEFAZ direta: ' + error.message, 'error');
+            } finally {
+                showLoading(false);
             }
         }
 

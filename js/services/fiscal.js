@@ -35,6 +35,10 @@ class FiscalSystem {
             console.log(`🏢 [FiscalSystem] Empresa: ${config?.razao_social} - CNPJ: ${config?.cnpj}`);
 
             let resultado;
+            const { data: empresa } = await supabase
+                .from('empresa_config')
+                .select('*')
+                .single();
 
             if (provider === 'nuvem_fiscal') {
                 console.log('☁️ [FiscalSystem] Usando Nuvem Fiscal para emissão...');
@@ -137,6 +141,40 @@ class FiscalSystem {
                         await this.reverterIncrementoNumerNFCe(numeroObtido);
                     } catch (erroRollback) {
                         console.warn('⚠️ [FiscalSystem] Não foi possível reverter incremento (manual fix needed):', erroRollback.message);
+                    }
+                    throw erroEmissao;
+                }
+            } else if (provider === 'sefaz_direta') {
+                console.log('ðŸ›ï¸ [FiscalSystem] Usando SEFAZ Direta para emissÃ£o...');
+
+                let numeroObtido = null;
+                try {
+                    numeroObtido = await this.obterProximoNumerNFCeComIncremento(empresa, 'sefaz_direta');
+                    console.log('âœ… [FiscalSystem] NÃºmero NFC-e reservado atomicamente:', numeroObtido);
+                } catch (erroIncremento) {
+                    console.error('âŒ [FiscalSystem] Falha ao obter/incrementar nÃºmero NFC-e:', erroIncremento.message);
+                    throw new Error(`Falha ao gerar nÃºmero de NFC-e: ${erroIncremento.message}`);
+                }
+
+                try {
+                    resultado = await SefazDireta.emitirNFCe(vendaData, itensData, pagamentosData, clienteData, {
+                        empresaConfig: empresa,
+                        numeroNfce: numeroObtido
+                    });
+
+                    if ((resultado.success || resultado.status === 'autorizado') && resultado.numero) {
+                        console.log('âœ… [FiscalSystem] NFC-e autorizada! NÃºmero utilizado:', resultado.numero);
+                        return resultado;
+                    }
+
+                    await this.reverterIncrementoNumerNFCe(numeroObtido);
+                    throw new Error(`EmissÃ£o nÃ£o autorizada: ${resultado.mensagem || resultado.status}`);
+                } catch (erroEmissao) {
+                    console.error('âŒ [FiscalSystem] Erro na emissÃ£o, revogando nÃºmero:', erroEmissao.message);
+                    try {
+                        await this.reverterIncrementoNumerNFCe(numeroObtido);
+                    } catch (erroRollback) {
+                        console.warn('âš ï¸ [FiscalSystem] NÃ£o foi possÃ­vel reverter incremento (manual fix needed):', erroRollback.message);
                     }
                     throw erroEmissao;
                 }
@@ -321,6 +359,49 @@ class FiscalSystem {
 
                     throw new Error('NFC-e rejeitada SEFAZ: ' + mensagens);
                 }
+            } else if (provider === 'sefaz_direta') {
+                resultado = await SefazDireta.emitirNFCe(
+                    venda,
+                    venda.venda_itens || [],
+                    [{ tipo: venda.forma_pagamento || 'DINHEIRO', valor: venda.total }],
+                    venda.clientes || null
+                );
+
+                if (resultado.success || resultado.status === 'autorizado') {
+                    const numeroEmitido = parseInt(resultado.numero);
+
+                    await supabase
+                        .from('vendas')
+                        .update({
+                            status_fiscal: 'EMITIDA_NFCE',
+                            numero_nfce: numeroEmitido,
+                            chave_acesso_nfce: resultado.chave_acesso || resultado.chave_nfe,
+                            protocolo_nfce: resultado.protocolo,
+                            xml_nfce: resultado.xml_proc || resultado.xml || null
+                        })
+                        .eq('id', vendaId);
+
+                    if (resultado.documentoFiscalData) {
+                        await supabase
+                            .from('documentos_fiscais')
+                            .insert({
+                                ...resultado.documentoFiscalData,
+                                venda_id: vendaId
+                            });
+                    }
+
+                    await this.atualizarNumerNFCeConfig(numeroEmitido);
+
+                    return {
+                        sucesso: true,
+                        numero: resultado.numero,
+                        chave: resultado.chave_acesso || resultado.chave_nfe,
+                        protocolo: resultado.protocolo,
+                        provider: 'sefaz_direta'
+                    };
+                }
+
+                throw new Error(resultado.mensagem || 'NFC-e rejeitada pela SEFAZ');
             } else {
                 // ===== EMISSÃO VIA FOCUS NFE (ORIGINAL) =====
                 // Montar XML da NFC-e
@@ -815,8 +896,9 @@ class FiscalSystem {
                 if (!nfceId) {
                     throw new Error('ID da nota não encontrado no banco de dados. Verifique se a nota foi emitida pela Nuvem Fiscal.');
                 }
-
                 return await NuvemFiscal.consultarNFCe(nfceId);
+            } else if (provider === 'sefaz_direta') {
+                return await SefazDireta.consultarDocumento(chaveAcesso, tipo);
             } else {
                 return await FocusNFe.consultarDocumento(chaveAcesso, tipo);
             }
@@ -932,7 +1014,7 @@ class FiscalSystem {
                 } else {
                     throw new Error('Resposta inesperada da Nuvem Fiscal ao cancelar: ' + JSON.stringify(resultado));
                 }
-            } else {
+            } else if (provider !== 'sefaz_direta') {
                 // Focus NFe também retorna sucesso após cancelamento
                 const resultadoFocus = await FocusNFe.cancelarDocumento(chaveAcesso, justificativa, tipo);
                 
@@ -962,6 +1044,33 @@ class FiscalSystem {
                 }
                 
                 return resultadoFocus;
+            }
+
+            if (provider === 'sefaz_direta') {
+                const resultadoSefaz = await SefazDireta.cancelarDocumento(chaveAcesso, justificativa, tipo);
+
+                if (resultadoSefaz?.sucesso) {
+                    try {
+                        const { data: venda } = await supabase
+                            .from('vendas')
+                            .select('id, status_fiscal')
+                            .eq('chave_acesso_nfce', chaveAcesso)
+                            .maybeSingle();
+
+                        if (venda?.id && venda.status_fiscal !== 'CANCELADA') {
+                            await supabase
+                                .from('vendas')
+                                .update({
+                                    status_fiscal: 'CANCELADA'
+                                })
+                                .eq('id', venda.id);
+                        }
+                    } catch (erroSync) {
+                        console.warn('âš ï¸ [FiscalSystem] Aviso ao sincronizar venda (SEFAZ Direta):', erroSync.message);
+                    }
+                }
+
+                return resultadoSefaz;
             }
         } catch (erro) {
             console.error('Erro ao cancelar documento:', erro);
@@ -1178,6 +1287,8 @@ class FiscalSystem {
                     console.log('📄 [FiscalService] Blob convertido para URL:', blobUrl.substring(0, 50) + '...');
                     return blobUrl;
                 }
+            } else if (provider === 'sefaz_direta') {
+                return await SefazDireta.baixarDANFE(referencia, tipo);
             } else {
                 pdfBlobOrUrl = await FocusNFe.baixarDANFE(referencia, tipo);
                 
@@ -1295,6 +1406,8 @@ class FiscalSystem {
                     return await NuvemFiscal.baixarXMLCancelamento(nfceId);
                 }
                 return await NuvemFiscal.baixarXML(nfceId);
+            } else if (provider === 'sefaz_direta') {
+                return await SefazDireta.baixarXML(referencia, tipo);
             } else {
                 return await FocusNFe.baixarXML(referencia, tipo);
             }
