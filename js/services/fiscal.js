@@ -1627,7 +1627,7 @@ class FiscalSystem {
      * @param {String} provider - Provider ('focus_nfe' ou 'nuvem_fiscal')
      * @returns {Number} Número obtido (já foi incrementado no config)
      */
-    static async obterProximoNumerNFCeComIncremento(empresa, provider = 'focus_nfe') {
+    static async obterProximoNumerNFCeComIncremento(empresa, provider = 'focus_nfe', tentativa = 1) {
         try {
             console.log('🔐 [FiscalSystem] Obtendo e incrementando número NFC-e atomicamente...');
             
@@ -1646,18 +1646,22 @@ class FiscalSystem {
                 throw new Error(`Não foi possível obter configuração da empresa: ${erroSelect?.message}`);
             }
             
-            // Validação extra: garantir que o número está correto antes de incrementar
-            if (parseInt(configAtual.nfce_numero || 1) !== proximoNumero) {
-                console.warn('⚠️ [FiscalSystem] Número em config divergente, sincronizando...');
+            const numeroAtualConfig = parseInt(configAtual.nfce_numero || 1);
+            const numeroReservado = Math.max(numeroAtualConfig, proximoNumero);
+
+            if (numeroAtualConfig !== proximoNumero) {
+                console.warn(
+                    `⚠️ [FiscalSystem] Número em config divergente. config=${numeroAtualConfig}, sincronizado=${proximoNumero}, reservando=${numeroReservado}`,
+                );
             }
-            
-            // UPDATE com validação: só atualiza se o número em BD corresponde ao esperado
-            const numeroProxEsperado = proximoNumero + 1;
+
+            // UPDATE com validação: só atualiza se ninguém alterou o valor após o SELECT
+            const numeroProxEsperado = numeroReservado + 1;
             const { error: erroUpdate, data: dataUpdate } = await supabase
                 .from('empresa_config')
                 .update({ nfce_numero: numeroProxEsperado })
                 .eq('id', configAtual.id)
-                .eq('nfce_numero', proximoNumero) // ⚠️ Validação de concorrência
+                .eq('nfce_numero', numeroAtualConfig) // ⚠️ Trava otimista baseada no valor atual do banco
                 .select();
             
             if (erroUpdate) {
@@ -1672,16 +1676,18 @@ class FiscalSystem {
                     .single();
                     
                 const numeroAtual = parseInt(configAtualizado?.nfce_numero || 1);
-                if (numeroAtual > proximoNumero) {
-                    console.warn('⚠️ [FiscalSystem] Número já foi incrementado por outra requisição, usando novo número:', numeroAtual);
-                    return await this.obterProximoNumerNFCeComIncremento(empresa, provider);
+                if (tentativa < 5) {
+                    console.warn(
+                        `⚠️ [FiscalSystem] Concorrência detectada ao reservar número NFC-e. atual=${numeroAtual}, tentativa=${tentativa}/5. Tentando novamente...`,
+                    );
+                    return await this.obterProximoNumerNFCeComIncremento(empresa, provider, tentativa + 1);
                 }
                 
                 throw new Error('Não foi possível incrementar o número (validação de concorrência falhou)');
             }
             
-            console.log('✅ [FiscalSystem] Número NFC-e reservado e incrementado atomicamente:', proximoNumero);
-            return proximoNumero;
+            console.log('✅ [FiscalSystem] Número NFC-e reservado e incrementado atomicamente:', numeroReservado);
+            return numeroReservado;
             
         } catch (erro) {
             console.error('❌ [FiscalSystem] Erro ao obter/incrementar número NFC-e:', erro.message);
