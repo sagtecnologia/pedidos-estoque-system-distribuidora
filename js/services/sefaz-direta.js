@@ -173,7 +173,10 @@ const SefazDireta = {
         });
 
         if (!resultado?.success) {
-            throw new Error(resultado?.mensagem || 'Falha ao emitir NFC-e pela SEFAZ direta');
+            const rejeicao = this.montarResultadoRejeicao(resultado, vendaData, payload);
+            const erro = new Error(rejeicao.mensagem || 'Falha ao emitir NFC-e pela SEFAZ direta');
+            erro.detalhesFiscal = rejeicao;
+            throw erro;
         }
 
         const dataEmissao = resultado.data_emissao || payload?.infNFe?.ide?.dhEmi || new Date().toISOString();
@@ -209,6 +212,72 @@ const SefazDireta = {
                 data_autorizacao: dataAutorizacao,
                 xml_nota: resultado.xml_proc || resultado.xml_assinado || null,
                 xml_retorno: JSON.stringify(resultado),
+                tentativas_emissao: 1,
+                ultima_tentativa: new Date().toISOString(),
+                api_provider: 'sefaz_direta'
+            }
+        };
+    },
+
+    montarResultadoRejeicao(resultado, vendaData, payload) {
+        const numero = String(
+            resultado?.numero ||
+            payload?.infNFe?.ide?.nNF ||
+            vendaData?.numero_nfce ||
+            '0'
+        );
+        const serie = parseInt(
+            resultado?.serie ||
+            payload?.infNFe?.ide?.serie ||
+            vendaData?.serie ||
+            1,
+            10
+        );
+        const chaveAcesso = (
+            resultado?.chave_acesso ||
+            resultado?.chave_nfe ||
+            payload?.infNFe?.['@_Id']?.replace(/^NFe/i, '') ||
+            null
+        );
+        const statusSefaz = String(
+            resultado?.codigo_status ||
+            resultado?.status_sefaz ||
+            resultado?.cStat ||
+            '999'
+        );
+        const mensagem = resultado?.mensagem || resultado?.xMotivo || 'NFC-e rejeitada pela SEFAZ';
+        const dataEmissao = resultado?.data_emissao || payload?.infNFe?.ide?.dhEmi || new Date().toISOString();
+        const xmlRetorno = typeof resultado?.xml_retorno === 'string'
+            ? resultado.xml_retorno
+            : JSON.stringify(resultado || {}, null, 2);
+
+        return {
+            success: false,
+            status: 'rejeitado',
+            status_sefaz: statusSefaz,
+            numero,
+            serie,
+            chave_acesso: chaveAcesso,
+            chave_nfe: chaveAcesso,
+            protocolo: resultado?.protocolo || null,
+            provider: 'sefaz_direta',
+            mensagem,
+            xml_retorno: xmlRetorno,
+            resultado_bruto: resultado,
+            documentoFiscalData: {
+                tipo_documento: 'NFCE',
+                numero_documento: numero,
+                serie,
+                chave_acesso: chaveAcesso,
+                protocolo_autorizacao: resultado?.protocolo || null,
+                status_sefaz: statusSefaz,
+                mensagem_sefaz: mensagem,
+                valor_total: vendaData?.total || 0,
+                natureza_operacao: payload?.infNFe?.ide?.natOp || 'VENDA',
+                data_emissao: dataEmissao,
+                data_autorizacao: null,
+                xml_nota: resultado?.xml_assinado || null,
+                xml_retorno: xmlRetorno,
                 tentativas_emissao: 1,
                 ultima_tentativa: new Date().toISOString(),
                 api_provider: 'sefaz_direta'

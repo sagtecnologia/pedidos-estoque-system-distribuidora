@@ -360,48 +360,53 @@ class FiscalSystem {
                     throw new Error('NFC-e rejeitada SEFAZ: ' + mensagens);
                 }
             } else if (provider === 'sefaz_direta') {
-                resultado = await SefazDireta.emitirNFCe(
-                    venda,
-                    venda.venda_itens || [],
-                    [{ tipo: venda.forma_pagamento || 'DINHEIRO', valor: venda.total }],
-                    venda.clientes || null
-                );
+                try {
+                    resultado = await SefazDireta.emitirNFCe(
+                        venda,
+                        venda.venda_itens || [],
+                        [{ tipo: venda.forma_pagamento || 'DINHEIRO', valor: venda.total }],
+                        venda.clientes || null
+                    );
 
-                if (resultado.success || resultado.status === 'autorizado') {
-                    const numeroEmitido = parseInt(resultado.numero);
+                    if (resultado.success || resultado.status === 'autorizado') {
+                        const numeroEmitido = parseInt(resultado.numero);
 
-                    await supabase
-                        .from('vendas')
-                        .update({
-                            status_fiscal: 'EMITIDA_NFCE',
-                            numero_nfce: numeroEmitido,
-                            chave_acesso_nfce: resultado.chave_acesso || resultado.chave_nfe,
-                            protocolo_nfce: resultado.protocolo,
-                            xml_nfce: resultado.xml_proc || resultado.xml || null
-                        })
-                        .eq('id', vendaId);
-
-                    if (resultado.documentoFiscalData) {
                         await supabase
-                            .from('documentos_fiscais')
-                            .insert({
-                                ...resultado.documentoFiscalData,
-                                venda_id: vendaId
-                            });
+                            .from('vendas')
+                            .update({
+                                status_fiscal: 'EMITIDA_NFCE',
+                                numero_nfce: numeroEmitido,
+                                chave_acesso_nfce: resultado.chave_acesso || resultado.chave_nfe,
+                                protocolo_nfce: resultado.protocolo,
+                                xml_nfce: resultado.xml_proc || resultado.xml || null
+                            })
+                            .eq('id', vendaId);
+
+                        if (resultado.documentoFiscalData) {
+                            await supabase
+                                .from('documentos_fiscais')
+                                .insert({
+                                    ...resultado.documentoFiscalData,
+                                    venda_id: vendaId
+                                });
+                        }
+
+                        await this.atualizarNumerNFCeConfig(numeroEmitido);
+
+                        return {
+                            sucesso: true,
+                            numero: resultado.numero,
+                            chave: resultado.chave_acesso || resultado.chave_nfe,
+                            protocolo: resultado.protocolo,
+                            provider: 'sefaz_direta'
+                        };
                     }
 
-                    await this.atualizarNumerNFCeConfig(numeroEmitido);
-
-                    return {
-                        sucesso: true,
-                        numero: resultado.numero,
-                        chave: resultado.chave_acesso || resultado.chave_nfe,
-                        protocolo: resultado.protocolo,
-                        provider: 'sefaz_direta'
-                    };
+                    throw new Error(resultado.mensagem || 'NFC-e rejeitada pela SEFAZ');
+                } catch (erroSefazDireta) {
+                    await this.registrarRejeicaoFiscal(vendaId, venda, erroSefazDireta?.detalhesFiscal, 'sefaz_direta');
+                    throw erroSefazDireta;
                 }
-
-                throw new Error(resultado.mensagem || 'NFC-e rejeitada pela SEFAZ');
             } else {
                 // ===== EMISSÃO VIA FOCUS NFE (ORIGINAL) =====
                 // Montar XML da NFC-e
@@ -825,6 +830,75 @@ class FiscalSystem {
                 });
         } catch (error) {
             console.error('Erro ao registrar documento:', error);
+        }
+    }
+
+    /**
+     * Registrar rejeição fiscal com retorno técnico para diagnóstico
+     */
+    static async registrarRejeicaoFiscal(vendaId, venda, detalhesFiscal = null, provider = 'sefaz_direta') {
+        try {
+            const mensagem = detalhesFiscal?.mensagem
+                || detalhesFiscal?.documentoFiscalData?.mensagem_sefaz
+                || 'NFC-e rejeitada pela SEFAZ';
+
+            await supabase
+                .from('vendas')
+                .update({
+                    status_fiscal: 'REJEITADA_SEFAZ',
+                    mensagem_erro_fiscal: mensagem
+                })
+                .eq('id', vendaId);
+
+            const documentoFiscalData = {
+                tipo_documento: 'NFCE',
+                numero_documento: detalhesFiscal?.documentoFiscalData?.numero_documento || venda?.numero_nfce || '0',
+                serie: detalhesFiscal?.documentoFiscalData?.serie || 1,
+                chave_acesso: detalhesFiscal?.documentoFiscalData?.chave_acesso || null,
+                protocolo_autorizacao: detalhesFiscal?.documentoFiscalData?.protocolo_autorizacao || null,
+                status_sefaz: detalhesFiscal?.documentoFiscalData?.status_sefaz || '999',
+                mensagem_sefaz: mensagem,
+                valor_total: detalhesFiscal?.documentoFiscalData?.valor_total || venda?.total || 0,
+                natureza_operacao: detalhesFiscal?.documentoFiscalData?.natureza_operacao || 'VENDA',
+                data_emissao: detalhesFiscal?.documentoFiscalData?.data_emissao || venda?.created_at || new Date().toISOString(),
+                data_autorizacao: null,
+                xml_nota: detalhesFiscal?.documentoFiscalData?.xml_nota || null,
+                xml_retorno: detalhesFiscal?.documentoFiscalData?.xml_retorno || null,
+                tentativas_emissao: detalhesFiscal?.documentoFiscalData?.tentativas_emissao || 1,
+                ultima_tentativa: detalhesFiscal?.documentoFiscalData?.ultima_tentativa || new Date().toISOString(),
+                api_provider: provider
+            };
+
+            const { data: existente } = await supabase
+                .from('documentos_fiscais')
+                .select('id, tentativas_emissao')
+                .eq('venda_id', vendaId)
+                .eq('tipo_documento', 'NFCE')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (existente?.id) {
+                await supabase
+                    .from('documentos_fiscais')
+                    .update({
+                        ...documentoFiscalData,
+                        tentativas_emissao: Math.max(
+                            documentoFiscalData.tentativas_emissao || 1,
+                            (existente.tentativas_emissao || 0) + 1
+                        )
+                    })
+                    .eq('id', existente.id);
+            } else {
+                await supabase
+                    .from('documentos_fiscais')
+                    .insert({
+                        ...documentoFiscalData,
+                        venda_id: vendaId
+                    });
+            }
+        } catch (error) {
+            console.error('Erro ao registrar rejeição fiscal:', error);
         }
     }
 

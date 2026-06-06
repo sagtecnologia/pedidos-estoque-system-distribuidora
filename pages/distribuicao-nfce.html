@@ -275,6 +275,15 @@
             <div class="bg-red-50 p-4 rounded-lg mb-6 max-h-40 overflow-y-auto">
                 <p class="text-sm text-red-800" id="erro_mensagem">-</p>
             </div>
+            <div id="erro_tecnico_container" class="hidden bg-slate-950 text-slate-100 p-4 rounded-lg mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-300">Retorno Técnico</p>
+                    <button type="button" onclick="copiarErroTecnico()" class="px-2 py-1 text-xs bg-slate-700 text-white rounded hover:bg-slate-600">
+                        <i class="fas fa-copy mr-1"></i>Copiar
+                    </button>
+                </div>
+                <pre id="erro_tecnico" class="text-xs whitespace-pre-wrap break-all max-h-56 overflow-y-auto"></pre>
+            </div>
             <button onclick="fecharModal('modal_erro')" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
                 Fechar
             </button>
@@ -676,7 +685,7 @@
                 console.error('Erro ao emitir:', erro);
                 document.getElementById('btn_emitir').disabled = false;
                 document.getElementById('btn_emitir').innerHTML = '<i class="fas fa-check mr-2"></i>Emitir NFC-e';
-                mostrarErro(erro.message);
+                mostrarErro(erro.message, erro);
             }
         }
 
@@ -717,8 +726,43 @@
             container.classList.remove('hidden');
         }
 
-        function mostrarErro(mensagem) {
+        function formatarDetalheTecnicoErro(erro) {
+            const conteudo = erro?.detalhesFiscal?.xml_retorno;
+            if (!conteudo) {
+                return '';
+            }
+
+            try {
+                const json = JSON.parse(conteudo);
+                return JSON.stringify(json, null, 2);
+            } catch (_) {
+                return String(conteudo);
+            }
+        }
+
+        function copiarErroTecnico() {
+            const conteudo = document.getElementById('erro_tecnico')?.textContent || '';
+            if (!conteudo) {
+                return;
+            }
+
+            navigator.clipboard.writeText(conteudo);
+        }
+
+        function mostrarErro(mensagem, erro = null) {
             document.getElementById('erro_mensagem').textContent = mensagem;
+            const detalheTecnico = formatarDetalheTecnicoErro(erro);
+            const detalheEl = document.getElementById('erro_tecnico');
+            const detalheContainer = document.getElementById('erro_tecnico_container');
+
+            if (detalheTecnico) {
+                detalheEl.textContent = detalheTecnico;
+                detalheContainer.classList.remove('hidden');
+            } else {
+                detalheEl.textContent = '';
+                detalheContainer.classList.add('hidden');
+            }
+
             abrirModal('modal_erro');
         }
 
