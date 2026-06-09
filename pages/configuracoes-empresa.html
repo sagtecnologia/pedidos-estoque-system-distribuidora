@@ -1493,7 +1493,9 @@
                 showLoading(true);
                 const resultado = await SefazDireta.consultarStatusServico();
                 const statusEl = document.getElementById('sefaz-direta-status');
-                const mensagem = `${resultado.cStat || '-'} - ${resultado.xMotivo || 'Sem retorno'}`;
+                const mensagem = resultado.cStat === '999'
+                    ? 'Conexao OK - SEFAZ GO retornou 999 no status'
+                    : `${resultado.cStat || '-'} - ${resultado.xMotivo || 'Sem retorno'}`;
 
                 statusEl.className = 'px-4 py-2 bg-green-100 rounded-lg text-green-700';
                 statusEl.innerHTML = `<i class="fas fa-check-circle mr-2"></i>${mensagem}`;

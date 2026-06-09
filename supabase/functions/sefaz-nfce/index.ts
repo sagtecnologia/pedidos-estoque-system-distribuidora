@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { create } from "npm:xmlbuilder2@3.1.1";
 import { XMLParser } from "npm:fast-xml-parser@4.5.0";
@@ -34,7 +34,7 @@ serve(async (req) => {
     const action = body?.action;
 
     if (!action) {
-      throw new Error("Ação não informada");
+      throw new Error("AÃƒÂ§ÃƒÂ£o nÃƒÂ£o informada");
     }
 
     if (action === "validar_certificado") {
@@ -42,7 +42,7 @@ serve(async (req) => {
       const senha = body?.senha;
 
       if (!certificado || !senha) {
-        throw new Error("Certificado e senha são obrigatórios");
+        throw new Error("Certificado e senha sÃƒÂ£o obrigatÃƒÂ³rios");
       }
 
       const material = parsePfx(certificado, senha);
@@ -53,6 +53,8 @@ serve(async (req) => {
         issuer: material.issuer,
         serial_number: material.serialNumber,
         chain_length: material.chainLength,
+        tls_chain_length: material.tlsChainLength,
+        tls_chain_complete: material.tlsChainComplete,
       });
     }
 
@@ -85,7 +87,7 @@ serve(async (req) => {
           ambiente,
           uf,
           certificado,
-          chaveAcesso: body?.chave_acesso,
+          chaveAcesso: normalizarChaveAcesso(body?.chave_acesso),
         }));
       case "cancelar":
         return jsonResponse(await cancelarNfce({
@@ -93,16 +95,17 @@ serve(async (req) => {
           ambiente,
           uf,
           certificado,
-          chaveAcesso: body?.chave_acesso,
+          chaveAcesso: normalizarChaveAcesso(body?.chave_acesso),
           justificativa: body?.justificativa,
+          protocoloAutorizacao: body?.protocolo_autorizacao,
         }));
       default:
-        throw new Error(`Ação não suportada: ${action}`);
+        throw new Error(`AÃƒÂ§ÃƒÂ£o nÃƒÂ£o suportada: ${action}`);
     }
   } catch (error) {
     console.error("[sefaz-nfce] erro:", error);
     return jsonResponse(
-      { erro: error instanceof Error ? error.message : "Erro interno da função" },
+      { erro: error instanceof Error ? error.message : "Erro interno da funÃƒÂ§ÃƒÂ£o" },
       500,
     );
   }
@@ -126,15 +129,15 @@ async function carregarEmpresa() {
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("Configuração da empresa não encontrada");
+    throw new Error("ConfiguraÃƒÂ§ÃƒÂ£o da empresa nÃƒÂ£o encontrada");
   }
 
   if (!data.certificado_digital || !data.senha_certificado) {
-    throw new Error("Certificado digital A1 não configurado");
+    throw new Error("Certificado digital A1 nÃƒÂ£o configurado");
   }
 
   if (!data.csc_id || !data.csc_token) {
-    throw new Error("CSC ID e CSC Token não configurados");
+    throw new Error("CSC ID e CSC Token nÃƒÂ£o configurados");
   }
 
   return data;
@@ -144,9 +147,17 @@ function normalizarAmbiente(ambiente: unknown) {
   return parseInt(String(ambiente || 2), 10) === 1 ? 1 : 2;
 }
 
+function normalizarChaveAcesso(chave: unknown) {
+  const somenteDigitos = String(chave || "").replace(/\D/g, "");
+  if (somenteDigitos && somenteDigitos.length !== 44) {
+    throw new Error(`Chave de acesso invalida: esperado 44 digitos, recebido ${somenteDigitos.length}`);
+  }
+  return somenteDigitos;
+}
+
 function resolverSefaz(uf: string, ambiente: number) {
   if (uf !== "GO") {
-    throw new Error(`SEFAZ direta ainda não está mapeada para a UF ${uf}. Esta implementação cobre Goiás.`);
+    throw new Error(`SEFAZ direta ainda nÃƒÂ£o estÃƒÂ¡ mapeada para a UF ${uf}. Esta implementaÃƒÂ§ÃƒÂ£o cobre GoiÃƒÂ¡s.`);
   }
 
   const base = ambiente === 1
@@ -154,13 +165,13 @@ function resolverSefaz(uf: string, ambiente: number) {
     : "https://homolog.sefaz.go.gov.br/nfe/services";
 
   return {
-    autorizacao: `${base}/NFeAutorizacao4`,
-    consultaProtocolo: `${base}/NFeConsultaProtocolo4`,
-    statusServico: `${base}/NFeStatusServico4`,
-    recepcaoEvento: `${base}/NFeRecepcaoEvento4`,
+    autorizacao: `${base}/NFeAutorizacao4?`,
+    consultaProtocolo: `${base}/NFeConsultaProtocolo4?`,
+    statusServico: `${base}/NFeStatusServico4?`,
+    recepcaoEvento: `${base}/NFeRecepcaoEvento4?`,
     qrCodeUrl: ambiente === 1
       ? "https://nfeweb.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe"
-      : "https://homolog.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe",
+      : "https://nfewebhomolog.sefaz.go.gov.br/nfeweb/sites/nfce/danfeNFCe",
     urlChave: ambiente === 1
       ? "www.sefaz.go.gov.br/nfce/consulta"
       : "www.sefaz.go.gov.br/nfce/consulta",
@@ -190,7 +201,7 @@ function parsePfx(base64: string, password: string) {
   const allKeyBags = [...pkcs8KeyBags, ...keyBags];
 
   if (!allKeyBags.length || !certBags.length) {
-    throw new Error("Não foi possível extrair chave privada e certificado do arquivo PFX");
+    throw new Error("NÃƒÂ£o foi possÃƒÂ­vel extrair chave privada e certificado do arquivo PFX");
   }
 
   const keyBag = allKeyBags[0];
@@ -219,6 +230,8 @@ function parsePfx(base64: string, password: string) {
     issuer: cert.issuer.attributes.map((item: { shortName?: string; name: string; value: string }) => `${item.shortName || item.name}=${item.value}`).join(", "),
     serialNumber: cert.serialNumber,
     chainLength: cadeia.length,
+    tlsChainLength: cadeia.length,
+    tlsChainComplete: cadeia.length > 1,
   };
 }
 
@@ -332,14 +345,20 @@ async function consultarStatusSefaz(params: {
   });
 
   const retorno = findNodeByLocalName(parser.parse(xmlRet), "retConsStatServ");
+  const cStat = String(retorno?.cStat || "");
+  const xMotivo = retorno?.xMotivo || null;
   return {
     success: true,
-    cStat: retorno?.cStat,
-    xMotivo: retorno?.xMotivo,
+    cStat,
+    xMotivo,
     cMsg: retorno?.cMsg || null,
     xMsg: retorno?.xMsg || null,
     tMed: retorno?.tMed,
     dhRecbto: retorno?.dhRecbto,
+    conexao_ok: true,
+    diagnostico: cStat === "999"
+      ? "Conexao mTLS e SOAP realizadas com sucesso; a SEFAZ GO respondeu 999 no StatusServico."
+      : null,
   };
 }
 
@@ -352,7 +371,7 @@ async function emitirNfce(params: {
   payload: any;
 }) {
   if (!params.payload?.infNFe) {
-    throw new Error("Payload da NFC-e não informado");
+    throw new Error("Payload da NFC-e nÃƒÂ£o informado");
   }
 
   const payload = structuredClone(params.payload);
@@ -386,46 +405,55 @@ async function emitirNfce(params: {
 
   emit.CNPJ = cnpj;
   emit.CRT = parseInt(String(emit.CRT || params.empresa.regime_tributario_codigo || params.empresa.regime_tributario || 1), 10);
+  normalizarCamposSchemaNfce(infNFe);
 
+  const nfeObj = {
+    NFe: {
+      "@_xmlns": NFE_NS,
+      infNFe: normalizarInfNFeParaXml(infNFe),
+    },
+  };
+
+  const xmlSemAssinatura = buildXml(nfeObj);
+  const xmlAssinado = assinarXml(xmlSemAssinatura, `#${infNFe["@_Id"]}`, params.certificado);
   const qrCode = await gerarQrCode({
     chaveAcesso,
     ambiente: params.ambiente,
     cscId: String(params.empresa.csc_id),
     cscToken: String(params.empresa.csc_token),
     qrCodeBaseUrl: params.sefaz.qrCodeUrl,
+    infNFe,
+    xmlAssinado,
   });
+  const xmlAssinadoComSupl = inserirInfNFeSupl(xmlAssinado, qrCode, params.sefaz.urlChave);
 
-  const nfeObj = {
-    NFe: {
-      "@_xmlns": NFE_NS,
-      infNFe: normalizarInfNFeParaXml(infNFe),
-      infNFeSupl: {
-        qrCode,
-        urlChave: params.sefaz.urlChave,
-      },
-    },
-  };
+  const enviNfeXml = `<?xml version="1.0" encoding="UTF-8"?><enviNFe xmlns="${NFE_NS}" versao="4.00"><idLote>${gerarIdLote()}</idLote><indSinc>1</indSinc>${removerDeclaracaoXml(xmlAssinadoComSupl)}</enviNFe>`;
 
-  const xmlSemAssinatura = buildXml(nfeObj);
-  const xmlAssinado = assinarXml(xmlSemAssinatura, `#${infNFe["@_Id"]}`, params.certificado);
-
-  const enviNfeXml = buildXml({
-    enviNFe: {
-      "@_xmlns": NFE_NS,
-      "@_versao": "4.00",
-      idLote: gerarIdLote(),
-      indSinc: 1,
-      NFe: parser.parse(xmlAssinado).NFe,
-    },
-  });
-
-  const xmlRet = await enviarSoap({
-    url: params.sefaz.autorizacao,
-    operacao: "NFeAutorizacao4",
-    metodo: "nfeAutorizacaoLote",
-    xml: enviNfeXml,
-    certificado: params.certificado,
-  });
+  let xmlRet = "";
+  try {
+    xmlRet = await enviarSoap({
+      url: params.sefaz.autorizacao,
+      operacao: "NFeAutorizacao4",
+      metodo: "nfeAutorizacaoLote",
+      xml: enviNfeXml,
+      certificado: params.certificado,
+    });
+  } catch (error) {
+    const mensagemErro = error instanceof Error ? error.message : String(error);
+    const xmlRetornoSefaz = (error as any)?.xmlRetornoSefaz || "";
+    return {
+      success: false,
+      status: "rejeitado",
+      codigo_status: "999",
+      mensagem: mensagemErro,
+      chave_acesso: chaveAcesso,
+      numero: parseInt(numero, 10),
+      serie: parseInt(serie, 10),
+      xml_assinado: xmlAssinadoComSupl,
+      xml_envio: enviNfeXml,
+      xml_retorno: xmlRetornoSefaz || mensagemErro,
+    };
+  }
 
   const retorno = findNodeByLocalName(parser.parse(xmlRet), "retEnviNFe");
   const protNFe = retorno?.protNFe;
@@ -451,7 +479,8 @@ async function emitirNfce(params: {
       chave_acesso: chaveAcesso,
       numero: parseInt(numero, 10),
       serie: parseInt(serie, 10),
-      xml_assinado: xmlAssinado,
+      xml_assinado: xmlAssinadoComSupl,
+      xml_envio: enviNfeXml,
       xml_retorno: xmlRet,
     };
   }
@@ -460,7 +489,7 @@ async function emitirNfce(params: {
     nfeProc: {
       "@_xmlns": NFE_NS,
       "@_versao": "4.00",
-      NFe: parser.parse(xmlAssinado).NFe,
+      NFe: parser.parse(xmlAssinadoComSupl).NFe,
       protNFe: protNFe,
     },
   });
@@ -478,7 +507,7 @@ async function emitirNfce(params: {
     protocolo: infProt?.nProt || null,
     data_emissao: dhEmi,
     data_autorizacao: infProt?.dhRecbto || null,
-    xml_assinado: xmlAssinado,
+    xml_assinado: xmlAssinadoComSupl,
     xml_proc: xmlProc,
     xml_retorno: xmlRet,
   };
@@ -492,7 +521,7 @@ async function consultarNfce(params: {
   chaveAcesso: string;
 }) {
   if (!params.chaveAcesso) {
-    throw new Error("Chave de acesso não informada");
+    throw new Error("Chave de acesso nÃƒÂ£o informada");
   }
 
   const xml = buildXml({
@@ -544,28 +573,53 @@ async function cancelarNfce(params: {
   certificado: ReturnType<typeof parsePfx>;
   chaveAcesso: string;
   justificativa: string;
+  protocoloAutorizacao?: string;
 }) {
   if (!params.chaveAcesso) {
-    throw new Error("Chave de acesso não informada");
+    throw new Error("Chave de acesso nÃƒÂ£o informada");
   }
 
   if (!params.justificativa || params.justificativa.length < 15) {
     throw new Error("A justificativa deve ter ao menos 15 caracteres");
   }
 
-  const consulta = await consultarNfce(params);
-  if (consulta.status_sefaz === "135" || consulta.status_sefaz === "101") {
-    return {
-      success: true,
-      status: "cancelado",
-      status_sefaz: "135",
-      mensagem: "Documento já se encontra cancelado na SEFAZ",
-      protocolo: consulta.protocolo,
-    };
+  const protocoloInformado = String(params.protocoloAutorizacao || "").replace(/\D/g, "");
+  let protocoloCancelamento = protocoloInformado;
+
+  if (!protocoloCancelamento) {
+    const consulta = await consultarNfce(params);
+    if (consulta.status_sefaz === "135" || consulta.status_sefaz === "101") {
+      return {
+        success: true,
+        status: "cancelado",
+        status_sefaz: "135",
+        mensagem: "Documento ja se encontra cancelado na SEFAZ",
+        protocolo: consulta.protocolo,
+      };
+    }
+
+    if (consulta.status_sefaz !== "100" && consulta.status_sefaz !== "150") {
+      const mensagem = construirMensagemSefaz([
+        consulta.status_sefaz ? `${consulta.status_sefaz} - ${consulta.mensagem || "NF-e nao autorizada para cancelamento"}` : consulta.mensagem,
+        "Confira se a chave pertence ao mesmo ambiente configurado e se a nota foi autorizada pela SEFAZ direta.",
+      ]) || "NF-e nao autorizada para cancelamento";
+
+      return {
+        success: false,
+        status: "rejeitado",
+        status_sefaz: consulta.status_sefaz,
+        mensagem,
+        protocolo: consulta.protocolo,
+        chave_acesso: params.chaveAcesso,
+        xml_retorno: consulta.xml_retorno,
+      };
+    }
+
+    protocoloCancelamento = String(consulta.protocolo || "").replace(/\D/g, "");
   }
 
-  if (!consulta.protocolo) {
-    throw new Error("Não foi possível localizar o protocolo da NFC-e para cancelamento");
+  if (!protocoloCancelamento) {
+    throw new Error("Nao foi possivel localizar o protocolo da NFC-e para cancelamento");
   }
 
   const dhEvento = formatarDataHoraBrasil();
@@ -588,7 +642,7 @@ async function cancelarNfce(params: {
         detEvento: {
           "@_versao": "1.00",
           descEvento: "Cancelamento",
-          nProt: consulta.protocolo,
+          nProt: protocoloCancelamento,
           xJust: params.justificativa,
         },
       },
@@ -597,16 +651,7 @@ async function cancelarNfce(params: {
 
   const xmlEvento = buildXml(evento);
   const xmlEventoAssinado = assinarXml(xmlEvento, `#${idEvento}`, params.certificado, "//*[local-name(.)='infEvento']");
-  const eventoObj = parser.parse(xmlEventoAssinado).evento;
-
-  const envEvento = buildXml({
-    envEvento: {
-      "@_xmlns": NFE_NS,
-      "@_versao": "1.00",
-      idLote: gerarIdLote(),
-      evento: eventoObj,
-    },
-  });
+  const envEvento = `<?xml version="1.0" encoding="UTF-8"?><envEvento xmlns="${NFE_NS}" versao="1.00"><idLote>${gerarIdLote()}</idLote>${removerDeclaracaoXml(xmlEventoAssinado)}</envEvento>`;
 
   const xmlRet = await enviarSoap({
     url: params.sefaz.recepcaoEvento,
@@ -623,13 +668,23 @@ async function cancelarNfce(params: {
   const xMsg = infEvento?.xMsg || retorno?.xMsg || null;
 
   if (status !== "135" && status !== "155") {
-    throw new Error(
-      construirMensagemSefaz([
+    return {
+      success: false,
+      status: "rejeitado",
+      status_sefaz: status,
+      mensagem: construirMensagemSefaz([
         status ? `${status} - ${infEvento?.xMotivo || retorno?.xMotivo || "Cancelamento rejeitado pela SEFAZ"}` : (infEvento?.xMotivo || retorno?.xMotivo || "Cancelamento rejeitado pela SEFAZ"),
         cMsg ? `cMsg ${cMsg}` : "",
         xMsg,
       ]) || "Cancelamento rejeitado pela SEFAZ",
-    );
+      cMsg,
+      xMsg,
+      protocolo: infEvento?.nProt || null,
+      chave_acesso: params.chaveAcesso,
+      protocolo_autorizacao: protocoloCancelamento,
+      xml_envio: envEvento,
+      xml_retorno: xmlRet,
+    };
   }
 
   return {
@@ -652,7 +707,7 @@ function normalizarInfNFeParaXml(infNFe: any) {
   return {
     "@_Id": infNFe["@_Id"],
     "@_versao": infNFe["@_versao"] || infNFe.versao || "4.00",
-    ide: infNFe.ide,
+    ide: ordenarIdeNFe(infNFe.ide),
     emit: infNFe.emit,
     ...(infNFe.dest ? { dest: infNFe.dest } : {}),
     det: Array.isArray(infNFe.det)
@@ -669,10 +724,119 @@ function normalizarInfNFeParaXml(infNFe: any) {
   };
 }
 
+function ordenarIdeNFe(ide: any) {
+  const ordem = [
+    "cUF", "cNF", "natOp", "mod", "serie", "nNF", "dhEmi", "dhSaiEnt", "tpNF", "idDest",
+    "cMunFG", "tpImp", "tpEmis", "cDV", "tpAmb", "finNFe", "indFinal", "indPres", "indIntermed",
+    "procEmi", "verProc", "dhCont", "xJust",
+  ];
+  return ordenarObjetoPorCampos(ide || {}, ordem);
+}
+
+function ordenarObjetoPorCampos(obj: Record<string, unknown>, ordem: string[]) {
+  const ordenado: Record<string, unknown> = {};
+  for (const campo of ordem) {
+    if (obj[campo] !== undefined && obj[campo] !== null && obj[campo] !== "") {
+      ordenado[campo] = obj[campo];
+    }
+  }
+  for (const [campo, valor] of Object.entries(obj)) {
+    if (!(campo in ordenado) && valor !== undefined && valor !== null && valor !== "") {
+      ordenado[campo] = valor;
+    }
+  }
+  return ordenado;
+}
+
+function normalizarCamposSchemaNfce(infNFe: any) {
+  if (Array.isArray(infNFe.det)) {
+    infNFe.det.forEach((det: any, index: number) => {
+      det.nItem = parseInt(String(det.nItem || index + 1), 10);
+      const prod = det.prod || {};
+      prod.cProd = String(prod.cProd || index + 1).replace(/[^A-Za-z0-9]/g, "").slice(0, 60) || String(index + 1);
+      prod.xProd = String(prod.xProd || "PRODUTO").slice(0, 120);
+      prod.NCM = String(prod.NCM || "00000000").replace(/\D/g, "").padStart(8, "0").slice(0, 8);
+      prod.CFOP = String(prod.CFOP || "5102").replace(/\D/g, "").slice(0, 4);
+      prod.uCom = String(prod.uCom || "UN").slice(0, 6);
+      prod.uTrib = String(prod.uTrib || prod.uCom || "UN").slice(0, 6);
+      prod.qCom = formatarDecimalSchema(prod.qCom, 4);
+      prod.qTrib = formatarDecimalSchema(prod.qTrib ?? prod.qCom, 4);
+      prod.vUnCom = formatarDecimalSchema(prod.vUnCom, 10);
+      prod.vUnTrib = formatarDecimalSchema(prod.vUnTrib ?? prod.vUnCom, 10);
+      prod.vProd = formatarDecimalSchema(prod.vProd, 2);
+      prod.cEAN = normalizarGtin(prod.cEAN);
+      prod.cEANTrib = normalizarGtin(prod.cEANTrib);
+      det.prod = prod;
+    });
+    if (parseInt(String(infNFe.ide?.tpAmb || 2), 10) === 2 && infNFe.det[0]?.prod) {
+      infNFe.det[0].prod.xProd = "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL";
+    }
+  }
+
+  const total = infNFe.total?.ICMSTot;
+  if (total) {
+    [
+      "vBC", "vICMS", "vICMSDeson", "vFCP", "vBCST", "vST", "vFCPST", "vFCPSTRet",
+      "vProd", "vFrete", "vSeg", "vDesc", "vII", "vIPI", "vIPIDevol", "vPIS", "vCOFINS",
+      "vOutro", "vNF", "vTotTrib",
+    ].forEach((campo) => {
+      if (total[campo] !== undefined && total[campo] !== null) {
+        total[campo] = formatarDecimalSchema(total[campo], 2);
+      }
+    });
+  }
+
+  const detPag = infNFe.pag?.detPag;
+  const pagamentos = Array.isArray(detPag) ? detPag : (detPag ? [detPag] : []);
+  pagamentos.forEach((pag: any) => {
+    pag.tPag = String(pag.tPag || "99").replace(/\D/g, "").padStart(2, "0").slice(0, 2);
+    pag.vPag = formatarDecimalSchema(pag.vPag, 2);
+    if (pag.tPag !== "99") {
+      delete pag.xPag;
+    }
+  });
+  if (infNFe.pag?.vTroco !== undefined && infNFe.pag?.vTroco !== null) {
+    infNFe.pag.vTroco = formatarDecimalSchema(infNFe.pag.vTroco, 2);
+  }
+}
+
+function normalizarGtin(valor: unknown) {
+  const texto = String(valor || "").trim();
+  if (!texto || /^sem\s*gtin$/i.test(texto)) {
+    return "SEM GTIN";
+  }
+  return texto.replace(/\D/g, "") || "SEM GTIN";
+}
+
+function formatarDecimalSchema(valor: unknown, casas: number) {
+  const numero = Number(String(valor ?? 0).replace(",", "."));
+  return (Number.isFinite(numero) ? numero : 0).toFixed(casas);
+}
+
 function buildXml(obj: unknown) {
-  return create({ version: "1.0", encoding: "UTF-8" }, obj as Record<string, unknown>).end({
+  return create({ version: "1.0", encoding: "UTF-8" }, normalizarAtributosXmlBuilder(obj) as Record<string, unknown>).end({
     prettyPrint: false,
   });
+}
+
+function normalizarAtributosXmlBuilder(valor: unknown): unknown {
+  if (Array.isArray(valor)) {
+    return valor.map((item) => normalizarAtributosXmlBuilder(item));
+  }
+
+  if (!valor || typeof valor !== "object") {
+    return valor;
+  }
+
+  const normalizado: Record<string, unknown> = {};
+  for (const [chave, item] of Object.entries(valor as Record<string, unknown>)) {
+    const chaveNormalizada = chave.startsWith("@_")
+      ? `@${chave.slice(2)}`
+      : chave;
+    normalizado[chaveNormalizada] = normalizarAtributosXmlBuilder(item);
+  }
+
+  return normalizado;
 }
 
 function removerDeclaracaoXml(xml: string) {
@@ -699,7 +863,7 @@ function assinarXml(
       "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
     ],
     digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
-    uri: referenceUri,
+    id: referenceUri.replace(/^#/, ""),
   });
 
   signer.computeSignature(xml, {
@@ -718,15 +882,67 @@ async function gerarQrCode(params: {
   cscId: string;
   cscToken: string;
   qrCodeBaseUrl: string;
+  infNFe: any;
+  xmlAssinado: string;
 }) {
-  const dados = `${params.chaveAcesso}|2|${params.ambiente}|${params.cscId}|${params.cscToken}`;
-  const hashBuffer = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(dados));
-  const hash = Array.from(new Uint8Array(hashBuffer))
+  const ide = params.infNFe?.ide || {};
+  const total = params.infNFe?.total?.ICMSTot || {};
+  const digestValue = String(findNodeByLocalName(parser.parse(params.xmlAssinado), "DigestValue") || "");
+  const dhEmiHex = stringToHex(String(ide.dhEmi || ""));
+  const digValHex = stringToHex(digestValue);
+  const cDest = String(params.infNFe?.dest?.CPF || params.infNFe?.dest?.CNPJ || "").replace(/\D/g, "");
+  const idToken = String(params.cscId || "").replace(/\D/g, "").replace(/^0+/, "") || "0";
+  const tpEmis = parseInt(String(ide.tpEmis || 1), 10);
+  const dadosQr = tpEmis === 9
+    ? [
+      params.chaveAcesso,
+      "2",
+      String(params.ambiente),
+      cDest,
+      dhEmiHex,
+      formatarDecimalSchema(total.vNF, 2),
+      formatarDecimalSchema(total.vICMS, 2),
+      digValHex,
+      idToken,
+    ].join("|")
+    : [
+      params.chaveAcesso,
+      "2",
+      String(params.ambiente),
+      idToken,
+    ].join("|");
+  const hash = await sha1Hex(`${dadosQr}${params.cscToken}`);
+
+  return `${params.qrCodeBaseUrl}?p=${dadosQr}|${hash}`;
+}
+
+function inserirInfNFeSupl(xmlAssinado: string, qrCode: string, urlChave: string) {
+  const supl = `<infNFeSupl><qrCode>${escapeXml(qrCode.trim())}</qrCode><urlChave>${escapeXml(urlChave)}</urlChave></infNFeSupl>`;
+  return String(xmlAssinado).replace("<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">", `${supl}<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">`);
+}
+
+async function sha1Hex(texto: string) {
+  const hashBuffer = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(texto));
+  return Array.from(new Uint8Array(hashBuffer))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("")
     .toUpperCase();
+}
 
-  return `${params.qrCodeBaseUrl}?p=${params.chaveAcesso}|2|${params.ambiente}|${params.cscId}|${hash}`;
+function stringToHex(texto: string) {
+  return Array.from(new TextEncoder().encode(texto))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
+}
+
+function escapeXml(valor: string) {
+  return String(valor || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 function formatarDataHoraBrasil(data?: string) {
@@ -795,7 +1011,7 @@ function obterCodigoUf(uf: string) {
 
   const codigo = mapa[String(uf || "").toUpperCase()];
   if (!codigo) {
-    throw new Error(`UF inválida para NFC-e: ${uf}`);
+    throw new Error(`UF invÃƒÂ¡lida para NFC-e: ${uf}`);
   }
 
   return codigo;
@@ -810,54 +1026,415 @@ async function enviarSoap(params: {
 }) {
   const action = `${NFE_NS}/wsdl/${params.operacao}/${params.metodo}`;
   const xmlSemDeclaracao = removerDeclaracaoXml(params.xml);
-  const envelope = `<?xml version="1.0" encoding="utf-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-                 xmlns:soap12="${SOAP_NS}">
-  <soap12:Body>
-    <${params.metodo} xmlns="${NFE_NS}/wsdl/${params.operacao}">
-      <nfeDadosMsg>${xmlSemDeclaracao}</nfeDadosMsg>
-    </${params.metodo}>
-  </soap12:Body>
-</soap12:Envelope>`;
+  const envelopes = [
+    {
+      nome: "soap12_operacao_action",
+      action,
+      versao: "1.2" as const,
+      xml: montarEnvelopeSoapOperacao(params.operacao, params.metodo, xmlSemDeclaracao, "1.2"),
+    },
+    {
+      nome: "soap12_operacao_sem_action",
+      action: "",
+      versao: "1.2" as const,
+      xml: montarEnvelopeSoapOperacao(params.operacao, params.metodo, xmlSemDeclaracao, "1.2"),
+    },
+    {
+      nome: "soap12_dados_action",
+      action,
+      versao: "1.2" as const,
+      xml: montarEnvelopeSoapDados(params.operacao, xmlSemDeclaracao, "1.2"),
+    },
+    {
+      nome: "soap12_prefixed_action",
+      action,
+      versao: "1.2" as const,
+      xml: montarEnvelopeSoapOperacaoPrefixada(params.operacao, params.metodo, xmlSemDeclaracao),
+    },
+    {
+      nome: "soap12_dados_prefixed_action",
+      action,
+      versao: "1.2" as const,
+      xml: montarEnvelopeSoapDadosPrefixado(params.operacao, xmlSemDeclaracao),
+    },
+    {
+      nome: "soap12_header_action",
+      action,
+      versao: "1.2" as const,
+      xml: montarEnvelopeSoapComCabecalho(params.operacao, params.metodo, xmlSemDeclaracao, obterVersaoDados(params.operacao)),
+    },
+    {
+      nome: "soap11_operacao_action",
+      action,
+      versao: "1.1" as const,
+      xml: montarEnvelopeSoapOperacao(params.operacao, params.metodo, xmlSemDeclaracao, "1.1"),
+    },
+  ];
 
-  const client = Deno.createHttpClient({
-    cert: params.certificado.certChainPem,
-    key: params.certificado.privateKeyPem,
-    http1: true,
-    http2: false,
-  });
+  const tentativas: string[] = [];
+  let ultimoRetorno999 = "";
+  let ultimoErro: Error | null = null;
 
-  let response: Response;
+  for (const envelope of envelopes) {
+    try {
+      const xmlRet = await enviarSoapEnvelope({
+        url: params.url,
+        action: envelope.action,
+        versao: envelope.versao,
+        envelope: envelope.xml,
+        certificado: params.certificado,
+      });
+
+      const cStat = String(findNodeByLocalName(parser.parse(xmlRet), "cStat") || "");
+      const xMotivo = String(findNodeByLocalName(parser.parse(xmlRet), "xMotivo") || "");
+      if (cStat && cStat !== "999") {
+        return xmlRet;
+      }
+
+      tentativas.push(`${envelope.nome}: ${cStat || "sem cStat"} - ${xMotivo || "Sem motivo"}`);
+      if (cStat === "999") {
+        ultimoRetorno999 = xmlRet;
+      }
+    } catch (error) {
+      ultimoErro = error instanceof Error ? error : new Error(String(error));
+      tentativas.push(`${envelope.nome}: ${ultimoErro.message}`);
+    }
+  }
+
+  if (ultimoRetorno999) {
+    const erro = new Error(`SEFAZ retornou 999 em todas as tentativas SOAP: ${tentativas.join(" || ")}`);
+    (erro as any).xmlRetornoSefaz = ultimoRetorno999;
+    throw erro;
+  }
+
+  throw ultimoErro || new Error(`Falha ao enviar SOAP para a SEFAZ: ${tentativas.join(" || ")}`);
+}
+
+async function enviarSoapEnvelope(params: {
+  url: string;
+  action: string;
+  versao: "1.1" | "1.2";
+  envelope: string;
+  certificado: ReturnType<typeof parsePfx>;
+}) {
+  let response: {
+    status: number;
+    body: string;
+  };
   try {
-    // @ts-ignore Deno fetch accepts the custom client option.
-    response = await fetch(params.url, {
-      method: "POST",
-      client,
-      headers: {
-        "Content-Type": `application/soap+xml; charset=utf-8; action="${action}"`,
-        "Accept": "application/soap+xml, application/xml, text/xml",
-      },
-      body: envelope,
+    response = await enviarHttpsMutualTls({
+      url: params.url,
+      body: params.envelope,
+      certificado: params.certificado,
+      headers: montarHeadersSoap(params.action, params.versao),
     });
   } catch (error) {
     const mensagem = error instanceof Error ? error.message : String(error);
     if (/HandshakeFailure/i.test(mensagem)) {
       throw new Error(
-        `Falha no handshake TLS com a SEFAZ em ${params.url}. Verifique se o PFX A1 contém a cadeia ICP-Brasil completa, se a chave privada corresponde ao certificado e se o ambiente configurado está correto.`,
+        `Falha no handshake TLS com a SEFAZ em ${params.url}. Certificado: ${params.certificado.subject}. Emissor: ${params.certificado.issuer}. Cadeia enviada: ${params.certificado.chainLength} certificado(s). Erro original: ${mensagem}`,
       );
     }
 
-    throw new Error(`Falha ao conectar na SEFAZ em ${params.url}: ${mensagem}`);
+    throw new Error(`Falha ao conectar na SEFAZ em ${params.url}. Certificado: ${params.certificado.subject}. Cadeia enviada: ${params.certificado.chainLength} certificado(s). Erro original: ${mensagem}`);
   }
 
-  const text = await response.text();
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(`SEFAZ retornou HTTP ${response.status}: ${response.body}`);
+  }
 
+  return response.body;
+}
+
+function montarEnvelopeSoapOperacao(operacao: string, metodo: string, xmlSemDeclaracao: string, versao: "1.1" | "1.2") {
+  if (versao === "1.1") {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <${metodo} xmlns="${NFE_NS}/wsdl/${operacao}">
+      <nfeDadosMsg>${xmlSemDeclaracao}</nfeDadosMsg>
+    </${metodo}>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:soap12="${SOAP_NS}">
+  <soap12:Body>
+    <${metodo} xmlns="${NFE_NS}/wsdl/${operacao}">
+      <nfeDadosMsg>${xmlSemDeclaracao}</nfeDadosMsg>
+    </${metodo}>
+  </soap12:Body>
+</soap12:Envelope>`;
+}
+
+function montarEnvelopeSoapDadosPrefixado(operacao: string, xmlSemDeclaracao: string) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:soap12="${SOAP_NS}"
+                 xmlns:ns1="${NFE_NS}/wsdl/${operacao}">
+  <soap12:Body>
+    <ns1:nfeDadosMsg>${xmlSemDeclaracao}</ns1:nfeDadosMsg>
+  </soap12:Body>
+</soap12:Envelope>`;
+}
+
+function montarEnvelopeSoapOperacaoPrefixada(operacao: string, metodo: string, xmlSemDeclaracao: string) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:soap12="${SOAP_NS}"
+                 xmlns:ns1="${NFE_NS}/wsdl/${operacao}">
+  <soap12:Body>
+    <ns1:${metodo}>
+      <nfeDadosMsg>${xmlSemDeclaracao}</nfeDadosMsg>
+    </ns1:${metodo}>
+  </soap12:Body>
+</soap12:Envelope>`;
+}
+
+function montarEnvelopeSoapComCabecalho(operacao: string, metodo: string, xmlSemDeclaracao: string, versaoDados: string) {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:soap12="${SOAP_NS}">
+  <soap12:Header>
+    <nfeCabecMsg xmlns="${NFE_NS}/wsdl/${operacao}">
+      <cUF>52</cUF>
+      <versaoDados>${versaoDados}</versaoDados>
+    </nfeCabecMsg>
+  </soap12:Header>
+  <soap12:Body>
+    <${metodo} xmlns="${NFE_NS}/wsdl/${operacao}">
+      <nfeDadosMsg>${xmlSemDeclaracao}</nfeDadosMsg>
+    </${metodo}>
+  </soap12:Body>
+</soap12:Envelope>`;
+}
+
+function obterVersaoDados(operacao: string) {
+  return operacao === "NFeRecepcaoEvento4" ? "1.00" : "4.00";
+}
+
+function montarEnvelopeSoapDados(operacao: string, xmlSemDeclaracao: string, versao: "1.1" | "1.2") {
+  if (versao === "1.1") {
+    return `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <nfeDadosMsg xmlns="${NFE_NS}/wsdl/${operacao}">${xmlSemDeclaracao}</nfeDadosMsg>
+  </soap:Body>
+</soap:Envelope>`;
+  }
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                 xmlns:soap12="${SOAP_NS}">
+  <soap12:Body>
+    <nfeDadosMsg xmlns="${NFE_NS}/wsdl/${operacao}">${xmlSemDeclaracao}</nfeDadosMsg>
+  </soap12:Body>
+</soap12:Envelope>`;
+}
+
+function montarHeadersSoap(action: string, versao: "1.1" | "1.2") {
+  if (versao === "1.1") {
+    const headers: Record<string, string> = {
+      "Content-Type": "text/xml; charset=utf-8",
+      "Accept": "application/soap+xml, application/xml, text/xml",
+    };
+    if (action) {
+      headers.SOAPAction = `"${action}"`;
+    }
+    return headers;
+  }
+
+  const contentType = action
+    ? `application/soap+xml; charset=utf-8; action="${action}"`
+    : "application/soap+xml; charset=utf-8";
+
+  return {
+    "Content-Type": contentType,
+    "Accept": "application/soap+xml, application/xml, text/xml",
+  };
+}
+
+async function enviarHttpsMutualTls(params: {
+  url: string;
+  body: string;
+  certificado: ReturnType<typeof parsePfx>;
+  headers: Record<string, string>;
+}) {
+  const proxyUrl = String(Deno.env.get("SEFAZ_SOAP_PROXY_URL") || "").trim();
+  if (proxyUrl) {
+    return await enviarSoapViaProxy({
+      proxyUrl,
+      url: params.url,
+      body: params.body,
+      headers: params.headers,
+      certificado: params.certificado,
+    });
+  }
+
+  const destino = new URL(params.url);
+  const hostname = destino.hostname;
+  const port = destino.port ? parseInt(destino.port, 10) : 443;
+  const path = `${destino.pathname || "/"}${destino.search || ""}`;
+  const bodyBytes = new TextEncoder().encode(params.body);
+  const headerLines = [
+    `POST ${path} HTTP/1.1`,
+    `Host: ${hostname}`,
+    "Connection: close",
+    "Expect:",
+    `Content-Length: ${bodyBytes.length}`,
+    ...Object.entries(params.headers).map(([key, value]) => `${key}: ${value}`),
+    "",
+    "",
+  ];
+
+  const conn = await Deno.connectTls({
+    hostname,
+    port,
+    cert: params.certificado.certChainPem,
+    key: params.certificado.privateKeyPem,
+    alpnProtocols: ["http/1.1"],
+  });
+
+  try {
+    const headerBytes = new TextEncoder().encode(headerLines.join("\r\n"));
+    await conn.write(headerBytes);
+    await conn.write(bodyBytes);
+
+    const chunks: Uint8Array[] = [];
+    const buffer = new Uint8Array(16 * 1024);
+    while (true) {
+      const n = await conn.read(buffer);
+      if (n === null) {
+        break;
+      }
+      chunks.push(buffer.slice(0, n));
+    }
+
+    const rawBytes = concatenarBytes(chunks);
+    const rawText = new TextDecoder().decode(rawBytes);
+    return parseHttpResponse(rawText);
+  } finally {
+    conn.close();
+  }
+}
+
+async function enviarSoapViaProxy(params: {
+  proxyUrl: string;
+  url: string;
+  body: string;
+  certificado: ReturnType<typeof parsePfx>;
+  headers: Record<string, string>;
+}) {
+  const secret = String(Deno.env.get("SEFAZ_SOAP_PROXY_SECRET") || "").trim();
+  if (!secret) {
+    throw new Error("SEFAZ_SOAP_PROXY_SECRET nao configurado na Edge Function");
+  }
+
+  const response = await fetch(params.proxyUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-sefaz-proxy-secret": secret,
+    },
+    body: JSON.stringify({
+      url: params.url,
+      body: params.body,
+      headers: params.headers,
+      certChainPem: params.certificado.certChainPem,
+      privateKeyPem: params.certificado.privateKeyPem,
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(`SEFAZ retornou HTTP ${response.status}: ${text}`);
+    throw new Error(data?.erro || `Proxy SEFAZ retornou HTTP ${response.status}`);
   }
 
-  return text;
+  return {
+    status: Number(data?.status || 0),
+    body: String(data?.body || ""),
+  };
+}
+
+function concatenarBytes(chunks: Uint8Array[]) {
+  const total = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+function parseHttpResponse(raw: string) {
+  const headerEnd = raw.indexOf("\r\n\r\n");
+  if (headerEnd === -1) {
+    throw new Error(`Resposta HTTP invalida da SEFAZ: ${raw.slice(0, 500)}`);
+  }
+
+  const headerText = raw.slice(0, headerEnd);
+  const bodyText = raw.slice(headerEnd + 4);
+  const headerLines = headerText.split(/\r\n/);
+  const statusMatch = headerLines[0]?.match(/^HTTP\/\d(?:\.\d)?\s+(\d+)/);
+  if (!statusMatch) {
+    throw new Error(`Status HTTP invalido da SEFAZ: ${headerLines[0] || ""}`);
+  }
+
+  const headers = new Map<string, string>();
+  for (const line of headerLines.slice(1)) {
+    const sep = line.indexOf(":");
+    if (sep > -1) {
+      headers.set(line.slice(0, sep).trim().toLowerCase(), line.slice(sep + 1).trim());
+    }
+  }
+
+  const body = headers.get("transfer-encoding")?.toLowerCase().includes("chunked")
+    ? decodificarChunked(bodyText)
+    : bodyText;
+
+  return {
+    status: parseInt(statusMatch[1], 10),
+    body,
+  };
+}
+
+function decodificarChunked(body: string) {
+  let pos = 0;
+  let out = "";
+
+  while (pos < body.length) {
+    const lineEnd = body.indexOf("\r\n", pos);
+    if (lineEnd === -1) {
+      break;
+    }
+
+    const sizeText = body.slice(pos, lineEnd).split(";", 1)[0].trim();
+    const size = parseInt(sizeText, 16);
+    if (!Number.isFinite(size) || size < 0) {
+      return body;
+    }
+    if (size === 0) {
+      break;
+    }
+
+    const chunkStart = lineEnd + 2;
+    out += body.slice(chunkStart, chunkStart + size);
+    pos = chunkStart + size + 2;
+  }
+
+  return out;
 }
 
 function findNodeByLocalName(node: any, localName: string): any {

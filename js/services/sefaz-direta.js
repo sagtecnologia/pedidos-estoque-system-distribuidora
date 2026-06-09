@@ -8,9 +8,7 @@ const SefazDireta = {
             'apikey': SUPABASE_ANON_KEY
         };
 
-        if (session?.access_token) {
-            headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
+        headers['Authorization'] = `Bearer ${session?.access_token || SUPABASE_ANON_KEY}`;
 
         const response = await fetch(this.ENDPOINT, {
             method: 'POST',
@@ -174,6 +172,7 @@ const SefazDireta = {
 
         if (!resultado?.success) {
             const rejeicao = this.montarResultadoRejeicao(resultado, vendaData, payload);
+            this.salvarDiagnosticoEmissao(rejeicao);
             const erro = new Error(rejeicao.mensagem || 'Falha ao emitir NFC-e pela SEFAZ direta');
             erro.detalhesFiscal = rejeicao;
             throw erro;
@@ -217,6 +216,27 @@ const SefazDireta = {
                 api_provider: 'sefaz_direta'
             }
         };
+    },
+
+    salvarDiagnosticoEmissao(rejeicao) {
+        try {
+            const diagnostico = {
+                criado_em: new Date().toISOString(),
+                provider: 'sefaz_direta',
+                status: rejeicao?.status_sefaz || rejeicao?.status || '999',
+                mensagem: rejeicao?.mensagem || '',
+                chave_acesso: rejeicao?.chave_acesso || null,
+                xml_assinado: rejeicao?.documentoFiscalData?.xml_nota || null,
+                xml_envio: rejeicao?.xml_envio || null,
+                xml_retorno: rejeicao?.xml_retorno || null,
+                resultado_bruto: rejeicao?.resultado_bruto || null
+            };
+            localStorage.setItem('sefaz_direta_ultimo_diagnostico', JSON.stringify(diagnostico, null, 2));
+            window.sefazDiretaUltimoDiagnostico = diagnostico;
+            console.warn('[SEFAZ Direta] Diagnostico salvo em localStorage: sefaz_direta_ultimo_diagnostico', diagnostico);
+        } catch (error) {
+            console.warn('[SEFAZ Direta] Falha ao salvar diagnostico local:', error);
+        }
     },
 
     montarResultadoRejeicao(resultado, vendaData, payload) {
@@ -263,6 +283,7 @@ const SefazDireta = {
             provider: 'sefaz_direta',
             mensagem,
             xml_retorno: xmlRetorno,
+            xml_envio: resultado?.xml_envio || null,
             resultado_bruto: resultado,
             documentoFiscalData: {
                 tipo_documento: 'NFCE',
@@ -277,7 +298,9 @@ const SefazDireta = {
                 data_emissao: dataEmissao,
                 data_autorizacao: null,
                 xml_nota: resultado?.xml_assinado || null,
-                xml_retorno: xmlRetorno,
+                xml_retorno: resultado?.xml_envio
+                    ? JSON.stringify({ xml_envio: resultado.xml_envio, xml_retorno: xmlRetorno })
+                    : xmlRetorno,
                 tentativas_emissao: 1,
                 ultima_tentativa: new Date().toISOString(),
                 api_provider: 'sefaz_direta'
@@ -287,37 +310,116 @@ const SefazDireta = {
 
     async consultarDocumento(chaveAcesso, tipo = 'nfce') {
         const config = await this.getConfig();
+        const chaveLimpa = String(chaveAcesso || '').replace(/\D/g, '');
         const resultado = await this.invoke('consultar', {
             ambiente: parseInt(config.focusnfe_ambiente || config.nuvemfiscal_ambiente || 2, 10),
             uf: config.estado,
-            chave_acesso: chaveAcesso,
+            chave_acesso: chaveLimpa,
             tipo
         });
 
         return {
             ...resultado,
-            caminho_danfe: await this.baixarDANFE(chaveAcesso, tipo)
+            caminho_danfe: await this.baixarDANFE(chaveLimpa, tipo)
         };
     },
 
     async cancelarDocumento(chaveAcesso, justificativa, tipo = 'nfce') {
         const config = await this.getConfig();
-        const resultado = await this.invoke('cancelar', {
+        const chaveLimpa = String(chaveAcesso || '').replace(/\D/g, '');
+        const protocoloAutorizacao = await this.obterProtocoloAutorizacao(chaveLimpa);
+        console.log(`[SEFAZ Direta] Cancelamento chave=${chaveLimpa} protocolo=${protocoloAutorizacao || 'NAO_ENCONTRADO'}`);
+        console.log('[SEFAZ Direta] Cancelando documento', {
+            chave_original: chaveAcesso,
+            chave_limpa: chaveLimpa,
+            protocolo_autorizacao: protocoloAutorizacao,
             ambiente: parseInt(config.focusnfe_ambiente || config.nuvemfiscal_ambiente || 2, 10),
             uf: config.estado,
-            chave_acesso: chaveAcesso,
-            justificativa,
             tipo
         });
 
+        const resultado = await this.invoke('cancelar', {
+            ambiente: parseInt(config.focusnfe_ambiente || config.nuvemfiscal_ambiente || 2, 10),
+            uf: config.estado,
+            chave_acesso: chaveLimpa,
+            justificativa,
+            tipo,
+            protocolo_autorizacao: protocoloAutorizacao
+        });
+
+        if (!resultado?.success) {
+            this.salvarDiagnosticoCancelamento({
+                chave_acesso: chaveLimpa,
+                protocolo_autorizacao: protocoloAutorizacao,
+                resultado
+            });
+            console.warn('[SEFAZ Direta] Cancelamento rejeitado', resultado);
+            throw new Error(resultado?.mensagem || resultado?.erro || 'Cancelamento rejeitado pela SEFAZ');
+        }
+
         return {
-            sucesso: !!resultado.success,
+            sucesso: true,
             status: resultado.status || 'cancelado',
-            status_sefaz: resultado.status_sefaz || '135',
+            status_sefaz: resultado.status_sefaz,
             protocolo: resultado.protocolo,
             mensagem: resultado.mensagem || 'Cancelamento autorizado pela SEFAZ',
             provider: 'sefaz_direta'
         };
+    },
+
+    salvarDiagnosticoCancelamento({ chave_acesso, protocolo_autorizacao, resultado }) {
+        try {
+            const diagnostico = {
+                criado_em: new Date().toISOString(),
+                provider: 'sefaz_direta',
+                acao: 'cancelar',
+                status: resultado?.status_sefaz || resultado?.status || null,
+                mensagem: resultado?.mensagem || '',
+                chave_acesso,
+                protocolo_autorizacao,
+                xml_envio: resultado?.xml_envio || null,
+                xml_retorno: resultado?.xml_retorno || null,
+                resultado_bruto: resultado || null
+            };
+            localStorage.setItem('sefaz_direta_ultimo_cancelamento', JSON.stringify(diagnostico, null, 2));
+            window.sefazDiretaUltimoCancelamento = diagnostico;
+            console.warn('[SEFAZ Direta] Diagnostico de cancelamento salvo: sefaz_direta_ultimo_cancelamento', diagnostico);
+        } catch (error) {
+            console.warn('[SEFAZ Direta] Falha ao salvar diagnostico de cancelamento:', error);
+        }
+    },
+
+    async obterProtocoloAutorizacao(chaveAcesso) {
+        const chaveLimpa = String(chaveAcesso || '').replace(/\D/g, '');
+
+        const { data: doc } = await supabase
+            .from('documentos_fiscais')
+            .select('protocolo_autorizacao, xml_nota, xml_retorno')
+            .eq('chave_acesso', chaveLimpa)
+            .maybeSingle();
+
+        const protocoloDoc = String(doc?.protocolo_autorizacao || '').replace(/\D/g, '');
+        if (protocoloDoc) return protocoloDoc;
+
+        const xmlDoc = doc?.xml_nota || doc?.xml_retorno || '';
+        const protocoloXmlDoc = this.extrairProtocoloXml(xmlDoc);
+        if (protocoloXmlDoc) return protocoloXmlDoc;
+
+        const { data: venda } = await supabase
+            .from('vendas')
+            .select('protocolo_nfce, xml_nfce')
+            .eq('chave_acesso_nfce', chaveLimpa)
+            .maybeSingle();
+
+        const protocoloVenda = String(venda?.protocolo_nfce || '').replace(/\D/g, '');
+        if (protocoloVenda) return protocoloVenda;
+
+        return this.extrairProtocoloXml(venda?.xml_nfce || '');
+    },
+
+    extrairProtocoloXml(xml) {
+        const match = String(xml || '').match(/<nProt>(\d+)<\/nProt>/);
+        return match?.[1] || null;
     },
 
     async obterXmlSalvo(chaveAcesso) {
