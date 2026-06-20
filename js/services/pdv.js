@@ -4,6 +4,14 @@
  */
 
 class PDVSystem {
+    static obterChaveRascunhoVenda() {
+        return 'pdv-rascunho-venda';
+    }
+
+    static obterTtlRascunhoVendaMs() {
+        return 6 * 60 * 60 * 1000;
+    }
+
     /**
      * Inicializa o PDV
      */
@@ -14,6 +22,7 @@ class PDVSystem {
             this.caixaAtual = null;
             this.movimentacaoAtual = null;
             this.vendaAtual = null;
+            this.operadorAtualId = null;
             this.itensCarrinho = [];
             
             // Setup de eventos primeiro
@@ -21,9 +30,13 @@ class PDVSystem {
             
             // Verificar se existe caixa aberto
             await this.verificarCaixaAberta();
+
+            this.restaurarRascunhoVenda();
             
             // Atualizar interface depois
             this.atualizarUI();
+
+            this.configurarPersistenciaRascunho();
             
             // Se não houver caixa aberto, exibir modal automaticamente
             if (!this.caixaAtual || !this.movimentacaoAtual) {
@@ -50,11 +63,15 @@ class PDVSystem {
             
             if (!authUser) {
                 console.log('⭕ Nenhum usuário autenticado');
+                this.operadorAtualId = null;
                 this.movimentacaoAtual = null;
                 this.caixaAtual = null;
+                this.limparRascunhoVenda();
                 this.atualizarStatusCaixa(false);
                 return;
             }
+
+            this.operadorAtualId = authUser.id;
 
             console.log('🔍 [VERIFICAÇÃO] Operador:', authUser.id, authUser.email);
             console.log('🔍 [VERIFICAÇÃO] Buscando caixa_sessoes com filtros:');
@@ -91,6 +108,7 @@ class PDVSystem {
                 console.log('   Limpando estado do PDV...');
                 this.movimentacaoAtual = null;
                 this.caixaAtual = null;
+                this.limparRascunhoVenda();
                 console.log('   Estado limpo:', { movimentacaoAtual: this.movimentacaoAtual, caixaAtual: this.caixaAtual });
                 this.atualizarStatusCaixa(false);
             } else {
@@ -103,6 +121,7 @@ class PDVSystem {
                     console.log('   Ignorando este registro e tratando como sem caixa aberto');
                     this.movimentacaoAtual = null;
                     this.caixaAtual = null;
+                    this.limparRascunhoVenda();
                     this.atualizarStatusCaixa(false);
                     return;
                 }
@@ -130,6 +149,179 @@ class PDVSystem {
             this.caixaAtual = null;
             this.atualizarStatusCaixa(false);
         }
+    }
+
+    static configurarPersistenciaRascunho() {
+        if (this.pageHideRascunhoHandler) {
+            window.removeEventListener('pagehide', this.pageHideRascunhoHandler);
+        }
+
+        this.pageHideRascunhoHandler = () => {
+            this.salvarRascunhoVenda('saida_pagina');
+        };
+
+        window.addEventListener('pagehide', this.pageHideRascunhoHandler);
+
+        const linkComandas = document.getElementById('menu-comandas');
+        if (linkComandas && !linkComandas.dataset.pdvRascunhoHooked) {
+            linkComandas.dataset.pdvRascunhoHooked = '1';
+            linkComandas.addEventListener('click', (event) => {
+                if (!this.itensCarrinho || this.itensCarrinho.length === 0) {
+                    return;
+                }
+
+                event.preventDefault();
+                const rascunhoSalvo = this.salvarRascunhoVenda('atalho_comandas');
+                if (rascunhoSalvo === false) {
+                    showToast('Nao foi possivel salvar o rascunho do PDV. Permanecendo na tela para evitar perda.', 'error');
+                    return;
+                }
+
+                showToast('Rascunho do PDV salvo. Abrindo Comandas...', 'info');
+                window.location.href = linkComandas.href;
+            });
+        }
+    }
+
+    static sanitizarItemRascunho(item, index = 0) {
+        const quantidade = parseFloat(item?.quantidade) || 0;
+        const precoUnitario = parseFloat(item?.preco_unitario) || 0;
+        const desconto = parseFloat(item?.desconto) || 0;
+        const acrescimo = parseFloat(item?.acrescimo) || 0;
+        const subtotalCalculado = quantidade * precoUnitario;
+        const subtotal = Number.isFinite(parseFloat(item?.subtotal))
+            ? parseFloat(item.subtotal)
+            : subtotalCalculado;
+
+        return {
+            id: item?.id || `item-rascunho-${Date.now()}-${index}`,
+            produto_id: item?.produto_id || item?.produto?.id || null,
+            quantidade,
+            unidade_medida: item?.unidade_medida || item?.produto?.unidade_venda || 'UN',
+            preco_unitario: precoUnitario,
+            subtotal,
+            desconto,
+            acrescimo,
+            produto: {
+                id: item?.produto?.id || item?.produto_id || null,
+                nome: item?.produto?.nome || item?.nome_produto || 'Produto',
+                codigo_barras: item?.produto?.codigo_barras || null,
+                sku: item?.produto?.sku || null,
+                unidade_venda: item?.produto?.unidade_venda || item?.unidade_medida || 'UN',
+                ncm: item?.produto?.ncm || null,
+                cfop: item?.produto?.cfop || null,
+                cst_icms: item?.produto?.cst_icms || null,
+                aliquota_icms: parseFloat(item?.produto?.aliquota_icms) || 0,
+                exige_estoque: item?.produto?.exige_estoque
+            }
+        };
+    }
+
+    static salvarRascunhoVenda(origem = 'auto') {
+        if (typeof sessionStorage === 'undefined') {
+            return false;
+        }
+
+        if (!this.itensCarrinho || this.itensCarrinho.length === 0) {
+            this.limparRascunhoVenda();
+            return true;
+        }
+
+        if (!this.operadorAtualId || !this.movimentacaoAtual?.id) {
+            return false;
+        }
+
+        try {
+            const agora = Date.now();
+            const payload = {
+                versao: 1,
+                origem,
+                salvo_em: new Date(agora).toISOString(),
+                expira_em: new Date(agora + this.obterTtlRascunhoVendaMs()).toISOString(),
+                operador_id: this.operadorAtualId,
+                caixa_sessao_id: this.movimentacaoAtual.id,
+                caixa_id: this.caixaAtual?.id || this.movimentacaoAtual?.caixa_id || null,
+                itens: this.itensCarrinho.map((item, index) => this.sanitizarItemRascunho(item, index))
+            };
+
+            sessionStorage.setItem(this.obterChaveRascunhoVenda(), JSON.stringify(payload));
+            return true;
+        } catch (error) {
+            console.warn('Nao foi possivel salvar o rascunho do PDV:', error);
+            return false;
+        }
+    }
+
+    static lerRascunhoVenda() {
+        if (typeof sessionStorage === 'undefined') {
+            return null;
+        }
+
+        const bruto = sessionStorage.getItem(this.obterChaveRascunhoVenda());
+        if (!bruto) {
+            return null;
+        }
+
+        try {
+            const payload = JSON.parse(bruto);
+            const expiraEm = payload?.expira_em ? new Date(payload.expira_em).getTime() : 0;
+
+            if (!payload?.itens || !Array.isArray(payload.itens) || payload.itens.length === 0) {
+                this.limparRascunhoVenda();
+                return null;
+            }
+
+            if (!expiraEm || Date.now() > expiraEm) {
+                this.limparRascunhoVenda();
+                return null;
+            }
+
+            return payload;
+        } catch (error) {
+            console.warn('Rascunho do PDV invalido. Limpando sessao temporaria.', error);
+            this.limparRascunhoVenda();
+            return null;
+        }
+    }
+
+    static restaurarRascunhoVenda() {
+        const payload = this.lerRascunhoVenda();
+        if (!payload) {
+            return false;
+        }
+
+        if (!this.operadorAtualId || !this.movimentacaoAtual?.id) {
+            return false;
+        }
+
+        if (payload.operador_id !== this.operadorAtualId || payload.caixa_sessao_id !== this.movimentacaoAtual.id) {
+            this.limparRascunhoVenda();
+            return false;
+        }
+
+        if (this.itensCarrinho && this.itensCarrinho.length > 0) {
+            return false;
+        }
+
+        this.itensCarrinho = payload.itens
+            .map((item, index) => this.sanitizarItemRascunho(item, index))
+            .filter(item => item.produto_id);
+
+        if (this.itensCarrinho.length === 0) {
+            this.limparRascunhoVenda();
+            return false;
+        }
+
+        showToast('Rascunho do PDV restaurado automaticamente.', 'info');
+        return true;
+    }
+
+    static limparRascunhoVenda() {
+        if (typeof sessionStorage === 'undefined') {
+            return;
+        }
+
+        sessionStorage.removeItem(this.obterChaveRascunhoVenda());
     }
 
     /**
@@ -707,6 +899,7 @@ class PDVSystem {
             this.movimentacaoAtual = null;
             this.caixaAtual = null;
             this.itensCarrinho = [];
+            this.limparRascunhoVenda();
             
             if (modal) modal.remove();
             this.exibirSucesso('Caixa fechado com sucesso!');
@@ -879,6 +1072,13 @@ class PDVSystem {
         this.atualizarCarrinho();
     }
 
+    static limparCarrinho() {
+        this.itensCarrinho = [];
+        this.vendaAtual = null;
+        this.limparRascunhoVenda();
+        this.atualizarCarrinho();
+    }
+
     /**
      * Atualizar quantidade do item
      */
@@ -1026,6 +1226,8 @@ class PDVSystem {
             acrescimo: acrescimoTotal,
             total: totalGeral
         };
+
+        this.salvarRascunhoVenda('atualizacao_carrinho');
     }
 
     /**
@@ -1204,6 +1406,7 @@ class PDVSystem {
 
             this.exibirSucesso('Venda finalizada com sucesso!');
             this.itensCarrinho = [];
+            this.limparRascunhoVenda();
             this.atualizarCarrinho();
             
             return {
@@ -2151,6 +2354,8 @@ class PDVSystem {
         
         // Limpar carrinho e atualizar UI
         this.itensCarrinho = [];
+        this.vendaAtual = null;
+        this.limparRascunhoVenda();
         this.atualizarCarrinho();
         this.atualizarUI();
         
