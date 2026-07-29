@@ -334,20 +334,40 @@ class DistribuicaoNFCeService {
                 natureza_operacao: 'DISTRIBUICAO',
                 data_emissao: dataEmissaoSefaz,
                 data_autorizacao: dataAutorizacaoSefaz,
-                xml_nota: resultadoFiscal.caminho_xml || resultadoFiscal.documentoFiscalData?.xml_nota || null,
-                xml_retorno: JSON.stringify(resultadoFiscal),
+                xml_nota: resultadoFiscal.xml_proc || resultadoFiscal.xml || resultadoFiscal.caminho_xml || resultadoFiscal.documentoFiscalData?.xml_nota || null,
+                xml_retorno: resultadoFiscal.documentoFiscalData?.xml_retorno || JSON.stringify(resultadoFiscal),
                 tentativas_emissao: 1,
                 ultima_tentativa: new Date().toISOString(),
                 api_provider: resultadoFiscal.provider || 'nuvem_fiscal',
                 nfce_id: nfceIdFinal // ✅ CRITICAL: ID da nota na Nuvem Fiscal para impressão/consulta
             };
 
-            let documentoFiscalId = null;
-            const { error: erroDocumento, data: docInserido } = await supabase
-                .from('documentos_fiscais')
-                .insert([documentoFiscalData])
-                .select('id')
-                .single();
+            // A Edge Function salva imediatamente após a autorização. Reutilizar
+            // esse registro pela ID/chave evita duplicidade e apenas complementa
+            // os dados específicos da distribuição.
+            let documentoFiscalId = resultadoFiscal.documento_fiscal_id || null;
+            if (!documentoFiscalId && chaveAcessoFinal) {
+                const { data: docExistente } = await supabase
+                    .from('documentos_fiscais')
+                    .select('id')
+                    .eq('chave_acesso', chaveAcessoFinal)
+                    .maybeSingle();
+                documentoFiscalId = docExistente?.id || null;
+            }
+
+            const operacaoDocumento = documentoFiscalId
+                ? supabase
+                    .from('documentos_fiscais')
+                    .update(documentoFiscalData)
+                    .eq('id', documentoFiscalId)
+                    .select('id')
+                    .single()
+                : supabase
+                    .from('documentos_fiscais')
+                    .insert([documentoFiscalData])
+                    .select('id')
+                    .single();
+            const { error: erroDocumento, data: docInserido } = await operacaoDocumento;
 
             if (erroDocumento) {
                 console.error('❌ [DistribuicaoNFCe] ERRO CRÍTICO ao salvar documento fiscal:', erroDocumento.message);

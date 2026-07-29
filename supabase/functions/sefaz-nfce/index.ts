@@ -7,6 +7,7 @@ import forge from "npm:node-forge@1.3.1";
 
 const NFE_NS = "http://www.portalfiscal.inf.br/nfe";
 const SOAP_NS = "http://www.w3.org/2003/05/soap-envelope";
+const DISTRIBUICAO_DFE_URL = "https://www1.nfe.fazenda.gov.br/NFeDistribuicaoDFe/NFeDistribuicaoDFe.asmx";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -99,6 +100,14 @@ serve(async (req) => {
           justificativa: body?.justificativa,
           protocoloAutorizacao: body?.protocolo_autorizacao,
         }));
+      case "consultar_nfe_entrada":
+        return jsonResponse(await consultarNfeEntradaPorChave({
+          certificado,
+          empresa,
+          uf,
+          ambiente,
+          chaveAcesso: normalizarChaveAcesso(body?.chave_acesso),
+        }));
       default:
         throw new Error(`AÃƒÂ§ÃƒÂ£o nÃƒÂ£o suportada: ${action}`);
     }
@@ -134,10 +143,6 @@ async function carregarEmpresa() {
 
   if (!data.certificado_digital || !data.senha_certificado) {
     throw new Error("Certificado digital A1 nÃƒÂ£o configurado");
-  }
-
-  if (!data.csc_id || !data.csc_token) {
-    throw new Error("CSC ID e CSC Token nÃƒÂ£o configurados");
   }
 
   return data;
@@ -373,6 +378,9 @@ async function emitirNfce(params: {
   if (!params.payload?.infNFe) {
     throw new Error("Payload da NFC-e nÃƒÂ£o informado");
   }
+  if (!params.empresa.csc_id || !params.empresa.csc_token) {
+    throw new Error("CSC ID e CSC Token nao configurados");
+  }
 
   const payload = structuredClone(params.payload);
   const infNFe = payload.infNFe;
@@ -494,6 +502,20 @@ async function emitirNfce(params: {
     },
   });
 
+  const persistencia = await persistirDocumentoAutorizado({
+    chaveAcesso,
+    numero: parseInt(numero, 10),
+    serie: parseInt(serie, 10),
+    protocolo: infProt?.nProt || null,
+    mensagem: mensagemCompleta || xMotivo,
+    dataEmissao: dhEmi,
+    dataAutorizacao: infProt?.dhRecbto || null,
+    valorTotal: Number(infNFe.total?.ICMSTot?.vNF || 0),
+    naturezaOperacao: String(infNFe.ide?.natOp || "VENDA"),
+    xmlProc,
+    xmlRetorno: xmlRet,
+  });
+
   return {
     success: true,
     status: "autorizado",
@@ -510,7 +532,65 @@ async function emitirNfce(params: {
     xml_assinado: xmlAssinadoComSupl,
     xml_proc: xmlProc,
     xml_retorno: xmlRet,
+    documento_fiscal_id: persistencia.id,
+    persistido_no_servidor: persistencia.success,
+    erro_persistencia: persistencia.erro || null,
   };
+}
+
+async function persistirDocumentoAutorizado(params: {
+  chaveAcesso: string;
+  numero: number;
+  serie: number;
+  protocolo: string | null;
+  mensagem: string;
+  dataEmissao: string;
+  dataAutorizacao: string | null;
+  valorTotal: number;
+  naturezaOperacao: string;
+  xmlProc: string;
+  xmlRetorno: string;
+}) {
+  const dados = {
+    tipo_documento: "NFCE",
+    numero_documento: String(params.numero),
+    serie: params.serie,
+    chave_acesso: params.chaveAcesso,
+    protocolo_autorizacao: params.protocolo,
+    status_sefaz: "100",
+    mensagem_sefaz: params.mensagem,
+    xml_nota: params.xmlProc,
+    xml_retorno: params.xmlRetorno,
+    valor_total: params.valorTotal,
+    natureza_operacao: params.naturezaOperacao,
+    data_emissao: params.dataEmissao,
+    data_autorizacao: params.dataAutorizacao,
+    tentativas_emissao: 1,
+    ultima_tentativa: new Date().toISOString(),
+    api_provider: "sefaz_direta",
+    updated_at: new Date().toISOString(),
+  };
+
+  try {
+    const { data: existente, error: erroConsulta } = await supabase
+      .from("documentos_fiscais")
+      .select("id")
+      .eq("chave_acesso", params.chaveAcesso)
+      .maybeSingle();
+    if (erroConsulta) throw erroConsulta;
+
+    const operacao = existente?.id
+      ? supabase.from("documentos_fiscais").update(dados).eq("id", existente.id).select("id").single()
+      : supabase.from("documentos_fiscais").insert(dados).select("id").single();
+    const { data, error } = await operacao;
+    if (error) throw error;
+
+    return { success: true, id: data.id as string, erro: null };
+  } catch (error) {
+    const mensagem = error instanceof Error ? error.message : String(error);
+    console.error("[sefaz-nfce] NFC-e autorizada, mas falhou persistencia imediata:", mensagem);
+    return { success: false, id: null, erro: mensagem };
+  }
 }
 
 async function consultarNfce(params: {
@@ -708,20 +788,44 @@ function normalizarInfNFeParaXml(infNFe: any) {
     "@_Id": infNFe["@_Id"],
     "@_versao": infNFe["@_versao"] || infNFe.versao || "4.00",
     ide: ordenarIdeNFe(infNFe.ide),
-    emit: infNFe.emit,
-    ...(infNFe.dest ? { dest: infNFe.dest } : {}),
+    emit: limparValoresVazios(infNFe.emit),
+    ...(infNFe.dest ? { dest: limparValoresVazios(infNFe.dest) } : {}),
     det: Array.isArray(infNFe.det)
       ? infNFe.det.map((item: any) => ({
         "@_nItem": item.nItem,
-        prod: item.prod,
-        imposto: item.imposto,
+        prod: ordenarObjetoPorCampos(limparValoresVazios(item.prod) || {}, [
+          "cProd", "cEAN", "xProd", "NCM", "NVE", "CEST", "indEscala", "CNPJFab", "cBenef",
+          "EXTIPI", "CFOP", "uCom", "qCom", "vUnCom", "vProd", "cEANTrib", "uTrib", "qTrib",
+          "vUnTrib", "vFrete", "vSeg", "vDesc", "vOutro", "indTot", "xPed", "nItemPed", "nFCI",
+        ]),
+        imposto: ordenarObjetoPorCampos(limparValoresVazios(item.imposto) || {}, [
+          "vTotTrib", "ICMS", "IPI", "II", "ISSQN", "PIS", "PISST", "COFINS", "COFINSST",
+          "ICMSUFDest",
+        ]),
       }))
       : [],
-    total: infNFe.total,
-    transp: infNFe.transp,
-    pag: infNFe.pag,
-    ...(infNFe.infAdic ? { infAdic: infNFe.infAdic } : {}),
+    total: limparValoresVazios(infNFe.total),
+    transp: limparValoresVazios(infNFe.transp),
+    pag: limparValoresVazios(infNFe.pag),
+    ...(infNFe.infAdic ? { infAdic: limparValoresVazios(infNFe.infAdic) } : {}),
   };
+}
+
+function limparValoresVazios(valor: any): any {
+  if (Array.isArray(valor)) {
+    return valor.map(limparValoresVazios).filter((item) => item !== undefined);
+  }
+  if (!valor || typeof valor !== "object") {
+    return valor === "" || valor === null || valor === undefined ? undefined : valor;
+  }
+  const resultado: Record<string, unknown> = {};
+  for (const [campo, item] of Object.entries(valor)) {
+    const limpo = limparValoresVazios(item);
+    if (limpo !== undefined && (!Array.isArray(limpo) || limpo.length > 0)) {
+      resultado[campo] = limpo;
+    }
+  }
+  return resultado;
 }
 
 function ordenarIdeNFe(ide: any) {
@@ -767,6 +871,7 @@ function normalizarCamposSchemaNfce(infNFe: any) {
       prod.cEAN = normalizarGtin(prod.cEAN);
       prod.cEANTrib = normalizarGtin(prod.cEANTrib);
       det.prod = prod;
+      normalizarDecimaisImpostos(det.imposto);
     });
     if (parseInt(String(infNFe.ide?.tpAmb || 2), 10) === 2 && infNFe.det[0]?.prod) {
       infNFe.det[0].prod.xProd = "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL";
@@ -775,6 +880,9 @@ function normalizarCamposSchemaNfce(infNFe: any) {
 
   const total = infNFe.total?.ICMSTot;
   if (total) {
+    // O total deve refletir os campos de ICMS efetivamente presentes nos itens.
+    // Ex.: ICMSSN102 não possui vBC/vICMS; nesse caso ambos os totais são zero.
+    recalcularTotaisIcmsPelosItens(infNFe.det, total);
     [
       "vBC", "vICMS", "vICMSDeson", "vFCP", "vBCST", "vST", "vFCPST", "vFCPSTRet",
       "vProd", "vFrete", "vSeg", "vDesc", "vII", "vIPI", "vIPIDevol", "vPIS", "vCOFINS",
@@ -793,11 +901,138 @@ function normalizarCamposSchemaNfce(infNFe: any) {
     pag.vPag = formatarDecimalSchema(pag.vPag, 2);
     if (pag.tPag !== "99") {
       delete pag.xPag;
+    } else if (!String(pag.xPag || "").trim()) {
+      pag.xPag = "Outros";
     }
   });
   if (infNFe.pag?.vTroco !== undefined && infNFe.pag?.vTroco !== null) {
     infNFe.pag.vTroco = formatarDecimalSchema(infNFe.pag.vTroco, 2);
   }
+
+  if (infNFe.infAdic?.infCpl !== undefined) {
+    infNFe.infAdic.infCpl = normalizarTextoSchema(infNFe.infAdic.infCpl, 5000);
+    if (!infNFe.infAdic.infCpl) {
+      delete infNFe.infAdic;
+    }
+  }
+}
+
+function recalcularTotaisIcmsPelosItens(detalhes: any[], total: any) {
+  const itens = Array.isArray(detalhes) ? detalhes : [];
+  const somarCampoIcms = (campo: string) => itens.reduce((soma, det) => {
+    const grupoIcms = det?.imposto?.ICMS;
+    if (!grupoIcms || typeof grupoIcms !== "object") return soma;
+    return soma + Object.values(grupoIcms).reduce((subtotal: number, grupo: any) => {
+      const valor = Number(String(grupo?.[campo] ?? 0).replace(",", "."));
+      return subtotal + (Number.isFinite(valor) ? valor : 0);
+    }, 0);
+  }, 0);
+
+  total.vBC = somarCampoIcms("vBC");
+  total.vICMS = somarCampoIcms("vICMS");
+  total.vICMSDeson = somarCampoIcms("vICMSDeson");
+  total.vFCP = somarCampoIcms("vFCP");
+  total.vBCST = somarCampoIcms("vBCST");
+  total.vST = somarCampoIcms("vICMSST");
+  total.vFCPST = somarCampoIcms("vFCPST");
+  total.vFCPSTRet = somarCampoIcms("vFCPSTRet");
+}
+
+function normalizarDecimaisImpostos(imposto: any) {
+  if (!imposto || typeof imposto !== "object") return;
+
+  for (const [campo, valor] of Object.entries(imposto)) {
+    if (valor && typeof valor === "object") {
+      normalizarDecimaisImpostos(valor);
+      continue;
+    }
+    if (valor === undefined || valor === null || valor === "") continue;
+
+    // Campos monetários dos grupos ICMS/PIS/COFINS exigem duas casas.
+    if (campo === "vAliqProd") {
+      imposto[campo] = formatarDecimalSchema(valor, 4);
+    } else if (/^v[A-Z]/.test(campo) || campo === "vBC") {
+      imposto[campo] = formatarDecimalSchema(valor, 2);
+    // Percentuais aceitam até quatro casas; quatro mantém o XML consistente.
+    } else if (/^p[A-Z]/.test(campo)) {
+      imposto[campo] = formatarDecimalSchema(valor, 4);
+    } else if (campo === "qBCProd") {
+      imposto[campo] = formatarDecimalSchema(valor, 4);
+    }
+  }
+}
+
+function normalizarTextoSchema(valor: unknown, limite: number) {
+  return String(valor || "")
+    .normalize("NFC")
+    .replace(/[\u0000-\u001F\u007F]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, limite);
+}
+
+async function consultarNfeEntradaPorChave(params: {
+  certificado: ReturnType<typeof parsePfx>;
+  empresa: Record<string, unknown>;
+  uf: string;
+  ambiente: number;
+  chaveAcesso: string;
+}) {
+  if (!params.chaveAcesso) throw new Error("Chave de acesso nao informada");
+  if (params.chaveAcesso.slice(20, 22) !== "55") {
+    throw new Error("A chave informada nao pertence a uma NF-e modelo 55");
+  }
+
+  const cnpj = String(params.empresa.cnpj || "").replace(/\D/g, "");
+  if (cnpj.length !== 14) throw new Error("CNPJ da empresa invalido");
+
+  const xml = buildXml({
+    distDFeInt: {
+      "@_xmlns": NFE_NS,
+      "@_versao": "1.01",
+      tpAmb: params.ambiente,
+      cUFAutor: obterCodigoUf(params.uf),
+      CNPJ: cnpj,
+      consChNFe: { chNFe: params.chaveAcesso },
+    },
+  });
+
+  const xmlRet = await enviarSoap({
+    url: DISTRIBUICAO_DFE_URL,
+    operacao: "NFeDistribuicaoDFe",
+    metodo: "nfeDistDFeInteresse",
+    xml,
+    certificado: params.certificado,
+  });
+  const retorno = findNodeByLocalName(parser.parse(xmlRet), "retDistDFeInt");
+  const cStat = String(retorno?.cStat || "");
+  const docs = retorno?.loteDistDFeInt?.docZip;
+  const lista = Array.isArray(docs) ? docs : (docs ? [docs] : []);
+
+  for (const doc of lista) {
+    const conteudo = typeof doc === "string" ? doc : doc?.["#text"];
+    const schema = String(typeof doc === "object" ? doc?.["@_schema"] || "" : "");
+    if (!conteudo || (!schema.includes("procNFe") && !schema.includes("resNFe"))) continue;
+    const xmlDocumento = await descompactarGzipBase64(conteudo);
+    if (xmlDocumento.includes("<nfeProc") || xmlDocumento.includes("<NFe")) {
+      return {
+        success: true,
+        chave_acesso: params.chaveAcesso,
+        schema,
+        xml: xmlDocumento,
+        status_sefaz: cStat,
+        mensagem: retorno?.xMotivo || "Documento localizado",
+      };
+    }
+  }
+
+  throw new Error(`${cStat || "SEFAZ"} - ${retorno?.xMotivo || "XML completo nao disponibilizado para esta chave. Confirme a manifestacao do destinatario."}`);
+}
+
+async function descompactarGzipBase64(base64: string) {
+  const bytes = Uint8Array.from(atob(String(base64).replace(/\s/g, "")), (char) => char.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(stream).text();
 }
 
 function normalizarGtin(valor: unknown) {

@@ -243,6 +243,11 @@ class FiscalSystem {
             
             const errorToThrow = new Error(mensagemUsuario);
             errorToThrow.originalError = error;
+            // Preservar o diagnóstico fiscal até a tela. Sem isso a rejeição 225
+            // chegava ao modal apenas com a mensagem genérica da SEFAZ.
+            errorToThrow.detalhesFiscal = error.detalhesFiscal
+                || error.originalError?.detalhesFiscal
+                || null;
             throw errorToThrow;
         }
     }

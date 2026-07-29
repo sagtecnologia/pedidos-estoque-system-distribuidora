@@ -1186,6 +1186,32 @@ class NuvemFiscalService {
                 console.log('💰 [NuvemFiscal] Totais fiscais calculados manualmente:', totaisFiscais);
             }
 
+            // A configuração tributária da empresa prevalece sobre o cálculo
+            // genérico. No Simples Nacional, somente o CSOSN 900 deste leiaute
+            // gera os campos vBC/vICMS próprios; 102, por exemplo, não os possui.
+            const crtEmpresa = parseInt(
+                empresa.regime_tributario_codigo || empresa.regime_tributario || empresa.crt || '1',
+                10
+            );
+            if (crtEmpresa === 1 || crtEmpresa === 2) {
+                const itensComBaseIcmsPropria = itensComDadosFiscais.filter(item =>
+                    String(item.dadosFiscais?.icms?.situacao_tributaria || item.dadosFiscais?.cst_icms || '102') === '900'
+                );
+                totaisFiscais.base_icms = itensComBaseIcmsPropria.reduce(
+                    (sum, item) => sum + Number(item.dadosFiscais?.icms?.base_calculo || 0),
+                    0
+                );
+                totaisFiscais.valor_icms = itensComBaseIcmsPropria.reduce(
+                    (sum, item) => sum + Number(item.dadosFiscais?.icms?.valor || 0),
+                    0
+                );
+                console.log('💰 [NuvemFiscal] Totais ICMS ajustados pelo CRT/CSOSN:', {
+                    crt: crtEmpresa,
+                    base_icms: totaisFiscais.base_icms,
+                    valor_icms: totaisFiscais.valor_icms
+                });
+            }
+
             // Montar itens com dados fiscais calculados
             const itens = itensComDadosFiscais.map((item, index) => {
                 const fiscal = item.dadosFiscais;
@@ -1193,9 +1219,15 @@ class NuvemFiscalService {
                 return {
                     numero_item: index + 1,
                     codigo_produto: item.codigo_produto || String(item.produto_id),
+                    codigo_barras: item.codigo_barras || null,
                     descricao: item.nome_produto,
                     cfop: fiscal.cfop, // Calculado dinamicamente (5102/6102)
                     ncm: fiscal.ncm, // Do banco de dados (obrigatório)
+                    // Campos canônicos consumidos pela montagem do XML.
+                    unidade: item.unidade || item.unidade_medida || 'UN',
+                    quantidade: Number(item.quantidade || 0),
+                    preco_unitario: Number(item.preco_unitario || item.valor_unitario || 0),
+                    valor_total: Number(item.valor_total || item.subtotal || 0),
                     unidade_comercial: item.unidade || 'UN',
                     quantidade_comercial: item.quantidade,
                     valor_unitario_comercial: item.preco_unitario,

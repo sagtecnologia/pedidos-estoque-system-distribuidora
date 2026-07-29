@@ -225,6 +225,35 @@ class SincronizacaoNotasRecebidas {
     }
 
     /**
+     * Consulta uma NF-e destinada à empresa pela chave e cria o pedido de compra.
+     */
+    async importarPorChave(chaveAcesso) {
+        const chave = String(chaveAcesso || '').replace(/\D/g, '');
+        if (chave.length !== 44) {
+            throw new Error('A chave de acesso deve conter 44 dígitos.');
+        }
+        if (chave.substring(20, 22) !== '55') {
+            throw new Error('Informe uma chave de NF-e modelo 55.');
+        }
+        if (typeof SefazDireta === 'undefined') {
+            throw new Error('Serviço de consulta direta à SEFAZ indisponível.');
+        }
+
+        const consulta = await SefazDireta.invoke('consultar_nfe_entrada', {
+            chave_acesso: chave
+        });
+        if (!consulta?.success || !consulta?.xml) {
+            throw new Error(consulta?.mensagem || 'A SEFAZ não disponibilizou o XML da nota.');
+        }
+
+        return await this._importarXML(consulta.xml, {
+            tipo: 'nfe',
+            chave_acesso: chave,
+            origem: 'sefaz_direta'
+        });
+    }
+
+    /**
      * Importar XML como pedido de compra
      * Reutiliza a lógica de importação que já existe em pedidos.html
      */
@@ -397,7 +426,7 @@ class SincronizacaoNotasRecebidas {
                     total: dadosXML.total_nf,
                     nf_chave: dadosXML.chave,
                     nf_numero: dadosXML.numero_nf,
-                    observacoes: `Sincronizado de ${notaMetadata.tipo.toUpperCase()} via Nuvem Fiscal - Chave: ${dadosXML.chave}`
+                    observacoes: `Importado de ${notaMetadata.tipo.toUpperCase()} via ${notaMetadata.origem === 'sefaz_direta' ? 'SEFAZ' : 'Nuvem Fiscal'} - Chave: ${dadosXML.chave}`
                 }])
                 .select('id')
                 .single();

@@ -27,11 +27,16 @@
     <main class="lg:ml-64 pt-16 pb-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <!-- HEADER -->
-            <div class="mb-8">
-                <h2 class="text-3xl font-bold text-gray-900">
-                    <i class="fas fa-cube mr-3 text-blue-600"></i>Distribuição de NFC-e
-                </h2>
-                <p class="text-gray-600 mt-1">Emitir notas de saída para produtos que chegaram com NF-e</p>
+            <div class="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900">
+                        <i class="fas fa-cube mr-3 text-blue-600"></i>Distribuição de NFC-e
+                    </h2>
+                    <p class="text-gray-600 mt-1">Emitir notas de saída para produtos que chegaram com NF-e</p>
+                </div>
+                <button type="button" onclick="abrirModal('modal_importar_nfe')" class="px-5 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium shadow">
+                    <i class="fas fa-file-import mr-2"></i>Importar nota de entrada
+                </button>
             </div>
 
             <!-- FILTROS -->
@@ -265,7 +270,7 @@
 
     <!-- MODAL ERRO -->
     <div id="modal_erro" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-lg max-w-md w-full p-6">
+        <div class="bg-white rounded-lg max-w-4xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <div class="text-center mb-6">
                 <div class="inline-block p-3 bg-red-100 rounded-full mb-4">
                     <i class="fas fa-exclamation text-3xl text-red-600"></i>
@@ -275,18 +280,46 @@
             <div class="bg-red-50 p-4 rounded-lg mb-6 max-h-40 overflow-y-auto">
                 <p class="text-sm text-red-800" id="erro_mensagem">-</p>
             </div>
+            <div id="erro_orientacao_schema" class="hidden bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-lg mb-4">
+                <p class="font-semibold"><i class="fas fa-magnifying-glass mr-2"></i>Diagnóstico necessário</p>
+                <p class="text-sm mt-1">A rejeição 225 é uma resposta genérica. O XML enviado e o retorno completo estão disponíveis abaixo para identificar exatamente o campo inválido.</p>
+            </div>
             <div id="erro_tecnico_container" class="hidden bg-slate-950 text-slate-100 p-4 rounded-lg mb-6">
                 <div class="flex items-center justify-between mb-2">
-                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-300">Retorno Técnico</p>
-                    <button type="button" onclick="copiarErroTecnico()" class="px-2 py-1 text-xs bg-slate-700 text-white rounded hover:bg-slate-600">
-                        <i class="fas fa-copy mr-1"></i>Copiar
-                    </button>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-300">Diagnóstico completo da emissão</p>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="baixarErroTecnico()" class="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600">
+                            <i class="fas fa-download mr-1"></i>Baixar
+                        </button>
+                        <button type="button" onclick="copiarErroTecnico()" class="px-2 py-1 text-xs bg-slate-700 text-white rounded hover:bg-slate-600">
+                            <i class="fas fa-copy mr-1"></i>Copiar
+                        </button>
+                    </div>
                 </div>
-                <pre id="erro_tecnico" class="text-xs whitespace-pre-wrap break-all max-h-56 overflow-y-auto"></pre>
+                <pre id="erro_tecnico" class="text-xs whitespace-pre-wrap break-all max-h-96 overflow-y-auto select-text"></pre>
             </div>
             <button onclick="fecharModal('modal_erro')" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
                 Fechar
             </button>
+        </div>
+    </div>
+
+    <!-- MODAL IMPORTAR NOTA DE ENTRADA -->
+    <div id="modal_importar_nfe" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg max-w-lg w-full p-6">
+            <h3 class="text-xl font-bold text-gray-900 mb-2">
+                <i class="fas fa-file-import mr-2 text-emerald-600"></i>Importar NF-e de entrada
+            </h3>
+            <p class="text-sm text-gray-600 mb-5">Digite a chave de 44 dígitos. A nota deve ter sido emitida para o CNPJ desta empresa.</p>
+            <label for="chave_nfe_entrada" class="block text-sm font-medium text-gray-700 mb-2">Chave de acesso</label>
+            <input id="chave_nfe_entrada" type="text" inputmode="numeric" maxlength="54" oninput="formatarChaveEntrada(this)" placeholder="0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000" class="w-full px-4 py-3 border border-gray-300 rounded-lg font-mono focus:ring-2 focus:ring-emerald-500">
+            <p id="erro_importacao_nfe" class="hidden mt-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3"></p>
+            <div class="flex gap-3 mt-6">
+                <button id="btn_importar_nfe" type="button" onclick="importarNFeEntrada()" class="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">
+                    <i class="fas fa-cloud-download-alt mr-2"></i>Consultar e importar
+                </button>
+                <button type="button" onclick="fecharModal('modal_importar_nfe')" class="px-4 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Cancelar</button>
+            </div>
         </div>
     </div>
 
@@ -303,6 +336,7 @@
     <script src="../js/services/nuvem-fiscal.js"></script>
     <script src="../js/services/focus-nfe.js"></script>
     <script src="../js/services/sefaz-direta.js"></script>
+    <script src="../js/services/sync-notas-recebidas.js"></script>
     <script src="../js/services/empresa.js"></script>
 
     <!-- COMPONENTES -->
@@ -340,6 +374,41 @@
             itensSelecionados: new Map(), // Map<itemId, { quantidade, preco, cst_icms, cst_pis, cst_cofins }>
             ultimaEmissao: null // Armazena dados da última emissão para impressão
         };
+
+        function formatarChaveEntrada(input) {
+            const digitos = input.value.replace(/\D/g, '').slice(0, 44);
+            input.value = digitos.replace(/(\d{4})(?=\d)/g, '$1 ');
+        }
+
+        async function importarNFeEntrada() {
+            const chave = document.getElementById('chave_nfe_entrada').value.replace(/\D/g, '');
+            const botao = document.getElementById('btn_importar_nfe');
+            const erroEl = document.getElementById('erro_importacao_nfe');
+            erroEl.classList.add('hidden');
+
+            if (chave.length !== 44) {
+                erroEl.textContent = 'A chave deve conter exatamente 44 dígitos.';
+                erroEl.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                botao.disabled = true;
+                botao.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Consultando SEFAZ...';
+                const resultado = await SincronizacaoNotas.importarPorChave(chave);
+                fecharModal('modal_importar_nfe');
+                document.getElementById('chave_nfe_entrada').value = '';
+                mostrarMensagem(`Nota importada com sucesso. Pedido de compra criado com ${resultado.itens_importados} item(ns).`, 'success');
+                await buscarEntradas();
+            } catch (erro) {
+                console.error('Erro ao importar NF-e pela chave:', erro);
+                erroEl.textContent = erro.message || 'Não foi possível importar a nota.';
+                erroEl.classList.remove('hidden');
+            } finally {
+                botao.disabled = false;
+                botao.innerHTML = '<i class="fas fa-cloud-download-alt mr-2"></i>Consultar e importar';
+            }
+        }
 
         // BUSCAR ENTRADAS
         async function buscarEntradas() {
@@ -727,17 +796,25 @@
         }
 
         function formatarDetalheTecnicoErro(erro) {
-            const conteudo = erro?.detalhesFiscal?.xml_retorno;
-            if (!conteudo) {
+            const detalhes = erro?.detalhesFiscal
+                || erro?.originalError?.detalhesFiscal
+                || erro?.originalError?.originalError?.detalhesFiscal;
+            if (!detalhes) {
                 return '';
             }
 
-            try {
-                const json = JSON.parse(conteudo);
-                return JSON.stringify(json, null, 2);
-            } catch (_) {
-                return String(conteudo);
-            }
+            const partes = [
+                `STATUS: ${detalhes.status_sefaz || detalhes.status || '-'}`,
+                `MENSAGEM: ${detalhes.mensagem || '-'}`,
+                `CHAVE: ${detalhes.chave_acesso || '-'}`,
+                '',
+                'XML ENVIADO:',
+                detalhes.xml_envio || detalhes.documentoFiscalData?.xml_nota || 'Não disponível',
+                '',
+                'RETORNO SEFAZ:',
+                detalhes.xml_retorno || 'Não disponível'
+            ];
+            return partes.join('\n');
         }
 
         function copiarErroTecnico() {
@@ -746,7 +823,25 @@
                 return;
             }
 
-            navigator.clipboard.writeText(conteudo);
+            navigator.clipboard.writeText(conteudo).then(() => {
+                mostrarMensagem('Diagnóstico copiado. Agora ele pode ser enviado ao suporte.', 'success');
+            }).catch(() => {
+                alert('Não foi possível copiar automaticamente. Selecione o texto do diagnóstico e copie.');
+            });
+        }
+
+        function baixarErroTecnico() {
+            const conteudo = document.getElementById('erro_tecnico')?.textContent || '';
+            if (!conteudo) return;
+            const blob = new Blob([conteudo], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `diagnostico-sefaz-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
         }
 
         function mostrarErro(mensagem, erro = null) {
@@ -754,14 +849,19 @@
             const detalheTecnico = formatarDetalheTecnicoErro(erro);
             const detalheEl = document.getElementById('erro_tecnico');
             const detalheContainer = document.getElementById('erro_tecnico_container');
+            const orientacaoSchema = document.getElementById('erro_orientacao_schema');
+            const rejeicaoSchema = /(^|\D)225(\D|$)|schema xml/i.test(String(mensagem || ''));
 
             if (detalheTecnico) {
                 detalheEl.textContent = detalheTecnico;
                 detalheContainer.classList.remove('hidden');
             } else {
-                detalheEl.textContent = '';
-                detalheContainer.classList.add('hidden');
+                detalheEl.textContent = rejeicaoSchema
+                    ? 'O servidor não devolveu o XML de diagnóstico. Verifique se a versão atualizada da função sefaz-nfce foi publicada no Supabase.'
+                    : '';
+                detalheContainer.classList.toggle('hidden', !rejeicaoSchema);
             }
+            orientacaoSchema.classList.toggle('hidden', !rejeicaoSchema);
 
             abrirModal('modal_erro');
         }
