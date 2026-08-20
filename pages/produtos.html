@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Produtos - Sistema de Compras</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="../css/styles.css">
     <style>
@@ -60,6 +61,9 @@
                         <p class="text-gray-600 mt-2">Gerenciamento completo de inventário</p>
                     </div>
                     <div class="flex gap-2">
+                        <button onclick="exportarProdutosExcel()" class="bg-gradient-to-r from-green-600 to-green-700 text-white px-5 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
+                            <i class="fas fa-file-excel"></i> Exportar Excel
+                        </button>
                         <button onclick="openModalDadosFiscaisEmMassa()" class="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-5 py-3 rounded-lg hover:shadow-lg transition flex items-center gap-2">
                             <i class="fas fa-file-invoice"></i> Dados Fiscais em Massa
                         </button>
@@ -1233,11 +1237,11 @@
         }
 
         // ======== FILTRAR ========
-        function filterProdutos() {
+        function obterProdutosFiltrados() {
             const search = (document.getElementById('search')?.value || '').toLowerCase();
             const categoria = document.getElementById('categoria-filter')?.value || '';
 
-            const filtered = produtosData.filter(p => {
+            return produtosData.filter(p => {
                 const matchSearch = !search || 
                     p.nome.toLowerCase().includes(search) || 
                     (p.codigo && p.codigo.toLowerCase().includes(search)) ||
@@ -1247,8 +1251,131 @@
                 
                 return matchSearch && matchCategoria;
             });
+        }
+
+        function filterProdutos() {
+            const filtered = obterProdutosFiltrados();
 
             renderProdutos(filtered);
+        }
+
+        // ======== EXPORTAR EXCEL NO MODELO DE CADASTRO ========
+        function exportarProdutosExcel() {
+            if (typeof XLSX === 'undefined') {
+                showToast('Não foi possível carregar o recurso de exportação para Excel.', 'error');
+                return;
+            }
+
+            const produtos = obterProdutosFiltrados();
+            if (produtos.length === 0) {
+                showToast('Não há produtos para exportar com os filtros atuais.', 'warning');
+                return;
+            }
+
+            const cabecalhos = [
+                'CODIGO', 'DESCRICAO', 'GRUPO', 'SUB-GRUPO', 'ESTOQUE', 'UNIDADE',
+                'PRECO CUSTO', 'PRECO VAREJO', 'PRECO ATACADO', 'NCM',
+                'ESTOQUE MINIMO', 'ESTOQUE MAXIMO', 'CODIGO SEGUNDARIO', 'TIPO PRODUTO',
+                'MARCA', 'NIVEL', 'COMISSAO', 'CODIGO FABRICANTE', 'ENDERECO',
+                'DESCRICAO COMPLETA', 'OBS', 'CEST', 'CST', 'IPI', 'PIS', 'COFINS',
+                'aIpi', 'aPis', 'aCofins', 'cstIbsCbs', 'cClassTrib', 'CFOP_E',
+                'CFOP_I', 'CFOP_E_ST', 'CFOP_I_ST', 'CBENEF', 'UFAplic', 'pRedBC',
+                'pIVA', 'pICMSInt', 'pICMSExt', 'pIBSEst', 'pIBSMun', 'pFCP'
+            ];
+
+            const texto = valor => valor === null || valor === undefined ? '' : String(valor);
+            const numero = valor => {
+                if (valor === null || valor === undefined || valor === '') return '';
+                const convertido = typeof valor === 'number'
+                    ? valor
+                    : Number(String(valor).replace(',', '.'));
+                return Number.isFinite(convertido) ? convertido : '';
+            };
+            const nomeRelacao = (relacao, fallback = '') => {
+                if (relacao && typeof relacao === 'object') return texto(relacao.nome);
+                return texto(relacao || fallback);
+            };
+            const cfopInterestadual = produto => {
+                const cadastrado = texto(produto.cfop_interestadual || produto.cfop_i);
+                if (cadastrado) return cadastrado;
+
+                const estadual = texto(produto.cfop_venda || produto.cfop);
+                return /^5\d{3}$/.test(estadual) ? `6${estadual.slice(1)}` : '';
+            };
+
+            const linhas = produtos.map(produto => {
+                const categoria = categoriasData.find(item => item.id === produto.categoria_id);
+                const marca = marcasData.find(item => item.id === produto.marca_id);
+
+                return [
+                    texto(produto.codigo),
+                    texto(produto.nome),
+                    nomeRelacao(produto.categoria, categoria?.nome),
+                    nomeRelacao(produto.subgrupo, produto.subgrupo_nome),
+                    numero(produto.estoque_atual),
+                    texto(produto.unidade || produto.unidade_venda || produto.unidade_medida_padrao),
+                    numero(produto.preco_custo),
+                    numero(produto.preco_venda),
+                    numero(produto.preco_atacado),
+                    texto(produto.ncm),
+                    numero(produto.estoque_minimo),
+                    numero(produto.estoque_maximo),
+                    texto(produto.codigo_secundario || produto.codigo_barras),
+                    texto(produto.tipo_produto),
+                    nomeRelacao(produto.marca, marca?.nome),
+                    texto(produto.nivel),
+                    numero(produto.comissao),
+                    texto(produto.codigo_fabricante || produto.sku),
+                    texto(produto.endereco || produto.localizacao),
+                    texto(produto.descricao_nfe || produto.descricao),
+                    texto(produto.observacoes || produto.obs),
+                    texto(produto.cest),
+                    texto(produto.cst_icms),
+                    texto(produto.cst_ipi),
+                    texto(produto.cst_pis),
+                    texto(produto.cst_cofins),
+                    numero(produto.aliquota_ipi),
+                    numero(produto.aliquota_pis),
+                    numero(produto.aliquota_cofins),
+                    texto(produto.cst_ibs_cbs || produto.cstIbsCbs),
+                    texto(produto.cclass_trib || produto.cClassTrib),
+                    texto(produto.cfop_estadual || produto.cfop_venda || produto.cfop),
+                    cfopInterestadual(produto),
+                    texto(produto.cfop_estadual_st || produto.cfop_e_st),
+                    texto(produto.cfop_interestadual_st || produto.cfop_i_st),
+                    texto(produto.cbenef || produto.codigo_beneficio_fiscal),
+                    texto(produto.uf_aplic || produto.uf_aplicacao),
+                    numero(produto.p_red_bc ?? produto.percentual_reducao_bc),
+                    numero(produto.p_iva ?? produto.iva),
+                    numero(produto.p_icms_int ?? produto.aliquota_icms),
+                    numero(produto.p_icms_ext),
+                    numero(produto.p_ibs_est),
+                    numero(produto.p_ibs_mun),
+                    numero(produto.p_fcp ?? produto.aliquota_fcp)
+                ];
+            });
+
+            const planilha = XLSX.utils.aoa_to_sheet([cabecalhos, ...linhas]);
+            planilha['!cols'] = cabecalhos.map((cabecalho, indice) => ({
+                wch: Math.min(60, linhas.reduce(
+                    (largura, linha) => Math.max(largura, texto(linha[indice]).length + 2),
+                    cabecalho.length + 2
+                ))
+            }));
+            planilha['!autofilter'] = { ref: `A1:AR${linhas.length + 1}` };
+
+            const pasta = XLSX.utils.book_new();
+            pasta.Props = { Title: 'Cadastro de Produtos', Subject: 'Exportação de produtos' };
+            XLSX.utils.book_append_sheet(pasta, planilha, 'Planilha1');
+
+            const data = new Date().toISOString().slice(0, 10);
+            try {
+                XLSX.writeFile(pasta, `cadastro_produtos_${data}.xls`, { bookType: 'biff8' });
+                showToast(`${produtos.length} produto(s) exportado(s) para Excel!`, 'success');
+            } catch (error) {
+                console.error('Erro ao exportar produtos para Excel:', error);
+                showToast('Erro ao gerar o arquivo Excel.', 'error');
+            }
         }
 
         // Listener para filtro
